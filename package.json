@@ -1,6 +1,7 @@
 {
   "name": "3d_modeler",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Browser-based 3D furniture design tool",
   "private": true,
   "type": "module",
   "scripts": {

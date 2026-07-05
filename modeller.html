@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Modeller — Furniture Modeller</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a1a;
+      color: #fff;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Topbar ── */
+    #topbar {
+      height: 48px;
+      background: #111;
+      border-bottom: 1px solid #2a2a2a;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 16px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #888;
+      text-decoration: none;
+      font-size: 13px;
+      padding: 5px 10px;
+      border-radius: 5px;
+      transition: background .15s, color .15s;
+    }
+
+    .back-btn:hover {
+      background: #222;
+      color: #fff;
+    }
+
+    .sep {
+      width: 1px;
+      height: 20px;
+      background: #2a2a2a;
+    }
+
+    .app-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #ccc;
+      letter-spacing: .04em;
+    }
+
+    .spacer { flex: 1; }
+
+    .hint-bar {
+      font-size: 11px;
+      color: #555;
+    }
+
+    /* ── Main layout ── */
+    #main {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── Canvas ── */
+    #canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── Overlay info ── */
+    #info {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 12px;
+      color: #888;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    /* ── Axes label ── */
+    #axes {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      font-size: 11px;
+      color: #444;
+      text-align: right;
+      pointer-events: none;
+      line-height: 1.8;
+    }
+
+    #axes span { font-weight: 600; }
+    #axes .x { color: #e05050; }
+    #axes .y { color: #50c050; }
+    #axes .z { color: #5080e0; }
+
+  </style>
+</head>
+<body>
+
+  <!-- Top bar -->
+  <div id="topbar">
+    <a href="index.html" class="back-btn">← Back</a>
+    <div class="sep"></div>
+    <div class="app-name">3D Modeller</div>
+    <div class="spacer"></div>
+    <div class="hint-bar">Left-drag: rotate &nbsp;·&nbsp; Right-drag: pan &nbsp;·&nbsp; Scroll: zoom</div>
+  </div>
+
+  <!-- 3D viewport -->
+  <div id="main">
+    <canvas id="canvas"></canvas>
+
+    <div id="info">A simple cube — your first 3D object</div>
+
+    <div id="axes">
+      <span class="x">X</span> width<br>
+      <span class="y">Y</span> height<br>
+      <span class="z">Z</span> depth
+    </div>
+  </div>
+
+  <!-- Three.js from CDN — no build step needed -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <script>
+    // ─────────────────────────────────────────────
+    //  SCENE SETUP
+    // ─────────────────────────────────────────────
+
+    const canvas = document.getElementById('canvas');
+    const main   = document.getElementById('main');
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setClearColor(0x1a1a1a);
+
+    // Scene
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x1a1a1a, 400, 900);
+
+    // Camera
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 2000);
+    camera.position.set(3, 2.5, 4);
+    camera.lookAt(0, 0, 0);
+
+    // ─────────────────────────────────────────────
+    //  LIGHTS
+    // ─────────────────────────────────────────────
+
+    // Ambient — soft base light
+    const ambient = new THREE.AmbientLight(0xffffff, 0.45);
+    scene.add(ambient);
+
+    // Main directional light (with shadows)
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    dirLight.position.set(5, 8, 5);
+    dirLight.castShadow = true;
+    dirLight.shadow.camera.near = 0.1;
+    dirLight.shadow.camera.far  = 50;
+    dirLight.shadow.camera.left = dirLight.shadow.camera.bottom = -6;
+    dirLight.shadow.camera.right = dirLight.shadow.camera.top  =  6;
+    dirLight.shadow.mapSize.set(1024, 1024);
+    scene.add(dirLight);
+
+    // Fill light from the opposite side
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.2);
+    fillLight.position.set(-4, 3, -4);
+    scene.add(fillLight);
+
+    // ─────────────────────────────────────────────
+    //  GRID + GROUND PLANE
+    // ─────────────────────────────────────────────
+
+    const grid = new THREE.GridHelper(20, 20, 0x333333, 0x2a2a2a);
+    grid.position.y = -0.5;
+    scene.add(grid);
+
+    // Shadow-receiving ground (invisible plane)
+    const groundGeo = new THREE.PlaneGeometry(40, 40);
+    const groundMat = new THREE.ShadowMaterial({ opacity: 0.25 });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.5;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // ─────────────────────────────────────────────
+    //  THE CUBE
+    // ─────────────────────────────────────────────
+
+    // Geometry: 1×1×1 unit cube
+    const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
+
+    // Material: wood-like color with slight roughness via Lambert shading
+    const cubeMat = new THREE.MeshLambertMaterial({ color: 0xC8A97B });
+
+    const cube = new THREE.Mesh(cubeGeo, cubeMat);
+    cube.castShadow    = true;
+    cube.receiveShadow = true;
+    scene.add(cube);
+
+    // Wireframe edges on top — makes dimensions readable
+    const edgesGeo = new THREE.EdgesGeometry(cubeGeo);
+    const edgesMat = new THREE.LineBasicMaterial({ color: 0x8B6540, linewidth: 1 });
+    const edges = new THREE.LineSegments(edgesGeo, edgesMat);
+    cube.add(edges); // child of cube so it moves with it
+
+    // ─────────────────────────────────────────────
+    //  ORBIT CONTROLS (manual — no extra library)
+    // ─────────────────────────────────────────────
+
+    // Camera orbit state
+    let spherical = {
+      theta:  0.6,   // horizontal angle (radians)
+      phi:    1.0,   // vertical angle (radians)
+      radius: 5.5    // distance from target
+    };
+
+    let target = new THREE.Vector3(0, 0, 0); // orbit pivot
+
+    function applyCamera() {
+      camera.position.x = target.x + spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta);
+      camera.position.y = target.y + spherical.radius * Math.cos(spherical.phi);
+      camera.position.z = target.z + spherical.radius * Math.sin(spherical.phi) * Math.cos(spherical.theta);
+      camera.lookAt(target);
+    }
+
+    applyCamera();
+
+    // Mouse state
+    let mouse = { down: false, button: -1, x: 0, y: 0 };
+
+    canvas.addEventListener('mousedown', e => {
+      mouse.down   = true;
+      mouse.button = e.button;
+      mouse.x      = e.clientX;
+      mouse.y      = e.clientY;
+      canvas.style.cursor = e.button === 0 ? 'grabbing' : 'move';
+    });
+
+    window.addEventListener('mouseup', () => {
+      mouse.down = false;
+      canvas.style.cursor = 'grab';
+    });
+
+    window.addEventListener('mousemove', e => {
+      if (!mouse.down) return;
+
+      const dx = e.clientX - mouse.x;
+      const dy = e.clientY - mouse.y;
+      mouse.x  = e.clientX;
+      mouse.y  = e.clientY;
+
+      if (mouse.button === 0) {
+        // LEFT drag → orbit (rotate)
+        spherical.theta -= dx * 0.007;
+        spherical.phi    = Math.max(0.05, Math.min(Math.PI - 0.05, spherical.phi - dy * 0.007));
+      }
+
+      if (mouse.button === 2) {
+        // RIGHT drag → pan
+        // Move target in the camera's local XY plane
+        const panSpeed = spherical.radius * 0.001;
+        const right = new THREE.Vector3();
+        const up    = new THREE.Vector3();
+        right.crossVectors(camera.getWorldDirection(new THREE.Vector3()), camera.up).normalize();
+        up.copy(camera.up).normalize();
+
+        target.addScaledVector(right, -dx * panSpeed);
+        target.addScaledVector(up,     dy * panSpeed);
+      }
+
+      applyCamera();
+    });
+
+    // Scroll → zoom
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      spherical.radius = Math.max(1, Math.min(30, spherical.radius + e.deltaY * 0.01));
+      applyCamera();
+    }, { passive: false });
+
+    // Disable right-click context menu on canvas
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Default cursor
+    canvas.style.cursor = 'grab';
+
+    // ─────────────────────────────────────────────
+    //  RESIZE HANDLER
+    // ─────────────────────────────────────────────
+
+    function onResize() {
+      const w = main.clientWidth;
+      const h = main.clientHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+
+    window.addEventListener('resize', onResize);
+    onResize(); // call once on load
+
+    // ─────────────────────────────────────────────
+    //  RENDER LOOP
+    // ─────────────────────────────────────────────
+
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+
+</body>
+</html>

@@ -1,13 +1,166 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>3d_modeler</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Furniture Modeller</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #F7F4EF;
+      color: #1A1814;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 40px 24px;
+    }
+
+    .logo {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #6B6560;
+      margin-bottom: 40px;
+    }
+
+    h1 {
+      font-size: clamp(32px, 5vw, 56px);
+      font-weight: 700;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+      margin-bottom: 16px;
+      color: #1A1814;
+    }
+
+    h1 span {
+      color: #2D5A3D;
+    }
+
+    .subtitle {
+      font-size: 17px;
+      color: #6B6560;
+      max-width: 420px;
+      margin: 0 auto 48px;
+      line-height: 1.6;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #2D5A3D;
+      color: #fff;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 16px 32px;
+      border-radius: 8px;
+      letter-spacing: .02em;
+      transition: background .15s, transform .1s;
+      box-shadow: 0 2px 12px rgba(45,90,61,.25);
+    }
+
+    .btn:hover {
+      background: #1A3D26;
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .arrow {
+      font-size: 20px;
+      transition: transform .15s;
+    }
+
+    .btn:hover .arrow {
+      transform: translateX(4px);
+    }
+
+    .features {
+      display: flex;
+      gap: 32px;
+      margin-top: 64px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .feature {
+      text-align: center;
+      max-width: 160px;
+    }
+
+    .feature-icon {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .feature-label {
+      font-size: 13px;
+      color: #6B6560;
+      line-height: 1.4;
+    }
+
+    footer {
+      position: fixed;
+      bottom: 20px;
+      font-size: 12px;
+      color: #9B958E;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="hero">
+    <div class="logo">Furniture Modeller</div>
+
+    <h1>Design your furniture<br><span>in 3D</span></h1>
+
+    <p class="subtitle">
+      Build custom furniture visually, generate your cut list,
+      and order everything you need in one place.
+    </p>
+
+    <a href="modeller.html" class="btn">
+      Go to 3D Modeller
+      <span class="arrow">→</span>
+    </a>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">📐</div>
+        <div class="feature-label">Design in 3D with exact dimensions</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🪵</div>
+        <div class="feature-label">Auto-generate your cut list</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📦</div>
+        <div class="feature-label">Order panels and hardware</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔧</div>
+        <div class="feature-label">Step-by-step assembly guide</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Early prototype — work in progress</footer>
+
+</body>
 </html>
