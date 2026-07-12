@@ -13,19 +13,30 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #1a1a1a;
-      color: #fff;
+      background: #faf3ea;
+      color: #3a3126;
       height: 100vh;
       overflow: hidden;
       display: flex;
       flex-direction: column;
     }
 
+    /* Digit-only number fields — no increment/decrement arrows */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+
     /* ── Topbar ── */
     #topbar {
       height: 48px;
-      background: #111;
-      border-bottom: 1px solid #2a2a2a;
+      background: #f3e8d8;
+      border-bottom: 1px solid #e3d3ba;
       display: flex;
       align-items: center;
       padding: 0 16px;
@@ -38,7 +49,7 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      color: #888;
+      color: #8a7d68;
       text-decoration: none;
       font-size: 13px;
       padding: 5px 10px;
@@ -47,32 +58,104 @@
     }
 
     .back-btn:hover {
-      background: #222;
-      color: #fff;
+      background: #e9dcc5;
+      color: #3a3126;
     }
 
     .sep {
       width: 1px;
       height: 20px;
-      background: #2a2a2a;
+      background: #e3d3ba;
+    }
+
+    .icon-btn {
+      display: none; /* replaced by .collapse-tab, attached to the sidebars themselves */
     }
 
     .app-name {
       font-size: 13px;
       font-weight: 600;
-      color: #ccc;
+      color: #3a3126;
       letter-spacing: .04em;
+    }
+
+    #stage-label {
+      font-size: 11px;
+      color: #a4977f;
     }
 
     .spacer { flex: 1; }
 
     .hint-bar {
       font-size: 11px;
-      color: #555;
+      color: #a4977f;
     }
 
-    /* ── Main layout ── */
+    /* ── Main layout: sidebar / viewport / sidebar ── */
     #main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    #list-panel, #inspector {
+      width: 220px;
+      background: #fffaf3;
+      border-right: 1px solid #e6dcc9;
+      padding: 14px;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    #inspector {
+      border-right: none;
+      border-left: 1px solid #e6dcc9;
+    }
+
+    #list-panel.collapsed, #inspector.collapsed {
+      width: 0 !important;
+      padding: 0;
+      overflow: hidden;
+      border: none;
+    }
+
+    .resizer {
+      width: 5px;
+      flex-shrink: 0;
+      cursor: col-resize;
+      background: transparent;
+      position: relative;
+    }
+    .resizer:hover, .resizer.dragging {
+      background: #e0b98a;
+    }
+
+    .collapse-tab {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 16px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #e3d3ba;
+      border-radius: 6px;
+      background: #fffaf3;
+      color: #a4977f;
+      font-size: 10px;
+      cursor: pointer;
+      z-index: 5;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      transition: background .15s, color .15s;
+    }
+    .collapse-tab:hover {
+      background: #ece0cc;
+      color: #3a3126;
+    }
+
+    #viewport-wrap {
       flex: 1;
       position: relative;
       overflow: hidden;
@@ -83,6 +166,7 @@
       display: block;
       width: 100%;
       height: 100%;
+      touch-action: none; /* let pointer events (incl. touch/trackpad) drive orbit + gizmo */
     }
 
     /* ── Overlay info ── */
@@ -91,13 +175,13 @@
       bottom: 16px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(0,0,0,.55);
+      background: rgba(255,255,255,.7);
       backdrop-filter: blur(6px);
-      border: 1px solid rgba(255,255,255,.08);
+      border: 1px solid rgba(0,0,0,.06);
       border-radius: 20px;
       padding: 6px 16px;
       font-size: 12px;
-      color: #888;
+      color: #8a7d68;
       pointer-events: none;
       white-space: nowrap;
     }
@@ -108,16 +192,214 @@
       top: 16px;
       right: 16px;
       font-size: 11px;
-      color: #444;
+      color: #b5a68d;
       text-align: right;
       pointer-events: none;
       line-height: 1.8;
     }
 
     #axes span { font-weight: 600; }
-    #axes .x { color: #e05050; }
-    #axes .y { color: #50c050; }
-    #axes .z { color: #5080e0; }
+    #axes .x { color: #c0392b; }
+    #axes .y { color: #2f8a4f; }
+    #axes .z { color: #2f5fa8; }
+
+    /* ── Sidebar shared styles ── */
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #a4977f;
+      margin-bottom: 10px;
+    }
+
+    .list-item {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      text-align: left;
+      padding: 6px 8px;
+      margin-bottom: 6px;
+      font-size: 11px;
+      background: #fbf3e6;
+      border: 1px solid #e6dcc9;
+      color: #3a3126;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .list-item.selected {
+      border-color: #d97742;
+      background: #fce6d2;
+    }
+    .list-item .id { font-weight: 600; }
+    .list-item .dims { color: #a4977f; }
+
+    .add-btn {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 12px;
+      border: 1px dashed #d5c5a8;
+      border-radius: 4px;
+      background: transparent;
+      color: #8a7d68;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .add-btn:hover { border-color: #b5a68d; color: #3a3126; }
+
+    .remove-btn {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 12px;
+      border: 1px solid #e0b6a0;
+      border-radius: 4px;
+      background: transparent;
+      color: #b5502f;
+      cursor: pointer;
+      margin: 4px 0;
+    }
+    .remove-btn:hover { background: #fbe9e0; }
+
+    .field-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+    .field-row label { font-size: 12px; color: #7a6d58; }
+
+    .dims-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .dims-row .field-row {
+      flex: 1;
+      min-width: 0;
+      margin-bottom: 0;
+    }
+    .dims-row .field-input-wrap { gap: 3px; }
+    .dims-row .field-input { padding: 6px 4px; font-size: 12px; }
+    .dims-row .field-unit { width: auto; }
+
+    .field-input-wrap { display: flex; align-items: center; gap: 6px; }
+    .field-input {
+      flex: 1;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 8px;
+      font-size: 13px;
+      background: #fff;
+      border: 1px solid #ddd0ba;
+      color: #3a3126;
+      border-radius: 4px;
+      outline: none;
+    }
+    .field-input:focus { border-color: #d97742; }
+    .field-unit { font-size: 11px; color: #a4977f; width: 20px; }
+
+    .divider { height: 1px; background: #e6dcc9; margin: 8px 0 14px; }
+    .empty-state { font-size: 12px; color: #a4977f; }
+
+    .type-toggle {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .type-btn {
+      flex: 1;
+      padding: 8px 4px;
+      font-size: 11px;
+      text-align: center;
+      border: 1px solid #ddd0ba;
+      border-radius: 5px;
+      background: #fff;
+      color: #7a6d58;
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .type-btn.active {
+      border-color: #d97742;
+      background: #fce6d2;
+      color: #b5601f;
+      font-weight: 600;
+    }
+    .type-btn:hover:not(.active) {
+      border-color: #b5a68d;
+      color: #3a3126;
+    }
+
+    .box-preset-btn {
+      width: 100%;
+      padding: 8px;
+      font-size: 12px;
+      border: 1px dashed #d5c5a8;
+      border-radius: 5px;
+      background: transparent;
+      color: #7a6d58;
+      cursor: pointer;
+      margin-bottom: 14px;
+    }
+    .box-preset-btn:hover {
+      border-color: #b5a68d;
+      color: #3a3126;
+      background: #fbf3e6;
+    }
+
+    .transform-grid {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .transform-field-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #fff;
+      border: 1px solid #ddd0ba;
+      border-radius: 4px;
+      padding: 0 6px;
+    }
+    .transform-field-wrap .field-input {
+      border: none;
+      padding: 6px 2px;
+      text-align: right;
+    }
+    .transform-field-wrap .field-input:focus { border: none; outline: none; }
+    .axis-label { font-size: 10px; font-weight: 700; width: 10px; }
+    .axis-label.axis-x { color: #c0392b; }
+    .axis-label.axis-y { color: #2f8a4f; }
+    .axis-label.axis-z { color: #2f5fa8; }
+    .transform-label {
+      font-size: 10px;
+      color: #a4977f;
+      margin-bottom: 12px;
+    }
+
+    .reset-btn {
+      width: 100%;
+      padding: 7px 8px;
+      font-size: 12px;
+      border: 1px solid #d5c5a8;
+      border-radius: 4px;
+      background: #fff;
+      color: #6b5d47;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .reset-btn:hover { border-color: #b5a68d; background: #fbf3e6; }
+
+    table.bom { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.bom th {
+      text-align: left;
+      color: #a4977f;
+      font-weight: 500;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #e6dcc9;
+    }
+    table.bom th.right, table.bom td.right { text-align: right; }
+    table.bom td { padding: 6px 0; vertical-align: top; color: #3a3126; }
 
   </style>
 </head>
@@ -128,219 +410,47 @@
     <a href="index.html" class="back-btn">← Back</a>
     <div class="sep"></div>
     <div class="app-name">3D Modeller</div>
+    <div id="stage-label"></div>
     <div class="spacer"></div>
-    <div class="hint-bar">Left-drag: rotate &nbsp;·&nbsp; Right-drag: pan &nbsp;·&nbsp; Scroll: zoom</div>
+    <div class="hint-bar">Drag empty space: orbit &nbsp;·&nbsp; Right-drag: pan &nbsp;·&nbsp; Scroll: zoom &nbsp;·&nbsp; Click panel: select &nbsp;·&nbsp; Click empty space: deselect &nbsp;·&nbsp; Arrow: move &nbsp;·&nbsp; Ring: rotate &nbsp;·&nbsp; Corner: resize</div>
   </div>
 
-  <!-- 3D viewport -->
+  <!-- Main layout: panel list / 3D viewport / inspector -->
   <div id="main">
-    <canvas id="canvas"></canvas>
+    <div id="list-panel"></div>
+    <div class="resizer" id="resizer-left">
+      <button class="collapse-tab" id="toggle-list-btn" title="Toggle panel list">⟨⟩</button>
+    </div>
 
-    <div id="info">A simple cube — your first 3D object</div>
+    <div id="viewport-wrap">
+      <canvas id="canvas"></canvas>
 
-    <div id="axes">
-      <span class="x">X</span> width<br>
-      <span class="y">Y</span> height<br>
-      <span class="z">Z</span> depth
+      <div id="info">Panel Modeller — Stage 0</div>
+
+      <div id="axes">
+        <span class="x">X</span> width<br>
+        <span class="y">Y</span> height<br>
+        <span class="z">Z</span> depth
+      </div>
+    </div>
+
+    <div class="resizer" id="resizer-right">
+      <button class="collapse-tab" id="toggle-inspector-btn" title="Toggle inspector">⟨⟩</button>
+    </div>
+    <div id="inspector">
+      <div id="properties-container"></div>
+      <div class="divider"></div>
+      <div class="section-title">BOM (derived, grouped by material + thickness)</div>
+      <table class="bom">
+        <thead>
+          <tr><th>Material</th><th class="right">Qty</th><th class="right">m²</th></tr>
+        </thead>
+        <tbody id="bom-body"></tbody>
+      </table>
     </div>
   </div>
 
-  <!-- Three.js from CDN — no build step needed -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
-  <script>
-    // ─────────────────────────────────────────────
-    //  SCENE SETUP
-    // ─────────────────────────────────────────────
-
-    const canvas = document.getElementById('canvas');
-    const main   = document.getElementById('main');
-
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.setClearColor(0x1a1a1a);
-
-    // Scene
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x1a1a1a, 400, 900);
-
-    // Camera
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 2000);
-    camera.position.set(3, 2.5, 4);
-    camera.lookAt(0, 0, 0);
-
-    // ─────────────────────────────────────────────
-    //  LIGHTS
-    // ─────────────────────────────────────────────
-
-    // Ambient — soft base light
-    const ambient = new THREE.AmbientLight(0xffffff, 0.45);
-    scene.add(ambient);
-
-    // Main directional light (with shadows)
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
-    dirLight.position.set(5, 8, 5);
-    dirLight.castShadow = true;
-    dirLight.shadow.camera.near = 0.1;
-    dirLight.shadow.camera.far  = 50;
-    dirLight.shadow.camera.left = dirLight.shadow.camera.bottom = -6;
-    dirLight.shadow.camera.right = dirLight.shadow.camera.top  =  6;
-    dirLight.shadow.mapSize.set(1024, 1024);
-    scene.add(dirLight);
-
-    // Fill light from the opposite side
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.2);
-    fillLight.position.set(-4, 3, -4);
-    scene.add(fillLight);
-
-    // ─────────────────────────────────────────────
-    //  GRID + GROUND PLANE
-    // ─────────────────────────────────────────────
-
-    const grid = new THREE.GridHelper(20, 20, 0x333333, 0x2a2a2a);
-    grid.position.y = -0.5;
-    scene.add(grid);
-
-    // Shadow-receiving ground (invisible plane)
-    const groundGeo = new THREE.PlaneGeometry(40, 40);
-    const groundMat = new THREE.ShadowMaterial({ opacity: 0.25 });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.5;
-    ground.receiveShadow = true;
-    scene.add(ground);
-
-    // ─────────────────────────────────────────────
-    //  THE CUBE
-    // ─────────────────────────────────────────────
-
-    // Geometry: 1×1×1 unit cube
-    const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
-
-    // Material: wood-like color with slight roughness via Lambert shading
-    const cubeMat = new THREE.MeshLambertMaterial({ color: 0xC8A97B });
-
-    const cube = new THREE.Mesh(cubeGeo, cubeMat);
-    cube.castShadow    = true;
-    cube.receiveShadow = true;
-    scene.add(cube);
-
-    // Wireframe edges on top — makes dimensions readable
-    const edgesGeo = new THREE.EdgesGeometry(cubeGeo);
-    const edgesMat = new THREE.LineBasicMaterial({ color: 0x8B6540, linewidth: 1 });
-    const edges = new THREE.LineSegments(edgesGeo, edgesMat);
-    cube.add(edges); // child of cube so it moves with it
-
-    // ─────────────────────────────────────────────
-    //  ORBIT CONTROLS (manual — no extra library)
-    // ─────────────────────────────────────────────
-
-    // Camera orbit state
-    let spherical = {
-      theta:  0.6,   // horizontal angle (radians)
-      phi:    1.0,   // vertical angle (radians)
-      radius: 5.5    // distance from target
-    };
-
-    let target = new THREE.Vector3(0, 0, 0); // orbit pivot
-
-    function applyCamera() {
-      camera.position.x = target.x + spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta);
-      camera.position.y = target.y + spherical.radius * Math.cos(spherical.phi);
-      camera.position.z = target.z + spherical.radius * Math.sin(spherical.phi) * Math.cos(spherical.theta);
-      camera.lookAt(target);
-    }
-
-    applyCamera();
-
-    // Mouse state
-    let mouse = { down: false, button: -1, x: 0, y: 0 };
-
-    canvas.addEventListener('mousedown', e => {
-      mouse.down   = true;
-      mouse.button = e.button;
-      mouse.x      = e.clientX;
-      mouse.y      = e.clientY;
-      canvas.style.cursor = e.button === 0 ? 'grabbing' : 'move';
-    });
-
-    window.addEventListener('mouseup', () => {
-      mouse.down = false;
-      canvas.style.cursor = 'grab';
-    });
-
-    window.addEventListener('mousemove', e => {
-      if (!mouse.down) return;
-
-      const dx = e.clientX - mouse.x;
-      const dy = e.clientY - mouse.y;
-      mouse.x  = e.clientX;
-      mouse.y  = e.clientY;
-
-      if (mouse.button === 0) {
-        // LEFT drag → orbit (rotate)
-        spherical.theta -= dx * 0.007;
-        spherical.phi    = Math.max(0.05, Math.min(Math.PI - 0.05, spherical.phi - dy * 0.007));
-      }
-
-      if (mouse.button === 2) {
-        // RIGHT drag → pan
-        // Move target in the camera's local XY plane
-        const panSpeed = spherical.radius * 0.001;
-        const right = new THREE.Vector3();
-        const up    = new THREE.Vector3();
-        right.crossVectors(camera.getWorldDirection(new THREE.Vector3()), camera.up).normalize();
-        up.copy(camera.up).normalize();
-
-        target.addScaledVector(right, -dx * panSpeed);
-        target.addScaledVector(up,     dy * panSpeed);
-      }
-
-      applyCamera();
-    });
-
-    // Scroll → zoom
-    canvas.addEventListener('wheel', e => {
-      e.preventDefault();
-      spherical.radius = Math.max(1, Math.min(30, spherical.radius + e.deltaY * 0.01));
-      applyCamera();
-    }, { passive: false });
-
-    // Disable right-click context menu on canvas
-    canvas.addEventListener('contextmenu', e => e.preventDefault());
-
-    // Default cursor
-    canvas.style.cursor = 'grab';
-
-    // ─────────────────────────────────────────────
-    //  RESIZE HANDLER
-    // ─────────────────────────────────────────────
-
-    function onResize() {
-      const w = main.clientWidth;
-      const h = main.clientHeight;
-      renderer.setSize(w, h, false);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-    }
-
-    window.addEventListener('resize', onResize);
-    onResize(); // call once on load
-
-    // ─────────────────────────────────────────────
-    //  RENDER LOOP
-    // ─────────────────────────────────────────────
-
-    function animate() {
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
-    }
-
-    animate();
-  </script>
+  <script type="module" src="/src/modeller-main.js"></script>
 
 </body>
 </html>
