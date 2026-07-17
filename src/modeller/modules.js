@@ -22,6 +22,37 @@ export function nextId() {
   return `panel-${idCounter++}`;
 }
 
+// Guard against degenerate (zero/negative) panel geometry — used
+// wherever a dimension can be derived from user interaction (the
+// scale gizmo, the box preset, and later the constraint resolver).
+// One shared constant so all three can never quietly drift apart.
+export const MIN_PANEL_DIM_MM = 10;
+
+/**
+ * Canonical face vocabulary, in each panel's own LOCAL (unrotated)
+ * frame — width along X, height along Y, thickness along Z, exactly
+ * as BoxGeometry(width, height, thickness) lays it out before any
+ * rotation is applied. Defining faces here, once, is what lets
+ * constraints (Stage 2), edge-banding, and hole placement (Stage 5)
+ * all reference the same six names instead of each inventing its
+ * own — and keeps face identity independent of whatever `rotation`
+ * a panel currently has (see LOCAL_FACES doc below).
+ *
+ * The resolver is responsible for combining a face's local normal
+ * with a node's actual rotation to get a world-space direction —
+ * nothing here does that projection, on purpose, since "which way
+ * is my own top edge" must never change just because a panel got
+ * flipped into the "horizontal" orientation preset.
+ */
+export const LOCAL_FACES = {
+  right:  { x: 1, y: 0, z: 0 },   // +width axis
+  left:   { x: -1, y: 0, z: 0 },
+  top:    { x: 0, y: 1, z: 0 },   // +height axis
+  bottom: { x: 0, y: -1, z: 0 },
+  front:  { x: 0, y: 0, z: 1 },   // +thickness axis — the "show" face
+  back:   { x: 0, y: 0, z: -1 },
+};
+
 export function createPanelNode(overrides = {}) {
   return {
     id: nextId(),

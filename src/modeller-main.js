@@ -5,7 +5,7 @@
  * rule is what keeps "graph -> view" one-directional as this
  * grows past Stage 0.
  */
-import { createPanelNode, MM_TO_UNIT, computeAutoLayoutPositions } from './modeller/modules.js';
+import { createPanelNode, MM_TO_UNIT, MIN_PANEL_DIM_MM, computeAutoLayoutPositions } from './modeller/modules.js';
 import { createModellerScene } from './modeller/scene.js';
 import { getSelectedId, setSelectedId } from './modeller/selection.js';
 import { computeBom } from './engine/bom.js';
@@ -149,7 +149,6 @@ function setSelectedOrientation(orientation) {
  * of each independently cancelling out a placeholder layout.
  */
 const DEFAULT_BOX_DEPTH_MM = 400;
-const MIN_INNER_DIM_MM = 10;
 
 function addBoxFromSelection() {
   const selectedId = getSelectedId();
@@ -161,7 +160,7 @@ function addBoxFromSelection() {
   const T = basis.thickness;
   const D = DEFAULT_BOX_DEPTH_MM;
   const material = basis.material;
-  const innerWidth = Math.max(MIN_INNER_DIM_MM, W - 2 * T);
+  const innerWidth = Math.max(MIN_PANEL_DIM_MM, W - 2 * T);
 
   const left = createPanelNode({ width: D, height: H, thickness: T, material, rotation: { x: 0, y: 90, z: 0 } });
   const right = createPanelNode({ width: D, height: H, thickness: T, material, rotation: { x: 0, y: 90, z: 0 } });
@@ -221,7 +220,7 @@ function addPanel() {
 function removeSelected() {
   const selectedId = getSelectedId();
   panels = panels.filter((p) => p.id !== selectedId);
-  if (panels.length > 0) setSelectedId(panels[0].id);
+  setSelectedId(panels.length > 0 ? panels[0].id : null);
   renderAll();
 }
 

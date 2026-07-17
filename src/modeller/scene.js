@@ -45,9 +45,7 @@
 
 import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
-import { MM_TO_UNIT, computeAutoLayoutPositions } from './modules.js';
-
-const MIN_DIM_MM = 10; // guard against zero/negative geometry from an aggressive scale drag
+import { MM_TO_UNIT, MIN_PANEL_DIM_MM, computeAutoLayoutPositions } from './modules.js';
 
 export function createModellerScene(
   canvas,
@@ -122,7 +120,7 @@ export function createModellerScene(
     return transformMove.dragging || transformRotate.dragging || transformScale.dragging;
   }
 
-  canvas.addEventListener('pointerdown', (e) => {
+  function handlePointerDown(e) {
     gizmoHandled = false;
     pointer.down = true;
     pointer.button = e.button;
@@ -130,17 +128,17 @@ export function createModellerScene(
     pointer.y = e.clientY;
     pointer.moved = false;
     canvas.style.cursor = e.button === 0 ? 'grabbing' : 'move';
-  });
+  }
 
-  window.addEventListener('pointerup', (e) => {
+  function handlePointerUp(e) {
     if (pointer.down && !pointer.moved && pointer.button === 0 && !gizmoHandled) {
       handleClickSelect(e);
     }
     pointer.down = false;
     canvas.style.cursor = 'grab';
-  });
+  }
 
-  window.addEventListener('pointermove', (e) => {
+  function handlePointerMove(e) {
     if (!pointer.down) return;
     const dx = e.clientX - pointer.x;
     const dy = e.clientY - pointer.y;
@@ -166,16 +164,24 @@ export function createModellerScene(
       target.addScaledVector(up, dy * panSpeed);
     }
     applyCamera();
-  });
+  }
 
   // Trackpad two-finger scroll (or mouse wheel) still zooms.
-  canvas.addEventListener('wheel', (e) => {
+  function handleWheel(e) {
     e.preventDefault();
     spherical.radius = Math.max(1, Math.min(30, spherical.radius + e.deltaY * 0.01));
     applyCamera();
-  }, { passive: false });
+  }
 
-  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  function handleContextMenu(e) {
+    e.preventDefault();
+  }
+
+  canvas.addEventListener('pointerdown', handlePointerDown);
+  window.addEventListener('pointerup', handlePointerUp);
+  window.addEventListener('pointermove', handlePointerMove);
+  canvas.addEventListener('wheel', handleWheel, { passive: false });
+  canvas.addEventListener('contextmenu', handleContextMenu);
   canvas.style.cursor = 'grab';
 
   // ---- click-to-select / click-empty-to-deselect via raycast ----
@@ -272,9 +278,9 @@ export function createModellerScene(
       return;
     }
     const nodeId = mesh.userData.nodeId;
-    const newWidth = Math.max(MIN_DIM_MM, Math.abs(scaleDragStartDims.w * mesh.scale.x));
-    const newHeight = Math.max(MIN_DIM_MM, Math.abs(scaleDragStartDims.h * mesh.scale.y));
-    const newThickness = Math.max(MIN_DIM_MM, Math.abs(scaleDragStartDims.t * mesh.scale.z));
+    const newWidth = Math.max(MIN_PANEL_DIM_MM, Math.abs(scaleDragStartDims.w * mesh.scale.x));
+    const newHeight = Math.max(MIN_PANEL_DIM_MM, Math.abs(scaleDragStartDims.h * mesh.scale.y));
+    const newThickness = Math.max(MIN_PANEL_DIM_MM, Math.abs(scaleDragStartDims.t * mesh.scale.z));
 
     // Bake the drag into real dimensions; geometry (rebuilt by the
     // next reconcile pass) becomes the source of truth for size, not
@@ -411,11 +417,46 @@ export function createModellerScene(
   resizeObserver.observe(viewportEl);
   onResize();
 
+  let animationFrameId = null;
   function animate() {
-    requestAnimationFrame(animate);
+    animationFrameId = requestAnimationFrame(animate);
     renderer.render(scene, camera);
   }
   animate();
 
-  return { reconcile };
+  /**
+   * Tears down everything this scene instance registered: window
+   * listeners, the ResizeObserver, the render loop, all three
+   * gizmos, and the renderer's GPU resources. Not called anywhere
+   * yet (the app only ever creates one scene for the page's whole
+   * lifetime), but its absence was a real gap — added now, while
+   * this function is still small, rather than after Stage 2 adds
+   * more state to track here.
+   */
+  function dispose() {
+    cancelAnimationFrame(animationFrameId);
+    window.removeEventListener('resize', onResize);
+    window.removeEventListener('pointerup', handlePointerUp);
+    window.removeEventListener('pointermove', handlePointerMove);
+    resizeObserver.disconnect();
+
+    canvas.removeEventListener('pointerdown', handlePointerDown);
+    canvas.removeEventListener('wheel', handleWheel);
+    canvas.removeEventListener('contextmenu', handleContextMenu);
+
+    transformMove.dispose();
+    transformRotate.dispose();
+    transformScale.dispose();
+
+    for (const entry of meshRegistry.values()) {
+      entry.mesh.geometry.dispose();
+      entry.mesh.material.dispose();
+      entry.edges.geometry.dispose();
+    }
+    meshRegistry.clear();
+
+    renderer.dispose();
+  }
+
+  return { reconcile, dispose };
 }
