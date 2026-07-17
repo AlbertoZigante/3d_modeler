@@ -1,51 +1,34 @@
 /**
- * The view layer. Owns the Three.js scene, camera, renderer,
- * lights, camera controls, and the transform gizmos — and
- * nothing else. It never originates graph data; it only reads
- * the `panels` array handed to it via reconcile() and keeps the
- * scene in sync, and reports user manipulation back up through
- * callbacks (onSelect, onTransformChange, onDimensionChange).
+ * The view layer + THE RECONCILER. Owns the Three.js scene, camera,
+ * renderer, lights, and composes the two extracted modules —
+ * orbitControls.js (camera) and gizmos.js (move/rotate/resize
+ * handles) — rather than managing that wiring itself. This file's
+ * job is: keep the scene in sync with RESOLVED panel data, and
+ * report user manipulation back up through callbacks.
  *
- * THE RECONCILER
- * ---------------
- * `reconcile(panels, selectedId)` diffs the incoming panels array
- * against a live id -> mesh registry: creates meshes for new
- * nodes, disposes meshes for removed nodes, rebuilds geometry
- * only when dimensions actually changed, positions each mesh at
- * (auto-layout position + node.offset), and keeps all three
- * gizmos attached to whichever mesh is selected — or detached
- * entirely when nothing is selected.
- *
- * THREE GIZMOS, ALL AT ONCE
- * --------------------------
- * Move (translate arrows), rotate (rings), and resize (scale
- * handles) are three independent TransformControls instances all
- * attached to the selected mesh simultaneously — pick whichever
- * handle you want directly, no mode toggle. All are pointer-event
- * based, so dragging works the same with a trackpad's click-drag
- * as with a mouse.
- *
- * Resize is implemented via 'scale' mode rather than literal
- * edge-dragging (Three.js has no built-in box-edge-drag handle),
- * but it reads and feels the same: grab a handle near a face,
- * drag out/in, the panel gets bigger/smaller along that axis. The
- * scale factor is only ever transient — on drag end it's baked
- * into real width/height/thickness (mm) in the graph and the
- * mesh's scale is reset to 1, so geometry (not a lingering scale
- * transform) is always the source of truth for panel size.
+ * STAGE 2: `reconcile()` now takes the RESOLVED panels array (from
+ * snap.js's resolveConstraints — concrete width/height/thickness/
+ * position/lockedFields for every node), not the raw graph. This
+ * file no longer calls computeAutoLayoutPositions itself — the
+ * resolver already folds that fallback in. Locked fields hide their
+ * corresponding gizmo handle (see gizmos.js) so dragging a derived
+ * value isn't possible until the user explicitly breaks that link.
  *
  * CLICK ON EMPTY SPACE = DESELECT
  * ---------------------------------
- * A plain click that hits no panel mesh clears selection, which
- * detaches all three gizmos and (via main.js) clears the
- * inspector. A click that lands on a gizmo handle itself must NOT
- * be treated as "empty space" even though gizmo geometry isn't in
- * the panel raycast — `gizmoHandled` tracks that per-gesture.
+ * A plain click that hits no panel mesh clears selection (detaches
+ * all three gizmos, clears the inspector via main.js). A click that
+ * lands on a gizmo handle must NOT be read as "empty space" even
+ * though gizmo geometry isn't in the panel raycast — a shared
+ * `gestureState.gizmoHandled` flag (set by gizmos.js, read by
+ * orbitControls.js) tracks that per-gesture, regardless of which
+ * module's own event listeners happen to fire first.
  */
 
 import * as THREE from 'three';
-import { TransformControls } from 'three/addons/controls/TransformControls.js';
-import { MM_TO_UNIT, MIN_PANEL_DIM_MM, computeAutoLayoutPositions } from './modules.js';
+import { MM_TO_UNIT } from './modules.js';
+import { createOrbitControls } from './orbitControls.js';
+import { createGizmos } from './gizmos.js';
 
 export function createModellerScene(
   canvas,
@@ -94,95 +77,11 @@ export function createModellerScene(
   ground.receiveShadow = true;
   scene.add(ground);
 
-  // ---- manual orbit controls (pointer events: mouse, trackpad, touch) ----
-  const spherical = { theta: 0.6, phi: 1.0, radius: 5.5 };
-  const target = new THREE.Vector3(0, 0, 0);
-
-  function applyCamera() {
-    camera.position.x = target.x + spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta);
-    camera.position.y = target.y + spherical.radius * Math.cos(spherical.phi);
-    camera.position.z = target.z + spherical.radius * Math.sin(spherical.phi) * Math.cos(spherical.theta);
-    camera.lookAt(target);
-  }
-  applyCamera();
-
-  const pointer = { down: false, button: -1, x: 0, y: 0, moved: false };
-
-  // True only while the pointer gesture currently in progress started
-  // on one of the gizmo handles. Reset at the start of every new
-  // pointerdown, set by the gizmos' own 'mouseDown' events, and read
-  // at pointerup — this is more reliable than checking `.dragging`
-  // at pointerup time, since the gizmo's own listeners may already
-  // have cleared that flag by then depending on listener order.
-  let gizmoHandled = false;
-
-  function anyGizmoDragging() {
-    return transformMove.dragging || transformRotate.dragging || transformScale.dragging;
-  }
-
-  function handlePointerDown(e) {
-    gizmoHandled = false;
-    pointer.down = true;
-    pointer.button = e.button;
-    pointer.x = e.clientX;
-    pointer.y = e.clientY;
-    pointer.moved = false;
-    canvas.style.cursor = e.button === 0 ? 'grabbing' : 'move';
-  }
-
-  function handlePointerUp(e) {
-    if (pointer.down && !pointer.moved && pointer.button === 0 && !gizmoHandled) {
-      handleClickSelect(e);
-    }
-    pointer.down = false;
-    canvas.style.cursor = 'grab';
-  }
-
-  function handlePointerMove(e) {
-    if (!pointer.down) return;
-    const dx = e.clientX - pointer.x;
-    const dy = e.clientY - pointer.y;
-    if (Math.abs(dx) + Math.abs(dy) > 3) pointer.moved = true;
-    pointer.x = e.clientX;
-    pointer.y = e.clientY;
-
-    // While a gizmo is being dragged, it owns the pointer — camera
-    // orbit/pan must not fight it for the same drag.
-    if (anyGizmoDragging()) return;
-
-    if (pointer.button === 0) {
-      spherical.theta -= dx * 0.007;
-      spherical.phi = Math.max(0.05, Math.min(Math.PI - 0.05, spherical.phi - dy * 0.007));
-    }
-    if (pointer.button === 2) {
-      const panSpeed = spherical.radius * 0.001;
-      const right = new THREE.Vector3();
-      const up = new THREE.Vector3();
-      right.crossVectors(camera.getWorldDirection(new THREE.Vector3()), camera.up).normalize();
-      up.copy(camera.up).normalize();
-      target.addScaledVector(right, -dx * panSpeed);
-      target.addScaledVector(up, dy * panSpeed);
-    }
-    applyCamera();
-  }
-
-  // Trackpad two-finger scroll (or mouse wheel) still zooms.
-  function handleWheel(e) {
-    e.preventDefault();
-    spherical.radius = Math.max(1, Math.min(30, spherical.radius + e.deltaY * 0.01));
-    applyCamera();
-  }
-
-  function handleContextMenu(e) {
-    e.preventDefault();
-  }
-
-  canvas.addEventListener('pointerdown', handlePointerDown);
-  window.addEventListener('pointerup', handlePointerUp);
-  window.addEventListener('pointermove', handlePointerMove);
-  canvas.addEventListener('wheel', handleWheel, { passive: false });
-  canvas.addEventListener('contextmenu', handleContextMenu);
-  canvas.style.cursor = 'grab';
+  // ---- shared per-gesture state between orbitControls and gizmos ----
+  // True only while the pointer gesture in progress started on a
+  // gizmo handle. See file header for why this beats checking
+  // `.dragging` at pointerup time.
+  const gestureState = { gizmoHandled: false };
 
   // ---- click-to-select / click-empty-to-deselect via raycast ----
   const raycaster = new THREE.Raycaster();
@@ -197,108 +96,50 @@ export function createModellerScene(
     const meshes = Array.from(meshRegistry.values()).map((entry) => entry.mesh);
     const hits = raycaster.intersectObjects(meshes, false);
     if (!onSelect) return;
-    if (hits.length > 0) {
-      onSelect(hits[0].object.userData.nodeId);
-    } else {
-      onSelect(null); // clicked empty space — deselect
-    }
+    onSelect(hits.length > 0 ? hits[0].object.userData.nodeId : null);
   }
 
-  // ---- MOVE + ROTATE + RESIZE GIZMOS (all visible at once) ----
-  const transformMove = new TransformControls(camera, canvas);
-  transformMove.setMode('translate');
-  transformMove.setSize(0.9);
-  scene.add(transformMove.getHelper());
-
-  const transformRotate = new TransformControls(camera, canvas);
-  transformRotate.setMode('rotate');
-  transformRotate.setSize(0.75);
-  scene.add(transformRotate.getHelper());
-
-  const transformScale = new TransformControls(camera, canvas);
-  transformScale.setMode('scale');
-  transformScale.setSize(0.6);
-  scene.add(transformScale.getHelper());
-
-  for (const tc of [transformMove, transformRotate, transformScale]) {
-    tc.addEventListener('mouseDown', () => {
-      gizmoHandled = true;
-    });
-  }
-
-  // per-node id -> auto-layout base position (units), refreshed each
-  // reconcile pass. Needed to convert an absolute drag result back
-  // into an offset-from-home delta.
-  const autoBaseById = new Map();
-
-  function reportTransform(mesh) {
-    if (!onTransformChange) return;
-    const nodeId = mesh.userData.nodeId;
-    const base = autoBaseById.get(nodeId) || { x: 0, y: 0, z: 0 };
-    onTransformChange(nodeId, {
-      offset: {
-        x: (mesh.position.x - base.x) / MM_TO_UNIT,
-        y: (mesh.position.y - base.y) / MM_TO_UNIT,
-        z: (mesh.position.z - base.z) / MM_TO_UNIT,
-      },
-      rotation: {
-        x: THREE.MathUtils.radToDeg(mesh.rotation.x),
-        y: THREE.MathUtils.radToDeg(mesh.rotation.y),
-        z: THREE.MathUtils.radToDeg(mesh.rotation.z),
-      },
-    });
-  }
-
-  transformMove.addEventListener('objectChange', () => {
-    if (transformMove.object) reportTransform(transformMove.object);
-  });
-  transformRotate.addEventListener('objectChange', () => {
-    if (transformRotate.object) reportTransform(transformRotate.object);
+  // orbitControls registered BEFORE gizmos, deliberately: canvas
+  // 'pointerdown' listeners fire in registration order, and
+  // orbitControls resets gestureState.gizmoHandled = false at the
+  // very start of every gesture, before gizmos.js's own listeners
+  // (added when TransformControls is constructed, below) get a
+  // chance to set it back to true for a genuine gizmo hit.
+  const orbit = createOrbitControls(canvas, camera, {
+    isBlocked: () => gizmos.isDragging(),
+    onClick: handleClickSelect,
+    gestureState,
   });
 
-  // ---- resize (scale-drag -> baked mm dimensions on release) ----
-  let scaleDragStartDims = null; // { w, h, t } in mm, captured at drag start
-
-  transformScale.addEventListener('mouseDown', () => {
-    const mesh = transformScale.object;
-    if (!mesh) return;
-    const entry = meshRegistry.get(mesh.userData.nodeId);
-    if (!entry) return;
-    scaleDragStartDims = {
-      w: entry.lastDims.w / MM_TO_UNIT,
-      h: entry.lastDims.h / MM_TO_UNIT,
-      t: entry.lastDims.t / MM_TO_UNIT,
-    };
+  const gizmos = createGizmos(camera, canvas, scene, {
+    gestureState,
+    onDimensionChange,
+    onTransformChange: (nodeId, transform) => {
+      const entry = Array.from(meshRegistry.entries()).find(([id]) => id === nodeId);
+      const base = autoBaseById.get(nodeId) || { x: 0, y: 0, z: 0 };
+      if (!onTransformChange) return;
+      onTransformChange(nodeId, {
+        offset: {
+          x: (transform.offsetDelta.x - base.x) / MM_TO_UNIT,
+          y: (transform.offsetDelta.y - base.y) / MM_TO_UNIT,
+          z: (transform.offsetDelta.z - base.z) / MM_TO_UNIT,
+        },
+        rotation: transform.rotation,
+      });
+    },
   });
-
-  transformScale.addEventListener('mouseUp', () => {
-    const mesh = transformScale.object;
-    if (!mesh || !scaleDragStartDims || !onDimensionChange) {
-      scaleDragStartDims = null;
-      return;
-    }
-    const nodeId = mesh.userData.nodeId;
-    const newWidth = Math.max(MIN_PANEL_DIM_MM, Math.abs(scaleDragStartDims.w * mesh.scale.x));
-    const newHeight = Math.max(MIN_PANEL_DIM_MM, Math.abs(scaleDragStartDims.h * mesh.scale.y));
-    const newThickness = Math.max(MIN_PANEL_DIM_MM, Math.abs(scaleDragStartDims.t * mesh.scale.z));
-
-    // Bake the drag into real dimensions; geometry (rebuilt by the
-    // next reconcile pass) becomes the source of truth for size, not
-    // a lingering scale transform.
-    mesh.scale.set(1, 1, 1);
-    onDimensionChange(nodeId, { width: newWidth, height: newHeight, thickness: newThickness });
-    scaleDragStartDims = null;
-  });
+  gizmos.setMeshEntryLookup((mesh) => meshRegistry.get(mesh.userData.nodeId));
 
   // ---- THE RECONCILER ----
   const meshRegistry = new Map(); // id -> { mesh, edges, lastDims }
+  const autoBaseById = new Map(); // id -> resolved position (units) as of the last reconcile — used to convert a gizmo drag's absolute result back into an offset delta
 
-  function reconcile(panels, selectedId) {
-    const liveIds = new Set(panels.map((p) => p.id));
+  function reconcile(resolvedPanels, selectedId) {
+    const liveIds = new Set(resolvedPanels.map((p) => p.id));
 
     for (const [id, entry] of meshRegistry.entries()) {
       if (!liveIds.has(id)) {
-        for (const tc of [transformMove, transformRotate, transformScale]) {
+        for (const tc of gizmos.controls) {
           if (tc.object === entry.mesh) tc.detach();
         }
         scene.remove(entry.mesh);
@@ -309,11 +150,7 @@ export function createModellerScene(
       }
     }
 
-    // auto-layout placeholder for the base position — replaced once
-    // Stage 2 relations give panels real spatial constraints
-    const autoPositions = computeAutoLayoutPositions(panels);
-
-    panels.forEach((node) => {
+    resolvedPanels.forEach((node) => {
       const w = node.width * MM_TO_UNIT;
       const h = node.height * MM_TO_UNIT;
       const t = node.thickness * MM_TO_UNIT;
@@ -354,23 +191,17 @@ export function createModellerScene(
         entry.lastDims = { w, h, t };
       }
 
-      const base = autoPositions.get(node.id);
-      autoBaseById.set(node.id, base);
+      const posUnits = {
+        x: node.position.x * MM_TO_UNIT,
+        y: node.position.y * MM_TO_UNIT,
+        z: node.position.z * MM_TO_UNIT,
+      };
+      autoBaseById.set(node.id, posUnits);
 
-      const isBeingDragged =
-        (transformMove.object === entry.mesh && transformMove.dragging) ||
-        (transformRotate.object === entry.mesh && transformRotate.dragging) ||
-        (transformScale.object === entry.mesh && transformScale.dragging);
+      const isBeingDragged = gizmos.controls.some((tc) => tc.object === entry.mesh && tc.dragging);
 
-      // Don't stomp the mesh transform while the user is actively
-      // dragging it — it's already the source of truth mid-drag.
       if (!isBeingDragged) {
-        const off = node.offset || { x: 0, y: 0, z: 0 };
-        entry.mesh.position.set(
-          base.x + off.x * MM_TO_UNIT,
-          base.y + off.y * MM_TO_UNIT,
-          base.z + off.z * MM_TO_UNIT
-        );
+        entry.mesh.position.set(posUnits.x, posUnits.y, posUnits.z);
 
         const rot = node.rotation || { x: 0, y: 0, z: 0 };
         entry.mesh.rotation.set(
@@ -379,24 +210,19 @@ export function createModellerScene(
           THREE.MathUtils.degToRad(rot.z)
         );
 
-        entry.mesh.scale.set(1, 1, 1); // scale is only ever transient (see resize handlers above)
+        entry.mesh.scale.set(1, 1, 1); // scale is only ever transient (see gizmos.js)
       }
 
       entry.mesh.material.color.set(isSelected ? 0xe0904a : 0xdcbd8c);
       entry.edges.material.color.set(isSelected ? 0x8a4a1a : 0x8b6540);
     });
 
-    // keep all three gizmos attached to whichever mesh is selected —
-    // or fully detached (hidden) when nothing is selected
     const selectedEntry = meshRegistry.get(selectedId);
     if (selectedEntry) {
-      if (transformMove.object !== selectedEntry.mesh) transformMove.attach(selectedEntry.mesh);
-      if (transformRotate.object !== selectedEntry.mesh) transformRotate.attach(selectedEntry.mesh);
-      if (transformScale.object !== selectedEntry.mesh) transformScale.attach(selectedEntry.mesh);
+      const node = resolvedPanels.find((p) => p.id === selectedId);
+      gizmos.attachTo(selectedEntry.mesh, node?.lockedFields || {});
     } else {
-      transformMove.detach();
-      transformRotate.detach();
-      transformScale.detach();
+      gizmos.detachAll();
     }
   }
 
@@ -424,29 +250,12 @@ export function createModellerScene(
   }
   animate();
 
-  /**
-   * Tears down everything this scene instance registered: window
-   * listeners, the ResizeObserver, the render loop, all three
-   * gizmos, and the renderer's GPU resources. Not called anywhere
-   * yet (the app only ever creates one scene for the page's whole
-   * lifetime), but its absence was a real gap — added now, while
-   * this function is still small, rather than after Stage 2 adds
-   * more state to track here.
-   */
   function dispose() {
     cancelAnimationFrame(animationFrameId);
     window.removeEventListener('resize', onResize);
-    window.removeEventListener('pointerup', handlePointerUp);
-    window.removeEventListener('pointermove', handlePointerMove);
     resizeObserver.disconnect();
-
-    canvas.removeEventListener('pointerdown', handlePointerDown);
-    canvas.removeEventListener('wheel', handleWheel);
-    canvas.removeEventListener('contextmenu', handleContextMenu);
-
-    transformMove.dispose();
-    transformRotate.dispose();
-    transformScale.dispose();
+    orbit.dispose();
+    gizmos.dispose();
 
     for (const entry of meshRegistry.values()) {
       entry.mesh.geometry.dispose();

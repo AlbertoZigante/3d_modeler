@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Modeller — Furniture Modeller</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #faf3ea;
+      color: #3a3126;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Digit-only number fields — no increment/decrement arrows */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+
+    /* ── Topbar ── */
+    #topbar {
+      height: 48px;
+      background: #f3e8d8;
+      border-bottom: 1px solid #e3d3ba;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 16px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #8a7d68;
+      text-decoration: none;
+      font-size: 13px;
+      padding: 5px 10px;
+      border-radius: 5px;
+      transition: background .15s, color .15s;
+    }
+
+    .back-btn:hover {
+      background: #e9dcc5;
+      color: #3a3126;
+    }
+
+    .sep {
+      width: 1px;
+      height: 20px;
+      background: #e3d3ba;
+    }
+
+    .icon-btn {
+      display: none; /* replaced by .collapse-tab, attached to the sidebars themselves */
+    }
+
+    .app-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #3a3126;
+      letter-spacing: .04em;
+    }
+
+    #stage-label {
+      font-size: 11px;
+      color: #a4977f;
+    }
+
+    .spacer { flex: 1; }
+
+    .hint-bar {
+      font-size: 11px;
+      color: #a4977f;
+    }
+
+    /* ── Main layout: sidebar / viewport / sidebar ── */
+    #main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    #list-panel, #inspector {
+      width: 220px;
+      background: #fffaf3;
+      border-right: 1px solid #e6dcc9;
+      padding: 14px;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    #inspector {
+      border-right: none;
+      border-left: 1px solid #e6dcc9;
+    }
+
+    #list-panel.collapsed, #inspector.collapsed {
+      width: 0 !important;
+      padding: 0;
+      overflow: hidden;
+      border: none;
+    }
+
+    .resizer {
+      width: 5px;
+      flex-shrink: 0;
+      cursor: col-resize;
+      background: transparent;
+      position: relative;
+    }
+    .resizer:hover, .resizer.dragging {
+      background: #e0b98a;
+    }
+
+    .collapse-tab {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 16px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #e3d3ba;
+      border-radius: 6px;
+      background: #fffaf3;
+      color: #a4977f;
+      font-size: 10px;
+      cursor: pointer;
+      z-index: 5;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      transition: background .15s, color .15s;
+    }
+    .collapse-tab:hover {
+      background: #ece0cc;
+      color: #3a3126;
+    }
+
+    #viewport-wrap {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── Canvas ── */
+    #canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none; /* let pointer events (incl. touch/trackpad) drive orbit + gizmo */
+    }
+
+    /* ── Overlay info ── */
+    #info {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,.7);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(0,0,0,.06);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 12px;
+      color: #8a7d68;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    /* ── Axes label ── */
+    #axes {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      font-size: 11px;
+      color: #b5a68d;
+      text-align: right;
+      pointer-events: none;
+      line-height: 1.8;
+    }
+
+    #axes span { font-weight: 600; }
+    #axes .x { color: #c0392b; }
+    #axes .y { color: #2f8a4f; }
+    #axes .z { color: #2f5fa8; }
+
+    /* ── Sidebar shared styles ── */
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #a4977f;
+      margin-bottom: 10px;
+    }
+
+    .list-item {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      text-align: left;
+      padding: 6px 8px;
+      margin-bottom: 6px;
+      font-size: 11px;
+      background: #fbf3e6;
+      border: 1px solid #e6dcc9;
+      color: #3a3126;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .list-item.selected {
+      border-color: #d97742;
+      background: #fce6d2;
+    }
+    .list-item .id { font-weight: 600; }
+    .list-item .dims { color: #a4977f; }
+
+    .add-btn {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 12px;
+      border: 1px dashed #d5c5a8;
+      border-radius: 4px;
+      background: transparent;
+      color: #8a7d68;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .add-btn:hover { border-color: #b5a68d; color: #3a3126; }
+
+    .remove-btn {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 12px;
+      border: 1px solid #e0b6a0;
+      border-radius: 4px;
+      background: transparent;
+      color: #b5502f;
+      cursor: pointer;
+      margin: 4px 0;
+    }
+    .remove-btn:hover { background: #fbe9e0; }
+
+    .field-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+    .field-row label { font-size: 12px; color: #7a6d58; }
+
+    .dims-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .dims-row .field-row {
+      flex: 1;
+      min-width: 0;
+      margin-bottom: 0;
+    }
+    .dims-row .field-input-wrap { gap: 3px; }
+    .dims-row .field-input { padding: 6px 4px; font-size: 12px; }
+    .dims-row .field-unit { width: auto; }
+
+    .field-input-wrap { display: flex; align-items: center; gap: 6px; }
+    .field-input {
+      flex: 1;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 8px;
+      font-size: 13px;
+      background: #fff;
+      border: 1px solid #ddd0ba;
+      color: #3a3126;
+      border-radius: 4px;
+      outline: none;
+    }
+    .field-input:focus { border-color: #d97742; }
+    .field-unit { font-size: 11px; color: #a4977f; width: 20px; }
+
+    .divider { height: 1px; background: #e6dcc9; margin: 8px 0 14px; }
+    .empty-state { font-size: 12px; color: #a4977f; }
+
+    .type-toggle {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .type-btn {
+      flex: 1;
+      padding: 8px 4px;
+      font-size: 11px;
+      text-align: center;
+      border: 1px solid #ddd0ba;
+      border-radius: 5px;
+      background: #fff;
+      color: #7a6d58;
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .type-btn.active {
+      border-color: #d97742;
+      background: #fce6d2;
+      color: #b5601f;
+      font-weight: 600;
+    }
+    .type-btn:hover:not(.active) {
+      border-color: #b5a68d;
+      color: #3a3126;
+    }
+
+    .box-preset-btn {
+      width: 100%;
+      padding: 8px;
+      font-size: 12px;
+      border: 1px dashed #d5c5a8;
+      border-radius: 5px;
+      background: transparent;
+      color: #7a6d58;
+      cursor: pointer;
+      margin-bottom: 14px;
+    }
+    .box-preset-btn:hover {
+      border-color: #b5a68d;
+      color: #3a3126;
+      background: #fbf3e6;
+    }
+
+    .transform-grid {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .transform-field-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #fff;
+      border: 1px solid #ddd0ba;
+      border-radius: 4px;
+      padding: 0 6px;
+    }
+    .transform-field-wrap .field-input {
+      border: none;
+      padding: 6px 2px;
+      text-align: right;
+    }
+    .transform-field-wrap .field-input:focus { border: none; outline: none; }
+    .axis-label { font-size: 10px; font-weight: 700; width: 10px; }
+    .axis-label.axis-x { color: #c0392b; }
+    .axis-label.axis-y { color: #2f8a4f; }
+    .axis-label.axis-z { color: #2f5fa8; }
+    .transform-label {
+      font-size: 10px;
+      color: #a4977f;
+      margin-bottom: 12px;
+    }
+
+    .reset-btn {
+      width: 100%;
+      padding: 7px 8px;
+      font-size: 12px;
+      border: 1px solid #d5c5a8;
+      border-radius: 4px;
+      background: #fff;
+      color: #6b5d47;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .reset-btn:hover { border-color: #b5a68d; background: #fbf3e6; }
+
+    /* ---- Stage 2: relations UI ---- */
+    .warning-banner {
+      background: #fdf0e2;
+      border: 1px solid #e8c496;
+      color: #96551f;
+      font-size: 11px;
+      padding: 8px 10px;
+      border-radius: 5px;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .field-input-wrap.locked { opacity: 0.75; }
+    .field-input:disabled { background: #f3ede0; color: #7a6d58; cursor: not-allowed; }
+    .unlink-btn {
+      width: 100%;
+      margin-top: 4px;
+      padding: 4px 6px;
+      font-size: 10.5px;
+      border: 1px dashed #d5c5a8;
+      border-radius: 4px;
+      background: transparent;
+      color: #8a7d68;
+      cursor: pointer;
+    }
+    .unlink-btn:hover { border-color: #b5a68d; color: #3a3126; }
+
+    .constraint-list { margin-bottom: 10px; }
+    .constraint-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      padding: 6px 8px;
+      margin-bottom: 6px;
+      background: #fbf3e6;
+      border: 1px solid #e6dcc9;
+      border-radius: 5px;
+      font-size: 10.5px;
+    }
+    .constraint-item.overridden { opacity: 0.55; }
+    .constraint-desc { flex: 1; line-height: 1.4; color: #55503f; }
+    .constraint-remove-btn {
+      border: none;
+      background: transparent;
+      color: #b5502f;
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 2px;
+    }
+
+    .add-constraint-form {
+      background: #fffdf8;
+      border: 1px dashed #d5c5a8;
+      border-radius: 6px;
+      padding: 10px;
+    }
+    .relation-ref-pair {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .relation-ref {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: #fbf3e6;
+      border: 1px solid #e6dcc9;
+      border-radius: 5px;
+      padding: 6px;
+    }
+    .relation-ref-label {
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #a4977f;
+      font-weight: 600;
+    }
+    .relation-ref select, .relation-ref input {
+      width: 100%;
+      font-size: 11px;
+      padding: 4px 6px;
+    }
+    select.field-input {
+      background: #fff;
+      border: 1px solid #ddd0ba;
+      border-radius: 4px;
+      color: #3a3126;
+    }
+
+    table.bom { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.bom th {
+      text-align: left;
+      color: #a4977f;
+      font-weight: 500;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #e6dcc9;
+    }
+    table.bom th.right, table.bom td.right { text-align: right; }
+    table.bom td { padding: 6px 0; vertical-align: top; color: #3a3126; }
+
+  </style>
+</head>
+<body>
+
+  <!-- Top bar -->
+  <div id="topbar">
+    <a href="index.html" class="back-btn">← Back</a>
+    <div class="sep"></div>
+    <div class="app-name">3D Modeller</div>
+    <div id="stage-label"></div>
+    <div class="spacer"></div>
+    <div class="hint-bar">Drag empty space: orbit &nbsp;·&nbsp; Right-drag: pan &nbsp;·&nbsp; Scroll: zoom &nbsp;·&nbsp; Click panel: select &nbsp;·&nbsp; Click empty space: deselect &nbsp;·&nbsp; Arrow: move &nbsp;·&nbsp; Ring: rotate &nbsp;·&nbsp; Corner: resize</div>
+  </div>
+
+  <!-- Main layout: panel list / 3D viewport / inspector -->
+  <div id="main">
+    <div id="list-panel"></div>
+    <div class="resizer" id="resizer-left">
+      <button class="collapse-tab" id="toggle-list-btn" title="Toggle panel list">⟨⟩</button>
+    </div>
+
+    <div id="viewport-wrap">
+      <canvas id="canvas"></canvas>
+
+      <div id="info">Panel Modeller — Stage 0</div>
+
+      <div id="axes">
+        <span class="x">X</span> width<br>
+        <span class="y">Y</span> height<br>
+        <span class="z">Z</span> depth
+      </div>
+    </div>
+
+    <div class="resizer" id="resizer-right">
+      <button class="collapse-tab" id="toggle-inspector-btn" title="Toggle inspector">⟨⟩</button>
+    </div>
+    <div id="inspector">
+      <div id="properties-container"></div>
+      <div class="divider"></div>
+      <div class="section-title">BOM (derived, grouped by material + thickness)</div>
+      <table class="bom">
+        <thead>
+          <tr><th>Material</th><th class="right">Qty</th><th class="right">m²</th></tr>
+        </thead>
+        <tbody id="bom-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script type="module" src="/src/modeller-main.js"></script>
+
+</body>
+</html>

@@ -1,19 +1,32 @@
 /**
  * Graph node definitions for the modeller.
  *
- * Stage 0/1: a single node type — the rectangular panel — with
- * only literal-valued fields (no relationships to other nodes).
- * That comes in Stage 2 as a `spans_between` / `attached_to`
- * field referencing other node ids.
+ * STAGE 2: nodes now carry an optional `constraints` array. Each
+ * constraint targets exactly one field ('width' | 'height' |
+ * 'thickness' | 'positionX' | 'positionY' | 'positionZ') and is
+ * either:
  *
- * `offset` / `rotation` follow the "manual override" pattern used
- * for dimensions, but expressed as a DELTA from the computed
- * auto-layout position rather than an absolute coordinate:
- *   final position = auto-layout position + offset
- * That's what makes {x:0,y:0,z:0} always mean "exactly where
- * auto-layout would have put it" — zeroing offset and rotation
- * restores the original position/orientation with no separate
- * bookkeeping needed.
+ *   spansBetween — this field's VALUE is the distance between two
+ *   referenced faces (used for width/height/thickness).
+ *
+ *   attachedTo — this field's VALUE is derived from touching one of
+ *   THIS node's own faces (`myFace`) against one referenced face
+ *   (used for positionX/positionY/positionZ).
+ *
+ * A face reference is always the same shape — { node, face, offset }
+ * — a normal+offset representation: `face` names one of the six
+ * LOCAL_FACES below, and `offset` (mm) shifts the reference point
+ * outward along that face's own normal. Offset defaults to 0 (flush
+ * contact); a positive value is what an inset/rabbet joint would use
+ * later, so this doesn't need to change shape when that's built.
+ *
+ * `overridden: true` means the user manually edited a field that
+ * used to be governed by this constraint — the resolver skips it
+ * (keeps the literal value on the node) but the constraint's
+ * definition is NOT deleted, so it's still visible/re-linkable later.
+ *
+ * Every existing panel (no `constraints`) keeps working exactly as
+ * before — this is additive, not a breaking migration.
  */
 
 let idCounter = 1;
@@ -24,7 +37,7 @@ export function nextId() {
 
 // Guard against degenerate (zero/negative) panel geometry — used
 // wherever a dimension can be derived from user interaction (the
-// scale gizmo, the box preset, and later the constraint resolver).
+// scale gizmo, the box preset, and now the constraint resolver).
 // One shared constant so all three can never quietly drift apart.
 export const MIN_PANEL_DIM_MM = 10;
 
@@ -33,16 +46,20 @@ export const MIN_PANEL_DIM_MM = 10;
  * frame — width along X, height along Y, thickness along Z, exactly
  * as BoxGeometry(width, height, thickness) lays it out before any
  * rotation is applied. Defining faces here, once, is what lets
- * constraints (Stage 2), edge-banding, and hole placement (Stage 5)
- * all reference the same six names instead of each inventing its
- * own — and keeps face identity independent of whatever `rotation`
- * a panel currently has (see LOCAL_FACES doc below).
+ * constraints, edge-banding, and hole placement (later stages) all
+ * reference the same six names instead of each inventing their own
+ * — and keeps face identity independent of whatever `rotation` a
+ * panel currently has: flipping a panel's orientation preset must
+ * never redefine which physical edge is "top".
  *
- * The resolver is responsible for combining a face's local normal
- * with a node's actual rotation to get a world-space direction —
- * nothing here does that projection, on purpose, since "which way
- * is my own top edge" must never change just because a panel got
- * flipped into the "horizontal" orientation preset.
+ * The resolver combines a face's local normal with the target node's
+ * ACTUAL rotation to get a world-space direction, and requires that
+ * result to land on an axis (within a small tolerance) — general
+ * angled joinery (a face resolved against a non-axis-aligned target)
+ * is explicitly unsupported for now. When that happens the resolver
+ * raises a clear, named warning rather than silently producing wrong
+ * geometry; see snap.js. Lifting that restriction later only means
+ * extending the resolver's math — this vocabulary doesn't change.
  */
 export const LOCAL_FACES = {
   right:  { x: 1, y: 0, z: 0 },   // +width axis
@@ -52,6 +69,27 @@ export const LOCAL_FACES = {
   front:  { x: 0, y: 0, z: 1 },   // +thickness axis — the "show" face
   back:   { x: 0, y: 0, z: -1 },
 };
+
+// Which of a panel's own literal dimension fields a given LOCAL face
+// belongs to — e.g. the 'right'/'left' faces sit at ±width/2. The
+// resolver uses this to find a face's distance from its node's own
+// center, regardless of which specific face was chosen.
+export const FACE_TO_DIM_FIELD = {
+  right: 'width', left: 'width',
+  top: 'height', bottom: 'height',
+  front: 'thickness', back: 'thickness',
+};
+
+// Which world axis a constrainable field corresponds to.
+export const FIELD_TO_AXIS = {
+  width: 'x', height: 'y', thickness: 'z',
+  positionX: 'x', positionY: 'y', positionZ: 'z',
+};
+
+let constraintIdCounter = 1;
+export function nextConstraintId() {
+  return `c${constraintIdCounter++}`;
+}
 
 export function createPanelNode(overrides = {}) {
   return {
@@ -64,6 +102,7 @@ export function createPanelNode(overrides = {}) {
     quantity: 1,
     offset: { x: 0, y: 0, z: 0 },       // mm, delta from auto-layout position
     rotation: { x: 0, y: 0, z: 0 },     // degrees
+    constraints: [],                    // Stage 2: see file header
     ...overrides,
   };
 }
@@ -71,15 +110,16 @@ export function createPanelNode(overrides = {}) {
 // Three.js scene unit = 1 metre; graph values are always mm.
 export const MM_TO_UNIT = 1 / 1000;
 
-const PANEL_GAP_UNITS = 0.15; // placeholder spacing until Stage 2 relations exist
+const PANEL_GAP_UNITS = 0.15; // placeholder spacing until every panel is constraint-driven
 
 /**
- * Auto-layout placeholder: lines panels up along X, ground-level Y.
- * This is the single source of truth for "where would this node sit
- * if nobody had moved it" — both the 3D view (scene.js) and the box
- * preset generator (which needs to compute an offset that cancels
- * this out) call this same function, so they can never disagree.
- * Replaced entirely once Stage 2's spans_between relations exist.
+ * Auto-layout FALLBACK: lines up, along X, ground-level Y, any panel
+ * that has no active position constraint on a given axis. This is
+ * the single source of truth for "where would this node sit if
+ * nothing constrains it" — the resolver (snap.js) calls this once
+ * and only overrides the axes that a constraint actually governs,
+ * so a panel with (say) only a width constraint still gets a sane
+ * auto position on all three axes.
  */
 export function computeAutoLayoutPositions(panels) {
   let cursorX = 0;
