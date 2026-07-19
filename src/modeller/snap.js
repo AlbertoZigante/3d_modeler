@@ -57,6 +57,7 @@ const EMPTY_LOCKS = { width: false, height: false, thickness: false, positionX: 
 function emptyResolved(node, autoPos) {
   return {
     id: node.id,
+    name: node.name,
     material: node.material,
     quantity: node.quantity,
     rotation: node.rotation || { x: 0, y: 0, z: 0 },

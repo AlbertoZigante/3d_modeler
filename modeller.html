@@ -91,6 +91,33 @@
       color: #a4977f;
     }
 
+    .mode-toggle {
+      display: flex;
+      gap: 4px;
+      background: #ece0cc;
+      border-radius: 6px;
+      padding: 3px;
+    }
+    .mode-btn {
+      font-size: 12px;
+      padding: 5px 12px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: #7a6d58;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .mode-btn.active {
+      background: #fff;
+      color: #b5601f;
+      font-weight: 600;
+      box-shadow: 0 1px 2px rgba(0,0,0,.08);
+    }
+    .mode-btn:hover:not(.active) {
+      color: #3a3126;
+    }
+
     /* ── Main layout: sidebar / viewport / sidebar ── */
     #main {
       flex: 1;
@@ -202,6 +229,16 @@
     #axes .x { color: #c0392b; }
     #axes .y { color: #2f8a4f; }
     #axes .z { color: #2f5fa8; }
+
+    /* ── Rotating 3D axes gizmo, bottom-left ── */
+    #axes-gizmo-canvas {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      width: 100px;
+      height: 100px;
+      pointer-events: none;
+    }
 
     /* ── Sidebar shared styles ── */
     .section-title {
@@ -390,6 +427,139 @@
     }
     .reset-btn:hover { border-color: #b5a68d; background: #fbf3e6; }
 
+    /* ---- rename (pencil icon) ---- */
+    .node-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .node-header-row .section-title { margin-bottom: 0; }
+    .rename-btn {
+      border: none;
+      background: transparent;
+      font-size: 12px;
+      cursor: pointer;
+      opacity: 0.6;
+      padding: 2px 4px;
+      flex-shrink: 0;
+    }
+    .rename-btn:hover { opacity: 1; }
+    .rename-input { font-size: 12px; padding: 3px 6px; }
+
+    /* ---- Stage 2: relations UI ---- */
+    .warning-banner {
+      background: #fdf0e2;
+      border: 1px solid #e8c496;
+      color: #96551f;
+      font-size: 11px;
+      padding: 8px 10px;
+      border-radius: 5px;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .field-input-wrap.locked { opacity: 0.75; }
+    .field-input:disabled { background: #f3ede0; color: #7a6d58; cursor: not-allowed; }
+    .unlink-btn {
+      width: 100%;
+      margin-top: 4px;
+      padding: 4px 6px;
+      font-size: 10.5px;
+      border: 1px dashed #d5c5a8;
+      border-radius: 4px;
+      background: transparent;
+      color: #8a7d68;
+      cursor: pointer;
+    }
+    .unlink-btn:hover { border-color: #b5a68d; color: #3a3126; }
+
+    .constraint-list { margin-bottom: 10px; }
+    .constraint-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      padding: 6px 8px;
+      margin-bottom: 6px;
+      background: #fbf3e6;
+      border: 1px solid #e6dcc9;
+      border-radius: 5px;
+      font-size: 10.5px;
+    }
+    .constraint-item.overridden { opacity: 0.55; }
+    .constraint-item { cursor: pointer; }
+    .constraint-item:hover { border-color: #d5c5a8; }
+    .constraint-item.editing {
+      border-color: #d97742;
+      background: #fce6d2;
+    }
+    .editing-hint {
+      font-size: 10px;
+      color: #a4977f;
+      font-style: italic;
+      margin-bottom: 8px;
+    }
+    .constraint-form-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .constraint-form-actions .box-preset-btn,
+    .constraint-form-actions .remove-btn {
+      flex: 1;
+      margin: 0;
+    }
+    .constraint-desc { flex: 1; line-height: 1.4; color: #55503f; }
+    .constraint-remove-btn {
+      border: none;
+      background: transparent;
+      color: #b5502f;
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 2px;
+    }
+
+    .add-constraint-form {
+      background: #fffdf8;
+      border: 1px dashed #d5c5a8;
+      border-radius: 6px;
+      padding: 10px;
+    }
+    .relation-ref-pair {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .relation-ref {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: #fbf3e6;
+      border: 1px solid #e6dcc9;
+      border-radius: 5px;
+      padding: 6px;
+    }
+    .relation-ref-label {
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #a4977f;
+      font-weight: 600;
+    }
+    .relation-ref select, .relation-ref input {
+      width: 100%;
+      font-size: 11px;
+      padding: 4px 6px;
+    }
+    select.field-input {
+      background: #fff;
+      border: 1px solid #ddd0ba;
+      border-radius: 4px;
+      color: #3a3126;
+    }
+
     table.bom { width: 100%; border-collapse: collapse; font-size: 12px; }
     table.bom th {
       text-align: left;
@@ -411,13 +581,22 @@
     <div class="sep"></div>
     <div class="app-name">3D Modeller</div>
     <div id="stage-label"></div>
+    <div class="mode-toggle" id="view-mode-toggle">
+      <button class="mode-btn active" id="view-3d-btn">3D</button>
+      <button class="mode-btn" id="view-2d-btn">2D</button>
+    </div>
     <div class="spacer"></div>
-    <div class="hint-bar">Drag empty space: orbit &nbsp;·&nbsp; Right-drag: pan &nbsp;·&nbsp; Scroll: zoom &nbsp;·&nbsp; Click panel: select &nbsp;·&nbsp; Click empty space: deselect &nbsp;·&nbsp; Arrow: move &nbsp;·&nbsp; Ring: rotate &nbsp;·&nbsp; Corner: resize</div>
+    <div class="hint-bar" id="hint-bar-3d">Drag empty space: orbit &nbsp;·&nbsp; Right-drag: pan &nbsp;·&nbsp; Scroll: zoom &nbsp;·&nbsp; Click panel: select &nbsp;·&nbsp; Click empty space: deselect &nbsp;·&nbsp; Arrow: move &nbsp;·&nbsp; Ring: rotate &nbsp;·&nbsp; Corner: resize</div>
+    <div class="hint-bar" id="hint-bar-2d" style="display:none;">Drag a panel: move &nbsp;·&nbsp; Drag the orange handle: rotate &nbsp;·&nbsp; Drag empty space: pan &nbsp;·&nbsp; Scroll: zoom &nbsp;·&nbsp; Click empty space: deselect</div>
   </div>
 
   <!-- Main layout: panel list / 3D viewport / inspector -->
   <div id="main">
-    <div id="list-panel"></div>
+    <div id="list-panel">
+      <div id="panel-list-mount"></div>
+      <div class="divider"></div>
+      <div id="relations-mount"></div>
+    </div>
     <div class="resizer" id="resizer-left">
       <button class="collapse-tab" id="toggle-list-btn" title="Toggle panel list">⟨⟩</button>
     </div>
@@ -432,6 +611,8 @@
         <span class="y">Y</span> height<br>
         <span class="z">Z</span> depth
       </div>
+
+      <canvas id="axes-gizmo-canvas"></canvas>
     </div>
 
     <div class="resizer" id="resizer-right">

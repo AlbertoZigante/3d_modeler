@@ -25,6 +25,7 @@ import { getSelectedId, setSelectedId } from './modeller/selection.js';
 import { computeBom } from './engine/bom.js';
 import { renderProperties } from './ui/properties.js';
 import { renderPanelList } from './ui/toolbar.js';
+import { renderRelations } from './ui/relations.js';
 import { initResizableLayout } from './ui/layout.js';
 
 initResizableLayout();
@@ -39,13 +40,16 @@ setSelectedId(panels[0].id);
 // ---- DOM refs ----
 const canvas = document.getElementById('canvas');
 const main = document.getElementById('main');
-const listPanelEl = document.getElementById('list-panel');
+const panelListMountEl = document.getElementById('panel-list-mount');
+const relationsMountEl = document.getElementById('relations-mount');
 const inspectorEl = document.getElementById('properties-container');
 const bomBodyEl = document.getElementById('bom-body');
 const stageLabelEl = document.getElementById('stage-label');
+const axesCanvas = document.getElementById('axes-gizmo-canvas');
 
 // ---- Scene (view layer). Consumes RESOLVED panels only. ----
-const { reconcile } = createModellerScene(canvas, main, {
+const { reconcile, setViewMode } = createModellerScene(canvas, main, {
+  axesCanvas,
   onSelect: (id) => {
     setSelectedId(id);
     renderAll();
@@ -65,6 +69,35 @@ const { reconcile } = createModellerScene(canvas, main, {
 });
 
 // -------------------------------------------------------------
+// 3D / 2D view mode toggle. Purely a rendering/interaction switch —
+// nothing about the graph, resolver, BOM, or inspector changes
+// based on which view is active.
+// -------------------------------------------------------------
+const view3dBtn = document.getElementById('view-3d-btn');
+const view2dBtn = document.getElementById('view-2d-btn');
+const hintBar3d = document.getElementById('hint-bar-3d');
+const hintBar2d = document.getElementById('hint-bar-2d');
+
+view3dBtn.addEventListener('click', () => {
+  setSelectedId(null); // deselect on every mode switch — no gizmo/handle can be left stuck
+  setViewMode('3d');
+  view3dBtn.classList.add('active');
+  view2dBtn.classList.remove('active');
+  hintBar3d.style.display = '';
+  hintBar2d.style.display = 'none';
+  renderAll();
+});
+view2dBtn.addEventListener('click', () => {
+  setSelectedId(null);
+  setViewMode('2d');
+  view2dBtn.classList.add('active');
+  view3dBtn.classList.remove('active');
+  hintBar3d.style.display = 'none';
+  hintBar2d.style.display = '';
+  renderAll();
+});
+
+// -------------------------------------------------------------
 // Single generic graph-mutation primitive (Stage 2 consolidation:
 // every function below patches `panels` through this one function
 // instead of each hand-rolling its own `.map(...)`).
@@ -79,7 +112,7 @@ function renderAll() {
 
   reconcile(resolved, selectedId);
 
-  renderPanelList(listPanelEl, {
+  renderPanelList(panelListMountEl, {
     panels: resolved,
     selectedId,
     onSelect: (id) => {
@@ -118,16 +151,29 @@ function renderInspectorOnly() {
   renderProperties(inspectorEl, {
     selectedPanel,
     resolvedPanel,
-    allPanels: panels,
     onFieldChange: updateSelectedField,
     onTransformFieldChange: updateSelectedTransformField,
     onResetTransform: resetSelectedTransform,
     onSetOrientation: setSelectedOrientation,
     onCreateBox: addBoxFromSelection,
-    onAddConstraint: addConstraintToSelected,
     onUnlinkConstraint: unlinkOrRemoveConstraint,
+    onRename: renameSelected,
     onRemove: removeSelected,
   });
+
+  renderRelations(relationsMountEl, {
+    selectedPanel,
+    allPanels: panels,
+    onAddConstraint: addConstraintToSelected,
+    onUpdateConstraint: updateConstraintOnSelected,
+    onUnlinkConstraint: unlinkOrRemoveConstraint,
+  });
+}
+
+function renameSelected(newName) {
+  const trimmed = newName.trim();
+  updateNode(getSelectedId(), { name: trimmed === '' ? null : trimmed });
+  renderAll();
 }
 
 function updateSelectedField(field, value) {
@@ -187,6 +233,24 @@ function addConstraintToSelected(constraint) {
     ...(node.constraints || []).filter((c) => c.field !== constraint.field),
     withId,
   ];
+  updateNode(selectedId, { constraints: nextConstraints });
+  renderAll();
+}
+
+// Replaces an EXISTING constraint's definition in place (same id, so
+// the relations list's "editing" highlight and click-to-toggle state
+// in relations.js keep referring to the same row) — used by the
+// "Update" button when editing a relation, as opposed to
+// addConstraintToSelected's "Apply", which always creates a new one.
+// Re-activates it (overridden: false) even if it had been unlinked,
+// since updating it is the user's way of consciously re-linking.
+function updateConstraintOnSelected(constraintId, newConstraintData) {
+  const selectedId = getSelectedId();
+  const node = panels.find((p) => p.id === selectedId);
+  if (!node) return;
+  const nextConstraints = (node.constraints || []).map((c) =>
+    c.id === constraintId ? { ...newConstraintData, id: constraintId, overridden: false } : c
+  );
   updateNode(selectedId, { constraints: nextConstraints });
   renderAll();
 }

@@ -9,6 +9,11 @@
  * something else mid-drag, e.g. an active gizmo drag) and an
  * `onClick(e)` callback (fired only for a genuine click: no drag,
  * not blocked).
+ *
+ * SHIFT+LEFT-DRAG PANS instead of orbiting — same pan math as
+ * right-drag, just a second way to reach it without needing a
+ * right mouse button (useful on a trackpad-only setup, and it's the
+ * modifier-key convention this app already uses elsewhere).
  */
 import * as THREE from 'three';
 
@@ -24,10 +29,20 @@ export function createOrbitControls(canvas, camera, { isBlocked, onClick, gestur
   }
   applyCamera();
 
+  function pan(dx, dy) {
+    const panSpeed = spherical.radius * 0.001;
+    const right = new THREE.Vector3();
+    const up = new THREE.Vector3();
+    right.crossVectors(camera.getWorldDirection(new THREE.Vector3()), camera.up).normalize();
+    up.copy(camera.up).normalize();
+    target.addScaledVector(right, -dx * panSpeed);
+    target.addScaledVector(up, dy * panSpeed);
+  }
+
   const pointer = { down: false, button: -1, x: 0, y: 0, moved: false };
 
   function handlePointerDown(e) {
-    if (gestureState) gestureState.gizmoHandled = false;
+    if (gestureState) gestureState.interactionHandled = false;
     pointer.down = true;
     pointer.button = e.button;
     pointer.x = e.clientX;
@@ -37,7 +52,7 @@ export function createOrbitControls(canvas, camera, { isBlocked, onClick, gestur
   }
 
   function handlePointerUp(e) {
-    const blocked = gestureState ? gestureState.gizmoHandled : isBlocked?.();
+    const blocked = gestureState ? gestureState.interactionHandled : isBlocked?.();
     if (pointer.down && !pointer.moved && pointer.button === 0 && !blocked) {
       onClick?.(e);
     }
@@ -58,17 +73,15 @@ export function createOrbitControls(canvas, camera, { isBlocked, onClick, gestur
     if (isBlocked?.()) return;
 
     if (pointer.button === 0) {
-      spherical.theta -= dx * 0.007;
-      spherical.phi = Math.max(0.05, Math.min(Math.PI - 0.05, spherical.phi - dy * 0.007));
+      if (e.shiftKey) {
+        pan(dx, dy);
+      } else {
+        spherical.theta -= dx * 0.007;
+        spherical.phi = Math.max(0.05, Math.min(Math.PI - 0.05, spherical.phi - dy * 0.007));
+      }
     }
     if (pointer.button === 2) {
-      const panSpeed = spherical.radius * 0.001;
-      const right = new THREE.Vector3();
-      const up = new THREE.Vector3();
-      right.crossVectors(camera.getWorldDirection(new THREE.Vector3()), camera.up).normalize();
-      up.copy(camera.up).normalize();
-      target.addScaledVector(right, -dx * panSpeed);
-      target.addScaledVector(up, dy * panSpeed);
+      pan(dx, dy);
     }
     applyCamera();
   }

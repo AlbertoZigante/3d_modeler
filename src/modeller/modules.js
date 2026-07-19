@@ -95,6 +95,7 @@ export function createPanelNode(overrides = {}) {
   return {
     id: nextId(),
     type: 'panel',
+    name: null,                          // optional friendly label; id stays the stable reference key
     width: 600,     // mm
     height: 400,    // mm
     thickness: 18,  // mm
@@ -105,6 +106,14 @@ export function createPanelNode(overrides = {}) {
     constraints: [],                    // Stage 2: see file header
     ...overrides,
   };
+}
+
+// Used anywhere a panel needs to be shown to a person (list, inspector,
+// relation descriptions) — falls back to the stable id when no custom
+// name has been set. Constraints/relations always store the id, never
+// the name, so renaming a panel can never break a reference.
+export function getDisplayName(node) {
+  return (node && node.name) || (node ? node.id : '');
 }
 
 // Three.js scene unit = 1 metre; graph values are always mm.

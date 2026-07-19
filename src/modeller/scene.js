@@ -1,41 +1,35 @@
 /**
- * The view layer + THE RECONCILER. Owns the Three.js scene, camera,
- * renderer, lights, and composes the two extracted modules —
- * orbitControls.js (camera) and gizmos.js (move/rotate/resize
- * handles) — rather than managing that wiring itself. This file's
- * job is: keep the scene in sync with RESOLVED panel data, and
- * report user manipulation back up through callbacks.
+ * The view layer + THE RECONCILER. Owns the Three.js scene, renderer,
+ * lights, and composes three interaction modules: orbitControls.js +
+ * gizmos.js (the 3D experience) and view2d.js (the 2D front-elevation
+ * experience with PowerPoint-style direct manipulation). Exactly one
+ * of these interaction layers is alive at a time — switching modes
+ * disposes the old one and creates the other, rather than both
+ * fighting over the same pointer events.
  *
- * STAGE 2: `reconcile()` now takes the RESOLVED panels array (from
- * snap.js's resolveConstraints — concrete width/height/thickness/
- * position/lockedFields for every node), not the raw graph. This
- * file no longer calls computeAutoLayoutPositions itself — the
- * resolver already folds that fallback in. Locked fields hide their
- * corresponding gizmo handle (see gizmos.js) so dragging a derived
- * value isn't possible until the user explicitly breaks that link.
- *
- * CLICK ON EMPTY SPACE = DESELECT
- * ---------------------------------
- * A plain click that hits no panel mesh clears selection (detaches
- * all three gizmos, clears the inspector via main.js). A click that
- * lands on a gizmo handle must NOT be read as "empty space" even
- * though gizmo geometry isn't in the panel raycast — a shared
- * `gestureState.gizmoHandled` flag (set by gizmos.js, read by
- * orbitControls.js) tracks that per-gesture, regardless of which
- * module's own event listeners happen to fire first.
+ * `reconcile()` takes the RESOLVED panels array (from snap.js) and
+ * is completely mode-agnostic: it sets mesh position/rotation/
+ * geometry/material the same way regardless of which camera is
+ * currently rendering the scene. BOM, relations, the box preset, and
+ * locked-field logic all work identically in both views because none
+ * of that ever depended on a specific camera or interaction style —
+ * only WHICH camera renders, and WHICH layer listens for drags,
+ * changes between 2D and 3D.
  */
 
 import * as THREE from 'three';
 import { MM_TO_UNIT } from './modules.js';
 import { createOrbitControls } from './orbitControls.js';
 import { createGizmos } from './gizmos.js';
+import { create2DControls } from './view2d.js';
+import { createAxesGizmo } from './axesGizmo.js';
 
 export function createModellerScene(
   canvas,
   main,
-  { onSelect, onTransformChange, onDimensionChange } = {}
+  { onSelect, onTransformChange, onDimensionChange, axesCanvas } = {}
 ) {
-  // ---- renderer / scene / camera — warm, light palette ----
+  // ---- renderer / scene / lights — warm, light palette ----
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -44,9 +38,6 @@ export function createModellerScene(
 
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0xf6ede0, 8, 24);
-
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 2000);
-  camera.position.set(3, 2.5, 4);
 
   const ambient = new THREE.AmbientLight(0xfff4e2, 0.75);
   scene.add(ambient);
@@ -77,70 +68,119 @@ export function createModellerScene(
   ground.receiveShadow = true;
   scene.add(ground);
 
-  // ---- shared per-gesture state between orbitControls and gizmos ----
-  // True only while the pointer gesture in progress started on a
-  // gizmo handle. See file header for why this beats checking
-  // `.dragging` at pointerup time.
-  const gestureState = { gizmoHandled: false };
+  // ---- two cameras, one scene ----
+  const camera3d = new THREE.PerspectiveCamera(45, 1, 0.1, 2000);
+  camera3d.position.set(3, 2.5, 4);
 
-  // ---- click-to-select / click-empty-to-deselect via raycast ----
-  const raycaster = new THREE.Raycaster();
+  const ORTHO_HALF_HEIGHT = 2;
+  const camera2d = new THREE.OrthographicCamera(-2, 2, ORTHO_HALF_HEIGHT, -ORTHO_HALF_HEIGHT, 0.1, 100);
+  camera2d.position.set(0, 0, 10);
+  camera2d.lookAt(0, 0, 0);
 
-  function handleClickSelect(e) {
+  let viewMode = '3d';
+  let activeCamera = camera3d;
+
+  // ---- shared conversion: absolute mesh transform -> offset delta ----
+  // Both gizmos (3D) and view2d (2D) report an absolute world
+  // position after a drag; this is the one place that converts it
+  // back into `offset` (a delta from the auto-layout/constraint base)
+  // before handing it to the external onTransformChange callback —
+  // written once, used by both interaction layers.
+  const autoBaseById = new Map();
+  function reportTransformToExternal(nodeId, transform) {
+    if (!onTransformChange) return;
+    const base = autoBaseById.get(nodeId) || { x: 0, y: 0, z: 0 };
+    onTransformChange(nodeId, {
+      offset: {
+        x: (transform.offsetDelta.x - base.x) / MM_TO_UNIT,
+        y: (transform.offsetDelta.y - base.y) / MM_TO_UNIT,
+        z: (transform.offsetDelta.z - base.z) / MM_TO_UNIT,
+      },
+      rotation: transform.rotation,
+    });
+  }
+
+  // ---- THE RECONCILER's data (shared across whichever mode is active) ----
+  const meshRegistry = new Map(); // id -> { mesh, edges, lastDims }
+  let lastResolvedPanels = [];
+  let lastSelectedId = null;
+
+  function meshList() {
+    return Array.from(meshRegistry.values()).map((entry) => entry.mesh);
+  }
+
+  // ---- 3D interaction layer ----
+  const gestureState = { interactionHandled: false };
+
+  function handleClickSelect3D(e) {
     const rect = canvas.getBoundingClientRect();
     const ndc = new THREE.Vector2(
       ((e.clientX - rect.left) / rect.width) * 2 - 1,
       -((e.clientY - rect.top) / rect.height) * 2 + 1
     );
-    raycaster.setFromCamera(ndc, camera);
-    const meshes = Array.from(meshRegistry.values()).map((entry) => entry.mesh);
-    const hits = raycaster.intersectObjects(meshes, false);
-    if (!onSelect) return;
-    onSelect(hits.length > 0 ? hits[0].object.userData.nodeId : null);
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(ndc, camera3d);
+    const hits = raycaster.intersectObjects(meshList(), false);
+    onSelect?.(hits.length > 0 ? hits[0].object.userData.nodeId : null);
   }
 
-  // orbitControls registered BEFORE gizmos, deliberately: canvas
-  // 'pointerdown' listeners fire in registration order, and
-  // orbitControls resets gestureState.gizmoHandled = false at the
-  // very start of every gesture, before gizmos.js's own listeners
-  // (added when TransformControls is constructed, below) get a
-  // chance to set it back to true for a genuine gizmo hit.
-  const orbit = createOrbitControls(canvas, camera, {
-    isBlocked: () => gizmos.isDragging(),
-    onClick: handleClickSelect,
-    gestureState,
-  });
+  let orbit = null;
+  let gizmos = null;
+  let view2d = null;
 
-  const gizmos = createGizmos(camera, canvas, scene, {
-    gestureState,
-    onDimensionChange,
-    onTransformChange: (nodeId, transform) => {
-      const entry = Array.from(meshRegistry.entries()).find(([id]) => id === nodeId);
-      const base = autoBaseById.get(nodeId) || { x: 0, y: 0, z: 0 };
-      if (!onTransformChange) return;
-      onTransformChange(nodeId, {
-        offset: {
-          x: (transform.offsetDelta.x - base.x) / MM_TO_UNIT,
-          y: (transform.offsetDelta.y - base.y) / MM_TO_UNIT,
-          z: (transform.offsetDelta.z - base.z) / MM_TO_UNIT,
-        },
-        rotation: transform.rotation,
-      });
-    },
-  });
-  gizmos.setMeshEntryLookup((mesh) => meshRegistry.get(mesh.userData.nodeId));
+  function activate3D() {
+    gestureState.interactionHandled = false;
+    orbit = createOrbitControls(canvas, camera3d, {
+      isBlocked: () => gizmos.isDragging(),
+      onClick: handleClickSelect3D,
+      gestureState,
+    });
+    gizmos = createGizmos(camera3d, canvas, scene, {
+      gestureState,
+      onDimensionChange,
+      onTransformChange: reportTransformToExternal,
+    });
+    gizmos.setMeshEntryLookup((mesh) => meshRegistry.get(mesh.userData.nodeId));
+  }
 
-  // ---- THE RECONCILER ----
-  const meshRegistry = new Map(); // id -> { mesh, edges, lastDims }
-  const autoBaseById = new Map(); // id -> resolved position (units) as of the last reconcile — used to convert a gizmo drag's absolute result back into an offset delta
+  function activate2D() {
+    view2d = create2DControls(canvas, camera2d, scene, meshRegistry, {
+      onSelect,
+      onTransformChange: reportTransformToExternal,
+    });
+  }
+
+  function deactivateCurrent() {
+    if (orbit) { orbit.dispose(); orbit = null; }
+    if (gizmos) { gizmos.dispose(); gizmos = null; }
+    if (view2d) { view2d.dispose(); view2d = null; }
+  }
+
+  activate3D(); // default on load
+
+  function setViewMode(mode) {
+    if (mode === viewMode) return;
+    deactivateCurrent();
+    viewMode = mode;
+    activeCamera = mode === '2d' ? camera2d : camera3d;
+    if (mode === '2d') activate2D();
+    else activate3D();
+    onResize(); // camera projections depend on the active camera
+    reconcile(lastResolvedPanels, lastSelectedId); // re-apply immediately, don't wait for the next external render
+  }
 
   function reconcile(resolvedPanels, selectedId) {
+    lastResolvedPanels = resolvedPanels;
+    lastSelectedId = selectedId;
+
     const liveIds = new Set(resolvedPanels.map((p) => p.id));
 
     for (const [id, entry] of meshRegistry.entries()) {
       if (!liveIds.has(id)) {
-        for (const tc of gizmos.controls) {
-          if (tc.object === entry.mesh) tc.detach();
+        if (gizmos) {
+          for (const tc of gizmos.controls) {
+            if (tc.object === entry.mesh) tc.detach();
+          }
         }
         scene.remove(entry.mesh);
         entry.mesh.geometry.dispose();
@@ -191,6 +231,10 @@ export function createModellerScene(
         entry.lastDims = { w, h, t };
       }
 
+      // 2D drag needs to know, per axis, whether it's allowed to move
+      // this panel — same lockedFields the 3D gizmo already reads.
+      entry.mesh.userData.lockedFields = node.lockedFields || {};
+
       const posUnits = {
         x: node.position.x * MM_TO_UNIT,
         y: node.position.y * MM_TO_UNIT,
@@ -198,7 +242,9 @@ export function createModellerScene(
       };
       autoBaseById.set(node.id, posUnits);
 
-      const isBeingDragged = gizmos.controls.some((tc) => tc.object === entry.mesh && tc.dragging);
+      const isBeingDragged =
+        (gizmos && gizmos.controls.some((tc) => tc.object === entry.mesh && tc.dragging)) ||
+        (view2d && view2d.isDragging() && view2d.draggedMeshRef() === entry.mesh);
 
       if (!isBeingDragged) {
         entry.mesh.position.set(posUnits.x, posUnits.y, posUnits.z);
@@ -218,11 +264,16 @@ export function createModellerScene(
     });
 
     const selectedEntry = meshRegistry.get(selectedId);
-    if (selectedEntry) {
-      const node = resolvedPanels.find((p) => p.id === selectedId);
-      gizmos.attachTo(selectedEntry.mesh, node?.lockedFields || {});
-    } else {
-      gizmos.detachAll();
+    if (gizmos) {
+      if (selectedEntry) {
+        const node = resolvedPanels.find((p) => p.id === selectedId);
+        gizmos.attachTo(selectedEntry.mesh, node?.lockedFields || {});
+      } else {
+        gizmos.detachAll();
+      }
+    }
+    if (view2d) {
+      view2d.setSelectedMesh(selectedEntry ? selectedEntry.mesh : null);
     }
   }
 
@@ -235,18 +286,29 @@ export function createModellerScene(
     const w = viewportEl.clientWidth;
     const h = viewportEl.clientHeight;
     renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+
+    camera3d.aspect = w / h;
+    camera3d.updateProjectionMatrix();
+
+    const aspect = w / h;
+    camera2d.left = -ORTHO_HALF_HEIGHT * aspect;
+    camera2d.right = ORTHO_HALF_HEIGHT * aspect;
+    camera2d.top = ORTHO_HALF_HEIGHT;
+    camera2d.bottom = -ORTHO_HALF_HEIGHT;
+    camera2d.updateProjectionMatrix();
   }
   window.addEventListener('resize', onResize);
   const resizeObserver = new ResizeObserver(onResize);
   resizeObserver.observe(viewportEl);
   onResize();
 
+  const axesGizmo = axesCanvas ? createAxesGizmo(axesCanvas) : null;
+
   let animationFrameId = null;
   function animate() {
     animationFrameId = requestAnimationFrame(animate);
-    renderer.render(scene, camera);
+    renderer.render(scene, activeCamera);
+    if (axesGizmo) axesGizmo.render(activeCamera);
   }
   animate();
 
@@ -254,8 +316,8 @@ export function createModellerScene(
     cancelAnimationFrame(animationFrameId);
     window.removeEventListener('resize', onResize);
     resizeObserver.disconnect();
-    orbit.dispose();
-    gizmos.dispose();
+    deactivateCurrent();
+    if (axesGizmo) axesGizmo.dispose();
 
     for (const entry of meshRegistry.values()) {
       entry.mesh.geometry.dispose();
@@ -267,5 +329,5 @@ export function createModellerScene(
     renderer.dispose();
   }
 
-  return { reconcile, dispose };
+  return { reconcile, dispose, setViewMode };
 }
