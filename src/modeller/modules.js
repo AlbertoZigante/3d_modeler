@@ -96,13 +96,13 @@ export function createPanelNode(overrides = {}) {
     id: nextId(),
     type: 'panel',
     name: null,                          // optional friendly label; id stays the stable reference key
-    width: 600,     // mm
-    height: 400,    // mm
-    thickness: 18,  // mm
+    width: 350,     // mm — maps to world Z ("depth") once rotated into the YZ plane below
+    height: 350,    // mm — maps to world Y; equal to width by default, so the visible face is square
+    thickness: 18,  // mm — the small, BOM-fixed board thickness; maps to world X once rotated
     material: 'Melamine White 18mm',
     quantity: 1,
     offset: { x: 0, y: 0, z: 0 },       // mm, delta from auto-layout position
-    rotation: { x: 0, y: 0, z: 0 },     // degrees
+    rotation: { x: 0, y: 90, z: 0 },    // degrees — default orientation lies in the YZ plane (see above)
     constraints: [],                    // Stage 2: see file header
     ...overrides,
   };

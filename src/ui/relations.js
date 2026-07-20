@@ -3,20 +3,30 @@
  *
  * Click an existing relation in the list to load it into the form
  * below for editing (the form's fields pre-fill with that relation's
- * current field/type/node/face/offset values). While editing, the
- * submit area shows "Update" + "Remove" instead of "Apply". Clicking
- * the same relation again — or successfully updating/removing it —
- * returns the form to "create new" mode.
+ * current values). While editing, the submit area shows "Update" +
+ * "Remove" instead of "Apply". Clicking the same relation again — or
+ * successfully updating/removing it — returns the form to "create
+ * new" mode.
+ *
+ * SPANS-BETWEEN NO LONGER ASKS "WHICH FIELD": panels are mostly a 2D
+ * shape (thickness is a small, fixed board value — not something
+ * you'd span between two other panels), so which of width/height/
+ * thickness gets set is inferred from the chosen From/To faces
+ * themselves (see snap.js's inferSpanField). The field dropdown only
+ * remains for "attached to" relations, since positionX/Y/Z aren't a
+ * dimension choice the geometry can infer the same way.
+ *
+ * VALIDATION BEFORE COMMIT: onAddConstraint/onUpdateConstraint return
+ * { ok: true } or { ok: false, error }. On failure, the error is shown
+ * inline and the form is left exactly as the user had it — nothing is
+ * ever created that the resolver would immediately flag as broken.
  *
  * `editingConstraintId` is local module state, not threaded through
- * main.js: it only matters to this form's own rendering, and
- * main.js's `panels` shouldn't need to know "what's currently being
- * edited in some UI form" as part of the actual graph.
+ * main.js: it only matters to this form's own rendering.
  */
 import { LOCAL_FACES, getDisplayName } from '../modeller/modules.js';
 
 const FACE_NAMES = Object.keys(LOCAL_FACES);
-const DIM_FIELDS = ['width', 'height', 'thickness'];
 const POSITION_FIELDS = ['positionX', 'positionY', 'positionZ'];
 const POSITION_LABELS = { positionX: 'X position', positionY: 'Y position', positionZ: 'Z position' };
 
@@ -36,8 +46,6 @@ export function renderRelations(
     return;
   }
 
-  // switching to a different panel always exits edit mode — an
-  // in-progress edit on the previous panel's relation doesn't carry over
   if (selectedPanel.id !== lastSelectedPanelId) {
     editingConstraintId = null;
     lastSelectedPanelId = selectedPanel.id;
@@ -46,6 +54,9 @@ export function renderRelations(
   const otherPanels = (allPanels || []).filter((p) => p.id !== selectedPanel.id);
   const constraints = selectedPanel.constraints || [];
   const editingConstraint = constraints.find((c) => c.id === editingConstraintId) || null;
+
+  const rerender = () =>
+    renderRelations(container, { selectedPanel, allPanels, onAddConstraint, onUpdateConstraint, onUnlinkConstraint });
 
   container.innerHTML = `
     <div class="section-title">Relations</div>
@@ -58,10 +69,10 @@ export function renderRelations(
   // ---- click a relation row to load it into the form ----
   container.querySelectorAll('.constraint-item').forEach((item) => {
     item.addEventListener('click', (e) => {
-      if (e.target.closest('.constraint-remove-btn')) return; // × has its own handler
+      if (e.target.closest('.constraint-remove-btn')) return;
       const id = item.dataset.constraintId;
-      editingConstraintId = editingConstraintId === id ? null : id; // click again to cancel
-      renderRelations(container, { selectedPanel, allPanels, onAddConstraint, onUpdateConstraint, onUnlinkConstraint });
+      editingConstraintId = editingConstraintId === id ? null : id;
+      rerender();
     });
   });
 
@@ -76,24 +87,43 @@ export function renderRelations(
   // ---- the create/edit form ----
   const typeSelect = container.querySelector('#new-constraint-type');
   const formBody = container.querySelector('#new-constraint-form-body');
+  const errorEl = container.querySelector('#constraint-form-error');
+
+  function showError(message) {
+    if (errorEl) errorEl.textContent = '⚠ ' + message;
+  }
+
   if (typeSelect) {
     typeSelect.addEventListener('change', () => {
       formBody.innerHTML = renderConstraintFormBody(typeSelect.value, otherPanels, null);
+      if (errorEl) errorEl.textContent = '';
     });
 
     const applyBtn = container.querySelector('#apply-constraint-btn');
     if (applyBtn) {
       applyBtn.addEventListener('click', () => {
-        const constraint = readConstraintForm(container, typeSelect.value);
-        if (constraint) onAddConstraint(constraint);
+        const draft = readConstraintForm(container, typeSelect.value);
+        if (!draft) return;
+        const result = onAddConstraint(draft);
+        if (result && result.ok === false) {
+          showError(result.error);
+        } else {
+          rerender();
+        }
       });
     }
 
     const updateBtn = container.querySelector('#update-constraint-btn');
     if (updateBtn) {
       updateBtn.addEventListener('click', () => {
-        const constraint = readConstraintForm(container, typeSelect.value);
-        if (constraint) onUpdateConstraint(editingConstraintId, constraint);
+        const draft = readConstraintForm(container, typeSelect.value);
+        if (!draft) return;
+        const result = onUpdateConstraint(editingConstraintId, draft);
+        if (result && result.ok === false) {
+          showError(result.error);
+        } else {
+          rerender();
+        }
       });
     }
 
@@ -102,6 +132,7 @@ export function renderRelations(
       removeFormBtn.addEventListener('click', () => {
         onUnlinkConstraint(editingConstraintId, { remove: true });
         editingConstraintId = null;
+        rerender();
       });
     }
   }
@@ -139,11 +170,12 @@ function renderConstraintForm(editingConstraint, otherPanels) {
       <div class="field-row">
         <label>Relation type</label>
         <select id="new-constraint-type" class="field-input" ${editingConstraint ? 'disabled' : ''}>
-          <option value="spansBetween" ${type === 'spansBetween' ? 'selected' : ''}>Spans between two panels (sets a dimension)</option>
+          <option value="spansBetween" ${type === 'spansBetween' ? 'selected' : ''}>Spans between two panels</option>
           <option value="attachedTo" ${type === 'attachedTo' ? 'selected' : ''}>Attached to one panel (sets a position)</option>
         </select>
       </div>
       <div id="new-constraint-form-body">${renderConstraintFormBody(type, otherPanels, editingConstraint)}</div>
+      <div id="constraint-form-error" class="constraint-form-error"></div>
       ${editingConstraint
         ? `<div class="constraint-form-actions">
              <button class="box-preset-btn" id="update-constraint-btn">Update</button>
@@ -163,13 +195,8 @@ function renderConstraintFormBody(type, otherPanels, current) {
 
   if (type === 'spansBetween') {
     const c = current && current.type === 'spansBetween' ? current : null;
+    // No "field this sets" dropdown here on purpose — see file header.
     return `
-      <div class="field-row">
-        <label>Field this sets</label>
-        <select id="cf-field" class="field-input">
-          ${DIM_FIELDS.map((f) => `<option value="${f}" ${c?.field === f ? 'selected' : ''}>${f}</option>`).join('')}
-        </select>
-      </div>
       <div class="relation-ref-pair">
         <div class="relation-ref">
           <span class="relation-ref-label">From</span>
@@ -209,26 +236,27 @@ function renderConstraintFormBody(type, otherPanels, current) {
 }
 
 function readConstraintForm(container, type) {
-  const field = container.querySelector('#cf-field')?.value;
   const fromNode = container.querySelector('#cf-from-node')?.value;
   const fromFace = container.querySelector('#cf-from-face')?.value;
   const fromOffset = Number(container.querySelector('#cf-from-offset')?.value || 0);
-  if (!field || !fromNode || !fromFace) return null;
+  if (!fromNode || !fromFace) return null;
 
   if (type === 'spansBetween') {
     const toNode = container.querySelector('#cf-to-node')?.value;
     const toFace = container.querySelector('#cf-to-face')?.value;
     const toOffset = Number(container.querySelector('#cf-to-offset')?.value || 0);
     if (!toNode || !toFace) return null;
+    // no `field` — main.js infers it from the faces above
     return {
-      field, type: 'spansBetween',
+      type: 'spansBetween',
       from: { node: fromNode, face: fromFace, offset: fromOffset },
       to: { node: toNode, face: toFace, offset: toOffset },
     };
   }
 
+  const field = container.querySelector('#cf-field')?.value;
   const myFace = container.querySelector('#cf-my-face')?.value;
-  if (!myFace) return null;
+  if (!field || !myFace) return null;
   return {
     field, type: 'attachedTo', myFace,
     from: { node: fromNode, face: fromFace, offset: fromOffset },

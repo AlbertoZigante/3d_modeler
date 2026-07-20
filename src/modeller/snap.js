@@ -40,6 +40,19 @@
  * some arbitrary non-90°-aligned angle, that check fails and the
  * constraint is skipped with a clear warning — angled/mitred joinery
  * is a future stage, not silently-wrong geometry now.
+ *
+ * INFERRING WHICH FIELD A spansBetween RELATION SETS
+ * -----------------------------------------------------
+ * The relations UI no longer asks "which field does this set" for a
+ * spansBetween relation — panels are mostly a 2D shape (thickness is
+ * a small, fixed, BOM-driven value, not something you'd normally span
+ * between two other panels). `inferSpanField()` figures out the axis
+ * from the chosen From/To faces themselves (both must imply the SAME
+ * axis, or it's rejected), then figures out which of the target
+ * panel's own width/height/thickness fields lines up with that axis
+ * given ITS current rotation — the same alignment math the resolver
+ * already uses, just run in the "what field would satisfy this"
+ * direction instead of "does this field's face align" direction.
  */
 
 import * as THREE from 'three';
@@ -53,6 +66,7 @@ import {
 } from './modules.js';
 
 const EMPTY_LOCKS = { width: false, height: false, thickness: false, positionX: false, positionY: false, positionZ: false };
+const AXIS_VECTORS = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) };
 
 function emptyResolved(node, autoPos) {
   return {
@@ -96,8 +110,6 @@ function topoSort(panels) {
     const s = state.get(id) || 0;
     if (s === 2) return;
     if (s === 1) {
-      // found a cycle — mark everyone currently on the stack from
-      // the repeat point onward as cyclic
       const startIdx = stack.indexOf(id);
       stack.slice(startIdx).forEach((cid) => cyclic.add(cid));
       return;
@@ -114,20 +126,72 @@ function topoSort(panels) {
   return { order, cyclic };
 }
 
-function worldNormalAndAlignment(rotationDeg, faceName, axisKey) {
+/**
+ * Which single world axis (if any) a local face lands on, given a
+ * node's rotation — the one shared alignment check every constraint
+ * (and now the field-inference helper below) is built on.
+ * Returns { axis: 'x'|'y'|'z', sign: 1|-1 } or null if the face isn't
+ * aligned with any single axis within tolerance.
+ */
+export function getAlignedAxis(rotationDeg, faceName) {
   const local = LOCAL_FACES[faceName];
   if (!local) return null;
   const euler = new THREE.Euler(
-    THREE.MathUtils.degToRad(rotationDeg.x || 0),
-    THREE.MathUtils.degToRad(rotationDeg.y || 0),
-    THREE.MathUtils.degToRad(rotationDeg.z || 0)
+    THREE.MathUtils.degToRad(rotationDeg?.x || 0),
+    THREE.MathUtils.degToRad(rotationDeg?.y || 0),
+    THREE.MathUtils.degToRad(rotationDeg?.z || 0)
   );
   const worldNormal = new THREE.Vector3(local.x, local.y, local.z).applyEuler(euler);
-  const axisVec = axisKey === 'x' ? new THREE.Vector3(1, 0, 0)
-    : axisKey === 'y' ? new THREE.Vector3(0, 1, 0)
-    : new THREE.Vector3(0, 0, 1);
-  const alignment = worldNormal.dot(axisVec);
-  return alignment; // ~+1 or ~-1 if aligned with this axis; otherwise not usable
+  for (const axis of ['x', 'y', 'z']) {
+    const alignment = worldNormal.dot(AXIS_VECTORS[axis]);
+    if (Math.abs(Math.abs(alignment) - 1) <= 0.02) {
+      return { axis, sign: alignment >= 0 ? 1 : -1 };
+    }
+  }
+  return null;
+}
+
+// Representative face for each dimension field — used both to find
+// "which axis does field X line up with" (axisForDimensionField,
+// below applySpansBetween) and "which field lines up with axis Y"
+// (inferSpanField, right below) — one shared table so both
+// directions of this lookup can never quietly drift apart.
+const DIM_FIELD_PROBE_FACE = { width: 'right', height: 'top', thickness: 'front' };
+
+/**
+ * Given a target node and the From/To face references a user picked
+ * for a new spansBetween relation, works out which field (width /
+ * height / thickness) on the TARGET node should be governed by it —
+ * removing the need for the relations UI to ask directly.
+ * Returns { field, axis } on success, or { error: 'message' }.
+ */
+export function inferSpanField(targetNode, fromFaceRef, toFaceRef, byId) {
+  const fromNode = byId.get(fromFaceRef.node);
+  const toNode = byId.get(toFaceRef.node);
+  if (!fromNode) return { error: `"From" panel "${fromFaceRef.node}" not found.` };
+  if (!toNode) return { error: `"To" panel "${toFaceRef.node}" not found.` };
+
+  const fromAligned = getAlignedAxis(fromNode.rotation, fromFaceRef.face);
+  const toAligned = getAlignedAxis(toNode.rotation, toFaceRef.face);
+  if (!fromAligned) {
+    return { error: `"${fromFaceRef.face}" face of the "From" panel isn't aligned with any main axis at its current rotation.` };
+  }
+  if (!toAligned) {
+    return { error: `"${toFaceRef.face}" face of the "To" panel isn't aligned with any main axis at its current rotation.` };
+  }
+  if (fromAligned.axis !== toAligned.axis) {
+    return {
+      error: `The "From" and "To" faces point along different axes (${fromAligned.axis.toUpperCase()} vs ` +
+        `${toAligned.axis.toUpperCase()}) — pick two faces that face each other along the same axis.`,
+    };
+  }
+
+  const axis = fromAligned.axis;
+  for (const [field, probeFace] of Object.entries(DIM_FIELD_PROBE_FACE)) {
+    const aligned = getAlignedAxis(targetNode.rotation, probeFace);
+    if (aligned && aligned.axis === axis) return { field, axis };
+  }
+  return { error: `This panel has no dimension that lines up with the ${axis.toUpperCase()} axis at its current rotation.` };
 }
 
 // World-space position (mm, along axisKey) of a referenced face.
@@ -140,33 +204,53 @@ function resolveFacePointMm(faceRef, axisKey, resolvedById, byId) {
   if (!LOCAL_FACES[faceRef.face]) {
     throw new Error(`unknown face "${faceRef.face}"`);
   }
-  const alignment = worldNormalAndAlignment(targetResolved.rotation, faceRef.face, axisKey);
-  if (alignment == null || Math.abs(Math.abs(alignment) - 1) > 0.02) {
+  const aligned = getAlignedAxis(targetResolved.rotation, faceRef.face);
+  if (!aligned || aligned.axis !== axisKey) {
     throw new Error(
       `"${faceRef.face}" face of ${faceRef.node} isn't aligned with the ${axisKey.toUpperCase()} axis at its ` +
       `current rotation — angled/non-axis-aligned relations aren't supported yet`
     );
   }
-  const sign = alignment >= 0 ? 1 : -1;
   const dimField = FACE_TO_DIM_FIELD[faceRef.face];
   const halfExtentMm = targetResolved[dimField] / 2;
   const centerMm = targetResolved.position[axisKey];
   const offsetMm = faceRef.offset || 0;
-  return centerMm + sign * (halfExtentMm + offsetMm);
+  return centerMm + aligned.sign * (halfExtentMm + offsetMm);
+}
+
+// axisForDimensionField reuses DIM_FIELD_PROBE_FACE (defined above,
+// near inferSpanField) to find "which world axis does THIS node's
+// own width/height/thickness actually line up with right now" — this
+// can NOT be a static field->axis table (unlike position fields),
+// because it depends on the node's current rotation: an unrotated
+// panel's width lines up with world X, but the new default panel
+// (rotated 90° about Y, to lie in the YZ plane) has its width lining
+// up with world Z instead. Getting this wrong doesn't crash — it
+// silently checks alignment against the wrong axis and rejects a
+// perfectly valid relation with a confusing error, which is how this
+// was actually caught: by running the new default-panel case, not by
+// inspection.
+function axisForDimensionField(node, field) {
+  const probeFace = DIM_FIELD_PROBE_FACE[field];
+  if (!probeFace) return null;
+  const aligned = getAlignedAxis(node.rotation, probeFace);
+  return aligned ? aligned.axis : null;
 }
 
 function applySpansBetween(node, constraint, resolvedById, byId, r) {
-  const axisKey = FIELD_TO_AXIS[constraint.field];
+  const axisKey = axisForDimensionField(node, constraint.field);
+  if (!axisKey) {
+    throw new Error(
+      `this panel's own "${constraint.field}" doesn't line up with any main axis at its current rotation`
+    );
+  }
   const fromMm = resolveFacePointMm(constraint.from, axisKey, resolvedById, byId);
   const toMm = resolveFacePointMm(constraint.to, axisKey, resolvedById, byId);
   const span = Math.max(MIN_PANEL_DIM_MM, Math.abs(toMm - fromMm));
   r[constraint.field] = span;
   r.lockedFields[constraint.field] = true;
   // A dimension constraint also centers the node on that axis unless
-  // that exact axis already has its own explicit position constraint
-  // — simple, predictable default ("shelf fits between and is
-  // centered on its two supports") without fighting a more specific
-  // attachedTo constraint on the same axis.
+  // that exact axis already has its own explicit position constraint.
   const positionField = axisKey === 'x' ? 'positionX' : axisKey === 'y' ? 'positionY' : 'positionZ';
   const hasOwnPositionConstraint = (node.constraints || []).some(
     (c) => !c.overridden && c.field === positionField
@@ -182,17 +266,16 @@ function applyAttachedTo(node, constraint, resolvedById, byId, r) {
     throw new Error(`missing or unknown "myFace" for attachedTo constraint`);
   }
   const targetMm = resolveFacePointMm(constraint.from, axisKey, resolvedById, byId);
-  const myAlignment = worldNormalAndAlignment(r.rotation, constraint.myFace, axisKey);
-  if (myAlignment == null || Math.abs(Math.abs(myAlignment) - 1) > 0.02) {
+  const myAligned = getAlignedAxis(r.rotation, constraint.myFace);
+  if (!myAligned || myAligned.axis !== axisKey) {
     throw new Error(
       `this panel's own "${constraint.myFace}" face isn't aligned with the ${axisKey.toUpperCase()} axis ` +
       `at its current rotation — angled/non-axis-aligned relations aren't supported yet`
     );
   }
-  const mySign = myAlignment >= 0 ? 1 : -1;
   const dimField = FACE_TO_DIM_FIELD[constraint.myFace];
   const myHalfExtentMm = r[dimField] / 2;
-  r.position[axisKey] = targetMm - mySign * myHalfExtentMm;
+  r.position[axisKey] = targetMm - myAligned.sign * myHalfExtentMm;
   r.lockedFields[constraint.field] = true;
 }
 

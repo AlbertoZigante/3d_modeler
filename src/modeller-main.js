@@ -19,7 +19,7 @@ import {
   computeAutoLayoutPositions,
   nextConstraintId,
 } from './modeller/modules.js';
-import { resolveConstraints } from './modeller/snap.js';
+import { resolveConstraints, inferSpanField } from './modeller/snap.js';
 import { createModellerScene } from './modeller/scene.js';
 import { getSelectedId, setSelectedId } from './modeller/selection.js';
 import { computeBom } from './engine/bom.js';
@@ -201,7 +201,7 @@ function resetSelectedTransform() {
 }
 
 function addPanel() {
-  const node = createPanelNode({ width: 500, height: 500 });
+  const node = createPanelNode(); // picks up the default square, YZ-plane orientation
   panels = [...panels, node];
   setSelectedId(node.id);
   renderAll();
@@ -216,25 +216,64 @@ function removeSelected() {
 
 // -------------------------------------------------------------
 // Relation (constraint) CRUD — the dropdown-based creation UI in
-// properties.js calls these. No drag-to-snap in this pass: explicit,
+// relations.js calls these. No drag-to-snap in this pass: explicit,
 // deterministic selection of node + face + offset is easier to get
 // right and easier to test than proximity-based snapping, and can
 // be layered on top of this exact same data later without changing
 // the schema.
+//
+// Every create/update goes through `tryApplyConstraints`, which
+// resolves a HYPOTHETICAL version of the graph first and only
+// commits if that produces no warnings on the affected node — a
+// relation that would come out broken (misaligned face, missing
+// reference, etc.) is never actually created. relations.js shows
+// the rejection reason inline and leaves the form as-is so the user
+// can adjust and retry, rather than silently creating a broken
+// relation the way it worked before this check existed.
 // -------------------------------------------------------------
-function addConstraintToSelected(constraint) {
+function tryApplyConstraints(nodeId, nextConstraintsForNode) {
+  const hypothetical = panels.map((p) =>
+    p.id === nodeId ? { ...p, constraints: nextConstraintsForNode } : p
+  );
+  const resolved = resolveConstraints(hypothetical);
+  const resolvedNode = resolved.find((r) => r.id === nodeId);
+  if (resolvedNode && resolvedNode.warnings.length > 0) {
+    return { ok: false, error: resolvedNode.warnings.join(' ') };
+  }
+  panels = hypothetical;
+  renderAll();
+  return { ok: true };
+}
+
+// spansBetween relations no longer ask which field they set — panels
+// are mostly a 2D shape (thickness is a small, fixed board value, not
+// something you'd span between two other panels), so the field is
+// inferred from the chosen From/To faces themselves. See snap.js's
+// inferSpanField for the actual geometry.
+function resolveConstraintField(node, draft) {
+  if (draft.type !== 'spansBetween' || draft.field) return { ok: true, field: draft.field };
+  const byId = new Map(panels.map((p) => [p.id, p]));
+  const result = inferSpanField(node, draft.from, draft.to, byId);
+  if (result.error) return { ok: false, error: result.error };
+  return { ok: true, field: result.field };
+}
+
+function addConstraintToSelected(constraintDraft) {
   const selectedId = getSelectedId();
   const node = panels.find((p) => p.id === selectedId);
-  if (!node) return;
-  const withId = { ...constraint, id: nextConstraintId(), overridden: false };
+  if (!node) return { ok: false, error: 'No panel selected.' };
+
+  const fieldResult = resolveConstraintField(node, constraintDraft);
+  if (!fieldResult.ok) return fieldResult;
+
+  const withId = { ...constraintDraft, field: fieldResult.field, id: nextConstraintId(), overridden: false };
   // one active constraint per field at a time — adding a new one
   // for a field replaces rather than stacks
   const nextConstraints = [
-    ...(node.constraints || []).filter((c) => c.field !== constraint.field),
+    ...(node.constraints || []).filter((c) => c.field !== withId.field),
     withId,
   ];
-  updateNode(selectedId, { constraints: nextConstraints });
-  renderAll();
+  return tryApplyConstraints(selectedId, nextConstraints);
 }
 
 // Replaces an EXISTING constraint's definition in place (same id, so
@@ -244,15 +283,18 @@ function addConstraintToSelected(constraint) {
 // addConstraintToSelected's "Apply", which always creates a new one.
 // Re-activates it (overridden: false) even if it had been unlinked,
 // since updating it is the user's way of consciously re-linking.
-function updateConstraintOnSelected(constraintId, newConstraintData) {
+function updateConstraintOnSelected(constraintId, newConstraintDraft) {
   const selectedId = getSelectedId();
   const node = panels.find((p) => p.id === selectedId);
-  if (!node) return;
+  if (!node) return { ok: false, error: 'No panel selected.' };
+
+  const fieldResult = resolveConstraintField(node, newConstraintDraft);
+  if (!fieldResult.ok) return fieldResult;
+
   const nextConstraints = (node.constraints || []).map((c) =>
-    c.id === constraintId ? { ...newConstraintData, id: constraintId, overridden: false } : c
+    c.id === constraintId ? { ...newConstraintDraft, field: fieldResult.field, id: constraintId, overridden: false } : c
   );
-  updateNode(selectedId, { constraints: nextConstraints });
-  renderAll();
+  return tryApplyConstraints(selectedId, nextConstraints);
 }
 
 // identifier is either a FIELD NAME (soft "Unlink" — mark the active
