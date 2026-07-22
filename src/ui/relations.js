@@ -1,25 +1,27 @@
 /**
  * Relations (constraints) panel — left sidebar.
  *
- * Click an existing relation in the list to load it into the form
- * below for editing (the form's fields pre-fill with that relation's
- * current values). While editing, the submit area shows "Update" +
- * "Remove" instead of "Apply". Clicking the same relation again — or
- * successfully updating/removing it — returns the form to "create
- * new" mode.
+ * ITEM 11 — spansBetween's "From"/"To" are picked directly in the 3D
+ * view instead of dropdowns: clicking "Pick face" puts scene.js into
+ * a one-click picking mode (see modeller-main.js's onFacePick), and
+ * the picked face is colored green (From) or red (To) right on the
+ * mesh — see scene.js's reconcile(). `facePicks` (passed in as a
+ * prop, owned by main.js) holds the current picks; this file only
+ * renders what they say and asks main.js to start/clear a pick.
+ * attachedTo's Target still uses dropdowns — that relation type
+ * wasn't part of this request, and dropdowns remain a perfectly
+ * reasonable way to pick a single reference.
  *
- * SPANS-BETWEEN NO LONGER ASKS "WHICH FIELD": panels are mostly a 2D
- * shape (thickness is a small, fixed board value — not something
- * you'd span between two other panels), so which of width/height/
- * thickness gets set is inferred from the chosen From/To faces
- * themselves (see snap.js's inferSpanField). The field dropdown only
- * remains for "attached to" relations, since positionX/Y/Z aren't a
- * dimension choice the geometry can infer the same way.
+ * Click an existing relation in the list to load it into the form
+ * below for editing. While editing, the submit area shows "Update" +
+ * "Remove" instead of "Apply". Loading a spansBetween relation for
+ * editing also pre-fills facePicks with its current From/To (via
+ * onLoadPicksForEdit), so the 3D view immediately shows what's
+ * already set — pick again on either side to change just that one.
  *
  * VALIDATION BEFORE COMMIT: onAddConstraint/onUpdateConstraint return
  * { ok: true } or { ok: false, error }. On failure, the error is shown
- * inline and the form is left exactly as the user had it — nothing is
- * ever created that the resolver would immediately flag as broken.
+ * inline and the form is left exactly as the user had it.
  *
  * `editingConstraintId` is local module state, not threaded through
  * main.js: it only matters to this form's own rendering.
@@ -35,7 +37,17 @@ let lastSelectedPanelId = null;
 
 export function renderRelations(
   container,
-  { selectedPanel, allPanels, onAddConstraint, onUpdateConstraint, onUnlinkConstraint }
+  {
+    selectedPanel,
+    allPanels,
+    facePicks,
+    onStartPicking,
+    onClearPick,
+    onLoadPicksForEdit,
+    onAddConstraint,
+    onUpdateConstraint,
+    onUnlinkConstraint,
+  }
 ) {
   if (!selectedPanel) {
     editingConstraintId = null;
@@ -55,15 +67,18 @@ export function renderRelations(
   const constraints = selectedPanel.constraints || [];
   const editingConstraint = constraints.find((c) => c.id === editingConstraintId) || null;
 
-  const rerender = () =>
-    renderRelations(container, { selectedPanel, allPanels, onAddConstraint, onUpdateConstraint, onUnlinkConstraint });
+  const rerenderProps = {
+    selectedPanel, allPanels, facePicks, onStartPicking, onClearPick,
+    onLoadPicksForEdit, onAddConstraint, onUpdateConstraint, onUnlinkConstraint,
+  };
+  const rerender = () => renderRelations(container, rerenderProps);
 
   container.innerHTML = `
     <div class="section-title">Relations</div>
     ${renderConstraintList(constraints, allPanels)}
     ${otherPanels.length === 0
       ? `<div class="empty-state">Add another panel first to create a relation.</div>`
-      : renderConstraintForm(editingConstraint, otherPanels)}
+      : renderConstraintForm(editingConstraint, otherPanels, facePicks)}
   `;
 
   // ---- click a relation row to load it into the form ----
@@ -71,7 +86,18 @@ export function renderRelations(
     item.addEventListener('click', (e) => {
       if (e.target.closest('.constraint-remove-btn')) return;
       const id = item.dataset.constraintId;
-      editingConstraintId = editingConstraintId === id ? null : id;
+      const wasEditing = editingConstraintId === id;
+      editingConstraintId = wasEditing ? null : id;
+      if (!wasEditing) {
+        const c = constraints.find((cc) => cc.id === id);
+        if (c && c.type === 'spansBetween') {
+          onLoadPicksForEdit(c.from, c.to);
+        } else {
+          onLoadPicksForEdit(null, null);
+        }
+      } else {
+        onLoadPicksForEdit(null, null);
+      }
       rerender();
     });
   });
@@ -79,10 +105,23 @@ export function renderRelations(
   container.querySelectorAll('.constraint-remove-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (btn.dataset.constraintId === editingConstraintId) editingConstraintId = null;
+      if (btn.dataset.constraintId === editingConstraintId) {
+        editingConstraintId = null;
+        onLoadPicksForEdit(null, null);
+      }
       onUnlinkConstraint(btn.dataset.constraintId, { remove: true });
     });
   });
+
+  // ---- pick-in-3D buttons (spansBetween only) ----
+  const pickFromBtn = container.querySelector('#pick-from-btn');
+  if (pickFromBtn) pickFromBtn.addEventListener('click', () => onStartPicking('from'));
+  const pickToBtn = container.querySelector('#pick-to-btn');
+  if (pickToBtn) pickToBtn.addEventListener('click', () => onStartPicking('to'));
+  const clearFromBtn = container.querySelector('#clear-from-btn');
+  if (clearFromBtn) clearFromBtn.addEventListener('click', () => { onClearPick('from'); rerender(); });
+  const clearToBtn = container.querySelector('#clear-to-btn');
+  if (clearToBtn) clearToBtn.addEventListener('click', () => { onClearPick('to'); rerender(); });
 
   // ---- the create/edit form ----
   const typeSelect = container.querySelector('#new-constraint-type');
@@ -95,14 +134,14 @@ export function renderRelations(
 
   if (typeSelect) {
     typeSelect.addEventListener('change', () => {
-      formBody.innerHTML = renderConstraintFormBody(typeSelect.value, otherPanels, null);
+      formBody.innerHTML = renderConstraintFormBody(typeSelect.value, otherPanels, null, facePicks);
       if (errorEl) errorEl.textContent = '';
     });
 
     const applyBtn = container.querySelector('#apply-constraint-btn');
     if (applyBtn) {
       applyBtn.addEventListener('click', () => {
-        const draft = readConstraintForm(container, typeSelect.value);
+        const draft = readConstraintForm(container, typeSelect.value, facePicks);
         if (!draft) return;
         const result = onAddConstraint(draft);
         if (result && result.ok === false) {
@@ -116,7 +155,7 @@ export function renderRelations(
     const updateBtn = container.querySelector('#update-constraint-btn');
     if (updateBtn) {
       updateBtn.addEventListener('click', () => {
-        const draft = readConstraintForm(container, typeSelect.value);
+        const draft = readConstraintForm(container, typeSelect.value, facePicks);
         if (!draft) return;
         const result = onUpdateConstraint(editingConstraintId, draft);
         if (result && result.ok === false) {
@@ -132,6 +171,7 @@ export function renderRelations(
       removeFormBtn.addEventListener('click', () => {
         onUnlinkConstraint(editingConstraintId, { remove: true });
         editingConstraintId = null;
+        onLoadPicksForEdit(null, null);
         rerender();
       });
     }
@@ -162,7 +202,7 @@ function renderConstraintList(constraints, allPanels) {
     </div>`;
 }
 
-function renderConstraintForm(editingConstraint, otherPanels) {
+function renderConstraintForm(editingConstraint, otherPanels, facePicks) {
   const type = editingConstraint ? editingConstraint.type : 'spansBetween';
   return `
     <div class="add-constraint-form">
@@ -174,7 +214,7 @@ function renderConstraintForm(editingConstraint, otherPanels) {
           <option value="attachedTo" ${type === 'attachedTo' ? 'selected' : ''}>Attached to one panel (sets a position)</option>
         </select>
       </div>
-      <div id="new-constraint-form-body">${renderConstraintFormBody(type, otherPanels, editingConstraint)}</div>
+      <div id="new-constraint-form-body">${renderConstraintFormBody(type, otherPanels, editingConstraint, facePicks)}</div>
       <div id="constraint-form-error" class="constraint-form-error"></div>
       ${editingConstraint
         ? `<div class="constraint-form-actions">
@@ -185,7 +225,29 @@ function renderConstraintForm(editingConstraint, otherPanels) {
     </div>`;
 }
 
-function renderConstraintFormBody(type, otherPanels, current) {
+function pickerRowHTML(label, which, pick, allPanels) {
+  const nameOf = (id) => {
+    const p = (allPanels || []).find((pp) => pp.id === id);
+    return p ? getDisplayName(p) : id;
+  };
+  const swatchClass = which === 'from' ? 'pick-swatch-green' : 'pick-swatch-red';
+  return `
+    <div class="relation-ref">
+      <span class="relation-ref-label">${label}</span>
+      ${pick
+        ? `<div class="pick-result">
+             <span class="pick-swatch ${swatchClass}"></span>
+             <span class="pick-result-text">${nameOf(pick.node)} · ${pick.face}</span>
+             <button type="button" class="pick-clear-btn" id="clear-${which}-btn" title="Clear">×</button>
+           </div>`
+        : `<button type="button" class="pick-face-btn" id="pick-${which}-btn">
+             <span class="pick-swatch ${swatchClass}"></span> Click to pick face in 3D view
+           </button>`}
+      <input type="number" id="cf-${which}-offset" class="field-input" value="${pick?.offset ?? 0}" placeholder="offset mm" />
+    </div>`;
+}
+
+function renderConstraintFormBody(type, otherPanels, current, facePicks) {
   const panelOptions = (selectedValue) => otherPanels
     .map((p) => `<option value="${p.id}" ${p.id === selectedValue ? 'selected' : ''}>${getDisplayName(p)}</option>`)
     .join('');
@@ -194,22 +256,15 @@ function renderConstraintFormBody(type, otherPanels, current) {
     .join('');
 
   if (type === 'spansBetween') {
-    const c = current && current.type === 'spansBetween' ? current : null;
-    // No "field this sets" dropdown here on purpose — see file header.
+    // From/To picked directly in the 3D view (item 11) — no
+    // node/face dropdowns here. Offset stays a plain number input,
+    // since "how far outward" isn't something you'd click in 3D.
+    const fromPick = facePicks?.from ? { ...facePicks.from, offset: current?.from.offset ?? facePicks.from.offset } : (current?.type === 'spansBetween' ? current.from : null);
+    const toPick = facePicks?.to ? { ...facePicks.to, offset: current?.to.offset ?? facePicks.to.offset } : (current?.type === 'spansBetween' ? current.to : null);
     return `
       <div class="relation-ref-pair">
-        <div class="relation-ref">
-          <span class="relation-ref-label">From</span>
-          <select id="cf-from-node" class="field-input">${panelOptions(c?.from.node)}</select>
-          <select id="cf-from-face" class="field-input">${faceOptions(c?.from.face)}</select>
-          <input type="number" id="cf-from-offset" class="field-input" value="${c?.from.offset ?? 0}" placeholder="offset mm" />
-        </div>
-        <div class="relation-ref">
-          <span class="relation-ref-label">To</span>
-          <select id="cf-to-node" class="field-input">${panelOptions(c?.to.node)}</select>
-          <select id="cf-to-face" class="field-input">${faceOptions(c?.to.face)}</select>
-          <input type="number" id="cf-to-offset" class="field-input" value="${c?.to.offset ?? 0}" placeholder="offset mm" />
-        </div>
+        ${pickerRowHTML('From', 'from', fromPick, otherPanels)}
+        ${pickerRowHTML('To', 'to', toPick, otherPanels)}
       </div>`;
   }
 
@@ -235,28 +290,24 @@ function renderConstraintFormBody(type, otherPanels, current) {
     </div>`;
 }
 
-function readConstraintForm(container, type) {
-  const fromNode = container.querySelector('#cf-from-node')?.value;
-  const fromFace = container.querySelector('#cf-from-face')?.value;
-  const fromOffset = Number(container.querySelector('#cf-from-offset')?.value || 0);
-  if (!fromNode || !fromFace) return null;
-
+function readConstraintForm(container, type, facePicks) {
   if (type === 'spansBetween') {
-    const toNode = container.querySelector('#cf-to-node')?.value;
-    const toFace = container.querySelector('#cf-to-face')?.value;
+    if (!facePicks?.from || !facePicks?.to) return null; // Apply/Update guards on this via onAddConstraint's own check too
+    const fromOffset = Number(container.querySelector('#cf-from-offset')?.value || 0);
     const toOffset = Number(container.querySelector('#cf-to-offset')?.value || 0);
-    if (!toNode || !toFace) return null;
-    // no `field` — main.js infers it from the faces above
     return {
       type: 'spansBetween',
-      from: { node: fromNode, face: fromFace, offset: fromOffset },
-      to: { node: toNode, face: toFace, offset: toOffset },
+      from: { node: facePicks.from.node, face: facePicks.from.face, offset: fromOffset },
+      to: { node: facePicks.to.node, face: facePicks.to.face, offset: toOffset },
     };
   }
 
+  const fromNode = container.querySelector('#cf-from-node')?.value;
+  const fromFace = container.querySelector('#cf-from-face')?.value;
+  const fromOffset = Number(container.querySelector('#cf-from-offset')?.value || 0);
   const field = container.querySelector('#cf-field')?.value;
   const myFace = container.querySelector('#cf-my-face')?.value;
-  if (!field || !myFace) return null;
+  if (!fromNode || !fromFace || !field || !myFace) return null;
   return {
     field, type: 'attachedTo', myFace,
     from: { node: fromNode, face: fromFace, offset: fromOffset },

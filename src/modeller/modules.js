@@ -70,6 +70,14 @@ export const LOCAL_FACES = {
   back:   { x: 0, y: 0, z: -1 },
 };
 
+// BoxGeometry(width, height, thickness) creates exactly 6 material
+// groups, in this order — confirmed directly against the installed
+// three.js source (BoxGeometry.js's buildPlane calls): px, nx, py,
+// ny, pz, nz. This is what lets scene.js assign an array of 6
+// materials and know exactly which array index colors which named
+// face — group index N always means FACE_ORDER[N].
+export const FACE_ORDER = ['right', 'left', 'top', 'bottom', 'front', 'back'];
+
 // Which of a panel's own literal dimension fields a given LOCAL face
 // belongs to — e.g. the 'right'/'left' faces sit at ±width/2. The
 // resolver uses this to find a face's distance from its node's own

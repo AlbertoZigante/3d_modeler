@@ -48,10 +48,11 @@ const stageLabelEl = document.getElementById('stage-label');
 const axesCanvas = document.getElementById('axes-gizmo-canvas');
 
 // ---- Scene (view layer). Consumes RESOLVED panels only. ----
-const { reconcile, setViewMode } = createModellerScene(canvas, main, {
+const { reconcile, setViewMode, setFacePickMode } = createModellerScene(canvas, main, {
   axesCanvas,
   onSelect: (id) => {
     setSelectedId(id);
+    resetFacePicks();
     renderAll();
   },
   onTransformChange: (nodeId, transform) => {
@@ -66,7 +67,49 @@ const { reconcile, setViewMode } = createModellerScene(canvas, main, {
     updateNode(nodeId, { width: dims.width, height: dims.height, thickness: dims.thickness });
     renderAll();
   },
+  onFacePick: (which, nodeId, faceName) => {
+    if (which === 'from') facePicks.from = { node: nodeId, face: faceName };
+    else if (which === 'to') facePicks.to = { node: nodeId, face: faceName };
+    renderAll();
+  },
 });
+
+// -------------------------------------------------------------
+// FACE PICKING (item 11) — lets the relations form's "From"/"To"
+// face for a spansBetween relation be picked directly in the 3D
+// view instead of via dropdowns. `facePicks` is local UI state (not
+// part of the graph): it only matters to the currently-open relation
+// form, the same way relations.js's own `editingConstraintId` does.
+// startFacePicking puts scene.js into "next click picks a face"
+// mode; the callback above records the result and re-renders, which
+// makes reconcile() color that face green/red (see scene.js).
+// -------------------------------------------------------------
+const facePicks = { from: null, to: null };
+
+function startFacePicking(which) {
+  setFacePickMode(which);
+}
+
+function clearFacePick(which) {
+  facePicks[which] = null;
+  renderAll();
+}
+
+function resetFacePicks() {
+  facePicks.from = null;
+  facePicks.to = null;
+}
+
+// When relations.js loads an existing spansBetween relation into the
+// edit form, this pre-fills facePicks with that relation's current
+// From/To — so the 3D view immediately shows what's already set (and
+// the user can leave it as-is, or click Pick again to change just
+// one side) rather than starting edit mode from a blank slate.
+function loadFacePicksForEdit(from, to) {
+  facePicks.from = from || null;
+  facePicks.to = to || null;
+  renderAll();
+}
 
 // -------------------------------------------------------------
 // 3D / 2D view mode toggle. Purely a rendering/interaction switch —
@@ -80,6 +123,7 @@ const hintBar2d = document.getElementById('hint-bar-2d');
 
 view3dBtn.addEventListener('click', () => {
   setSelectedId(null); // deselect on every mode switch — no gizmo/handle can be left stuck
+  resetFacePicks();
   setViewMode('3d');
   view3dBtn.classList.add('active');
   view2dBtn.classList.remove('active');
@@ -89,6 +133,7 @@ view3dBtn.addEventListener('click', () => {
 });
 view2dBtn.addEventListener('click', () => {
   setSelectedId(null);
+  resetFacePicks(); // face picking is 3D-only for now
   setViewMode('2d');
   view2dBtn.classList.add('active');
   view3dBtn.classList.remove('active');
@@ -110,13 +155,14 @@ function renderAll() {
   const selectedId = getSelectedId();
   const resolved = resolveConstraints(panels);
 
-  reconcile(resolved, selectedId);
+  reconcile(resolved, selectedId, facePicks);
 
   renderPanelList(panelListMountEl, {
     panels: resolved,
     selectedId,
     onSelect: (id) => {
       setSelectedId(id);
+      resetFacePicks();
       renderAll();
     },
     onAdd: addPanel,
@@ -164,6 +210,10 @@ function renderInspectorOnly() {
   renderRelations(relationsMountEl, {
     selectedPanel,
     allPanels: panels,
+    facePicks,
+    onStartPicking: startFacePicking,
+    onClearPick: clearFacePick,
+    onLoadPicksForEdit: loadFacePicksForEdit,
     onAddConstraint: addConstraintToSelected,
     onUpdateConstraint: updateConstraintOnSelected,
     onUnlinkConstraint: unlinkOrRemoveConstraint,
@@ -204,6 +254,7 @@ function addPanel() {
   const node = createPanelNode(); // picks up the default square, YZ-plane orientation
   panels = [...panels, node];
   setSelectedId(node.id);
+  resetFacePicks();
   renderAll();
 }
 
@@ -211,6 +262,7 @@ function removeSelected() {
   const selectedId = getSelectedId();
   panels = panels.filter((p) => p.id !== selectedId);
   setSelectedId(panels.length > 0 ? panels[0].id : null);
+  resetFacePicks();
   renderAll();
 }
 
@@ -262,6 +314,9 @@ function addConstraintToSelected(constraintDraft) {
   const selectedId = getSelectedId();
   const node = panels.find((p) => p.id === selectedId);
   if (!node) return { ok: false, error: 'No panel selected.' };
+  if (constraintDraft.type === 'spansBetween' && (!constraintDraft.from || !constraintDraft.to)) {
+    return { ok: false, error: 'Pick both a "From" and a "To" face in the 3D view first.' };
+  }
 
   const fieldResult = resolveConstraintField(node, constraintDraft);
   if (!fieldResult.ok) return fieldResult;
@@ -273,7 +328,9 @@ function addConstraintToSelected(constraintDraft) {
     ...(node.constraints || []).filter((c) => c.field !== withId.field),
     withId,
   ];
-  return tryApplyConstraints(selectedId, nextConstraints);
+  const result = tryApplyConstraints(selectedId, nextConstraints);
+  if (result.ok) resetFacePicks();
+  return result;
 }
 
 // Replaces an EXISTING constraint's definition in place (same id, so
@@ -287,6 +344,9 @@ function updateConstraintOnSelected(constraintId, newConstraintDraft) {
   const selectedId = getSelectedId();
   const node = panels.find((p) => p.id === selectedId);
   if (!node) return { ok: false, error: 'No panel selected.' };
+  if (newConstraintDraft.type === 'spansBetween' && (!newConstraintDraft.from || !newConstraintDraft.to)) {
+    return { ok: false, error: 'Pick both a "From" and a "To" face in the 3D view first.' };
+  }
 
   const fieldResult = resolveConstraintField(node, newConstraintDraft);
   if (!fieldResult.ok) return fieldResult;
@@ -294,7 +354,9 @@ function updateConstraintOnSelected(constraintId, newConstraintDraft) {
   const nextConstraints = (node.constraints || []).map((c) =>
     c.id === constraintId ? { ...newConstraintDraft, field: fieldResult.field, id: constraintId, overridden: false } : c
   );
-  return tryApplyConstraints(selectedId, nextConstraints);
+  const result = tryApplyConstraints(selectedId, nextConstraints);
+  if (result.ok) resetFacePicks();
+  return result;
 }
 
 // identifier is either a FIELD NAME (soft "Unlink" — mark the active

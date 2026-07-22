@@ -523,6 +523,51 @@
       padding: 6px 8px;
       margin-bottom: 8px;
     }
+
+    /* ---- Face pick buttons (item 11) ---- */
+    .pick-face-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 8px;
+      font-size: 11px;
+      border: 1px dashed #c9b88e;
+      border-radius: 4px;
+      background: #fffdf6;
+      color: #6b5d47;
+      cursor: crosshair;
+      margin-bottom: 4px;
+    }
+    .pick-face-btn:hover { border-color: #a89060; background: #f7f0e0; }
+
+    .pick-result {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      background: #f5f0e4;
+      border: 1px solid #d5c5a8;
+      border-radius: 4px;
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+    .pick-result-text { flex: 1; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+    .pick-clear-btn {
+      border: none; background: transparent;
+      color: #a4977f; font-size: 13px;
+      cursor: pointer; padding: 0 2px;
+    }
+    .pick-clear-btn:hover { color: #b5502f; }
+
+    .pick-swatch {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .pick-swatch-green { background: #2f8a4f; }
+    .pick-swatch-red   { background: #c0392b; }
     .constraint-desc { flex: 1; line-height: 1.4; color: #55503f; }
     .constraint-remove-btn {
       border: none;

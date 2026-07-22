@@ -18,7 +18,7 @@
  */
 
 import * as THREE from 'three';
-import { MM_TO_UNIT } from './modules.js';
+import { MM_TO_UNIT, FACE_ORDER } from './modules.js';
 import { createOrbitControls } from './orbitControls.js';
 import { createGizmos } from './gizmos.js';
 import { create2DControls } from './view2d.js';
@@ -27,7 +27,7 @@ import { createAxesGizmo } from './axesGizmo.js';
 export function createModellerScene(
   canvas,
   main,
-  { onSelect, onTransformChange, onDimensionChange, axesCanvas } = {}
+  { onSelect, onTransformChange, onDimensionChange, onFacePick, axesCanvas } = {}
 ) {
   // ---- renderer / scene / lights — warm, light palette ----
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -104,6 +104,7 @@ export function createModellerScene(
   const meshRegistry = new Map(); // id -> { mesh, edges, lastDims }
   let lastResolvedPanels = [];
   let lastSelectedId = null;
+  let lastFacePicks = null;
 
   function meshList() {
     return Array.from(meshRegistry.values()).map((entry) => entry.mesh);
@@ -111,6 +112,26 @@ export function createModellerScene(
 
   // ---- 3D interaction layer ----
   const gestureState = { interactionHandled: false };
+
+  // FACE PICKING (item 11): while `facePickMode` is 'from' or 'to',
+  // the next click is interpreted as picking a FACE (not selecting a
+  // panel) — see reconcile() below for how the picked face gets
+  // colored, and handleClickSelect3D for how a face is identified
+  // from the raycast hit.
+  let facePickMode = null;
+
+  function setFacePickMode(mode) {
+    facePickMode = mode; // 'from' | 'to' | null — used by handleClickSelect3D
+    canvas.style.cursor = mode ? 'crosshair' : 'grab';
+    // delegate to the 2D layer when active — it has its own internal
+    // facePickMode state that governs handlePointerDown branching
+    if (view2d && view2d.setFacePickMode) view2d.setFacePickMode(mode);
+  }
+
+  function faceNameFromHit(hit) {
+    if (!hit.face) return null;
+    return FACE_ORDER[hit.face.materialIndex] ?? null;
+  }
 
   function handleClickSelect3D(e) {
     const rect = canvas.getBoundingClientRect();
@@ -121,6 +142,20 @@ export function createModellerScene(
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(ndc, camera3d);
     const hits = raycaster.intersectObjects(meshList(), false);
+
+    if (facePickMode) {
+      const mode = facePickMode;
+      facePickMode = null; // exit picking mode on any click, hit or miss
+      canvas.style.cursor = 'grab';
+      if (hits.length > 0) {
+        const faceName = faceNameFromHit(hits[0]);
+        if (faceName && onFacePick) {
+          onFacePick(mode, hits[0].object.userData.nodeId, faceName);
+        }
+      }
+      return;
+    }
+
     onSelect?.(hits.length > 0 ? hits[0].object.userData.nodeId : null);
   }
 
@@ -147,6 +182,7 @@ export function createModellerScene(
     view2d = create2DControls(canvas, camera2d, scene, meshRegistry, {
       onSelect,
       onTransformChange: reportTransformToExternal,
+      onFacePick, // item 12 — face picking in the 2D view
     });
   }
 
@@ -166,12 +202,13 @@ export function createModellerScene(
     if (mode === '2d') activate2D();
     else activate3D();
     onResize(); // camera projections depend on the active camera
-    reconcile(lastResolvedPanels, lastSelectedId); // re-apply immediately, don't wait for the next external render
+    reconcile(lastResolvedPanels, lastSelectedId, lastFacePicks); // re-apply immediately, don't wait for the next external render
   }
 
-  function reconcile(resolvedPanels, selectedId) {
+  function reconcile(resolvedPanels, selectedId, facePicks = null) {
     lastResolvedPanels = resolvedPanels;
     lastSelectedId = selectedId;
+    lastFacePicks = facePicks;
 
     const liveIds = new Set(resolvedPanels.map((p) => p.id));
 
@@ -184,7 +221,7 @@ export function createModellerScene(
         }
         scene.remove(entry.mesh);
         entry.mesh.geometry.dispose();
-        entry.mesh.material.dispose();
+        entry.mesh.material.forEach((m) => m.dispose());
         entry.edges.geometry.dispose();
         meshRegistry.delete(id);
       }
@@ -199,13 +236,13 @@ export function createModellerScene(
       const isSelected = node.id === selectedId;
 
       if (!entry) {
-        const material = new THREE.MeshStandardMaterial({
+        const materials = FACE_ORDER.map(() => new THREE.MeshStandardMaterial({
           color: 0xdcbd8c,
           roughness: 0.75,
           metalness: 0.04,
-        });
+        }));
         const geometry = new THREE.BoxGeometry(w, h, t);
-        const mesh = new THREE.Mesh(geometry, material);
+        const mesh = new THREE.Mesh(geometry, materials);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.userData.nodeId = node.id;
@@ -259,8 +296,21 @@ export function createModellerScene(
         entry.mesh.scale.set(1, 1, 1); // scale is only ever transient (see gizmos.js)
       }
 
-      entry.mesh.material.color.set(isSelected ? 0xe0904a : 0xdcbd8c);
+      const baseColor = isSelected ? 0xe0904a : 0xdcbd8c;
+      entry.mesh.material.forEach((m) => m.color.set(baseColor));
       entry.edges.material.color.set(isSelected ? 0x8a4a1a : 0x8b6540);
+
+      // FACE PICKING (item 11): tint a specific face green ("from")
+      // or red ("to") when this node's mesh has a picked face —
+      // applied AFTER the base color above so it always wins.
+      if (facePicks?.from?.node === node.id) {
+        const idx = FACE_ORDER.indexOf(facePicks.from.face);
+        if (idx >= 0) entry.mesh.material[idx].color.set(0x2f8a4f); // green
+      }
+      if (facePicks?.to?.node === node.id) {
+        const idx = FACE_ORDER.indexOf(facePicks.to.face);
+        if (idx >= 0) entry.mesh.material[idx].color.set(0xc0392b); // red
+      }
     });
 
     const selectedEntry = meshRegistry.get(selectedId);
@@ -321,7 +371,7 @@ export function createModellerScene(
 
     for (const entry of meshRegistry.values()) {
       entry.mesh.geometry.dispose();
-      entry.mesh.material.dispose();
+      entry.mesh.material.forEach((m) => m.dispose());
       entry.edges.geometry.dispose();
     }
     meshRegistry.clear();
@@ -329,5 +379,5 @@ export function createModellerScene(
     renderer.dispose();
   }
 
-  return { reconcile, dispose, setViewMode };
+  return { reconcile, dispose, setViewMode, setFacePickMode };
 }
