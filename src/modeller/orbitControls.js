@@ -14,8 +14,28 @@
  * right-drag, just a second way to reach it without needing a
  * right mouse button (useful on a trackpad-only setup, and it's the
  * modifier-key convention this app already uses elsewhere).
+ *
+ * SNAP-TO-FACE: `snapToFace(name)` sets theta/phi directly (see
+ * VIEW_ANGLES) and re-applies the camera immediately — used by the
+ * view cube (viewCube.js) when a user clicks one of its faces.
+ * Crucially this updates the SAME internal `spherical` state a manual
+ * drag reads/writes, not just the camera's position — otherwise the
+ * next drag after a cube click would jump back to the stale
+ * pre-click angle instead of continuing smoothly from the new one.
+ * theta=0/phi=PI/2 is "front" (matches camera2d's own convention:
+ * positioned on +Z looking toward -Z) — see viewCube.js for how the
+ * other five names map to world directions.
  */
 import * as THREE from 'three';
+
+const VIEW_ANGLES = {
+  front: { theta: 0, phi: Math.PI / 2 },
+  back: { theta: Math.PI, phi: Math.PI / 2 },
+  right: { theta: Math.PI / 2, phi: Math.PI / 2 },
+  left: { theta: -Math.PI / 2, phi: Math.PI / 2 },
+  top: { theta: 0, phi: 0.05 }, // matches this file's own drag clamp floor, just below
+  bottom: { theta: 0, phi: Math.PI - 0.05 },
+};
 
 export function createOrbitControls(canvas, camera, { isBlocked, onClick, gestureState } = {}) {
   const spherical = { theta: 0.6, phi: 1.0, radius: 5.5 };
@@ -104,6 +124,14 @@ export function createOrbitControls(canvas, camera, { isBlocked, onClick, gestur
   canvas.addEventListener('contextmenu', handleContextMenu);
   canvas.style.cursor = 'grab';
 
+  function snapToFace(faceName) {
+    const angles = VIEW_ANGLES[faceName];
+    if (!angles) return;
+    spherical.theta = angles.theta;
+    spherical.phi = angles.phi;
+    applyCamera();
+  }
+
   function dispose() {
     canvas.removeEventListener('pointerdown', handlePointerDown);
     window.removeEventListener('pointerup', handlePointerUp);
@@ -112,5 +140,5 @@ export function createOrbitControls(canvas, camera, { isBlocked, onClick, gestur
     canvas.removeEventListener('contextmenu', handleContextMenu);
   }
 
-  return { dispose };
+  return { dispose, snapToFace };
 }

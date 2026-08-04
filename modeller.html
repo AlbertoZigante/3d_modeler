@@ -235,8 +235,74 @@
       position: absolute;
       bottom: 16px;
       left: 16px;
-      width: 100px;
-      height: 100px;
+      width: 110px;
+      height: 110px;
+    }
+
+    /* ── Picture-in-picture preview, bottom-right: shows the OTHER
+       view (3D when main is 2D, 2D when main is 3D). Click to swap. ── */
+    /* ── Design-limit violation toast: dead-center of the whole
+       screen, not just the viewport — a design limit is a hard rule,
+       not a viewport-local hint. Hidden by default (opacity/scale),
+       shown by adding .visible (see modeller-main.js). ── */
+    #design-limit-toast {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.96);
+      z-index: 1000;
+      background: #3a1414;
+      color: #ffd7d1;
+      border: 1px solid #a83a2c;
+      box-shadow: 0 8px 28px rgba(0,0,0,.4);
+      border-radius: 10px;
+      padding: 14px 22px;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    #design-limit-toast.visible {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    #pip-window {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      width: 200px;
+      height: 140px;
+      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,.12);
+      box-shadow: 0 4px 14px rgba(0,0,0,.18);
+      overflow: hidden;
+      cursor: pointer;
+      background: #f6ede0;
+      transition: transform .12s ease, box-shadow .12s ease;
+    }
+    #pip-window:hover {
+      transform: scale(1.03);
+      box-shadow: 0 6px 20px rgba(0,0,0,.26);
+    }
+    #pip-window canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      pointer-events: none; /* the wrapper div owns the click, not the canvas */
+    }
+    #pip-window .pip-label {
+      position: absolute;
+      top: 6px;
+      left: 8px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #8a7d68;
+      background: rgba(255,255,255,.78);
+      padding: 2px 7px;
+      border-radius: 10px;
       pointer-events: none;
     }
 
@@ -271,6 +337,30 @@
     .list-item .id { font-weight: 600; }
     .list-item .dims { color: #a4977f; }
 
+    .list-item.group-header {
+      background: #f0e4d0;
+      border-style: solid;
+      border-width: 1px;
+    }
+    .list-item.group-header.selected {
+      border-color: #d97742;
+      background: #fce6d2;
+    }
+    .list-item.group-member {
+      margin-left: 16px;
+      width: calc(100% - 16px);
+    }
+    .list-item.multi-selected {
+      border-color: #4f8cff;
+      background: #e6edfc;
+    }
+
+    .group-member-note {
+      font-size: 10px;
+      color: #a4977f;
+      margin-bottom: 8px;
+    }
+
     .add-btn {
       width: 100%;
       padding: 6px 8px;
@@ -283,6 +373,20 @@
       margin-top: 4px;
     }
     .add-btn:hover { border-color: #b5a68d; color: #3a3126; }
+
+    .restore-face-list {
+      margin-bottom: 10px;
+    }
+    .restore-face-btn {
+      border-style: solid;
+      border-color: #4f8cff;
+      color: #2a5cc9;
+      margin-top: 6px;
+    }
+    .restore-face-btn:hover {
+      background: #e6edfc;
+      border-color: #2a5cc9;
+    }
 
     .remove-btn {
       width: 100%;
@@ -414,19 +518,6 @@
       margin-bottom: 12px;
     }
 
-    .reset-btn {
-      width: 100%;
-      padding: 7px 8px;
-      font-size: 12px;
-      border: 1px solid #d5c5a8;
-      border-radius: 4px;
-      background: #fff;
-      color: #6b5d47;
-      cursor: pointer;
-      margin-top: 4px;
-    }
-    .reset-btn:hover { border-color: #b5a68d; background: #fbf3e6; }
-
     /* ---- rename (pencil icon) ---- */
     .node-header-row {
       display: flex;
@@ -523,51 +614,6 @@
       padding: 6px 8px;
       margin-bottom: 8px;
     }
-
-    /* ---- Face pick buttons (item 11) ---- */
-    .pick-face-btn {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 8px;
-      font-size: 11px;
-      border: 1px dashed #c9b88e;
-      border-radius: 4px;
-      background: #fffdf6;
-      color: #6b5d47;
-      cursor: crosshair;
-      margin-bottom: 4px;
-    }
-    .pick-face-btn:hover { border-color: #a89060; background: #f7f0e0; }
-
-    .pick-result {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 8px;
-      background: #f5f0e4;
-      border: 1px solid #d5c5a8;
-      border-radius: 4px;
-      font-size: 11px;
-      margin-bottom: 4px;
-    }
-    .pick-result-text { flex: 1; font-family: 'SF Mono', Menlo, Consolas, monospace; }
-    .pick-clear-btn {
-      border: none; background: transparent;
-      color: #a4977f; font-size: 13px;
-      cursor: pointer; padding: 0 2px;
-    }
-    .pick-clear-btn:hover { color: #b5502f; }
-
-    .pick-swatch {
-      display: inline-block;
-      width: 10px; height: 10px;
-      border-radius: 2px;
-      flex-shrink: 0;
-    }
-    .pick-swatch-green { background: #2f8a4f; }
-    .pick-swatch-red   { background: #c0392b; }
     .constraint-desc { flex: 1; line-height: 1.4; color: #55503f; }
     .constraint-remove-btn {
       border: none;
@@ -645,8 +691,8 @@
       <button class="mode-btn" id="view-2d-btn">2D</button>
     </div>
     <div class="spacer"></div>
-    <div class="hint-bar" id="hint-bar-3d">Drag empty space: orbit &nbsp;·&nbsp; Right-drag: pan &nbsp;·&nbsp; Scroll: zoom &nbsp;·&nbsp; Click panel: select &nbsp;·&nbsp; Click empty space: deselect &nbsp;·&nbsp; Arrow: move &nbsp;·&nbsp; Ring: rotate &nbsp;·&nbsp; Corner: resize</div>
-    <div class="hint-bar" id="hint-bar-2d" style="display:none;">Drag a panel: move &nbsp;·&nbsp; Drag the orange handle: rotate &nbsp;·&nbsp; Drag empty space: pan &nbsp;·&nbsp; Scroll: zoom &nbsp;·&nbsp; Click empty space: deselect</div>
+    <div class="hint-bar" id="hint-bar-3d">Drag empty space: orbit &nbsp;·&nbsp; Right-drag: pan &nbsp;·&nbsp; Scroll: zoom &nbsp;·&nbsp; Click panel: select &nbsp;·&nbsp; Ctrl/Cmd-click: multi-select &nbsp;·&nbsp; Click empty space: deselect &nbsp;·&nbsp; Arrow: move &nbsp;·&nbsp; Drag a face dot: resize &nbsp;·&nbsp; Click cube face: snap view</div>
+    <div class="hint-bar" id="hint-bar-2d" style="display:none;">Drag a panel: move &nbsp;·&nbsp; Ctrl/Cmd-click: multi-select &nbsp;·&nbsp; Drag an edge handle: resize &nbsp;·&nbsp; Drag empty space: pan &nbsp;·&nbsp; Scroll: zoom &nbsp;·&nbsp; Click empty space: deselect</div>
   </div>
 
   <!-- Main layout: panel list / 3D viewport / inspector -->
@@ -672,6 +718,11 @@
       </div>
 
       <canvas id="axes-gizmo-canvas"></canvas>
+
+      <div id="pip-window" title="Click to switch view">
+        <canvas id="pip-canvas"></canvas>
+        <span class="pip-label" id="pip-label">3D</span>
+      </div>
     </div>
 
     <div class="resizer" id="resizer-right">
@@ -689,6 +740,8 @@
       </table>
     </div>
   </div>
+
+  <div id="design-limit-toast"></div>
 
   <script type="module" src="/src/modeller-main.js"></script>
 

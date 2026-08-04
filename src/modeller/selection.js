@@ -13,6 +13,7 @@
  */
 
 let selectedId = null;
+let selectedGroupId = null;
 
 export function getSelectedId() {
   return selectedId;
@@ -20,4 +21,20 @@ export function getSelectedId() {
 
 export function setSelectedId(id) {
   selectedId = id;
+}
+
+// Set only when a GROUP is selected at the "whole group" level (no
+// specific member drilled into) — see modeller-main.js's
+// handleCanvasSelectClick for the two-level progressive-drill-in
+// logic this supports. When a specific panel IS drilled into,
+// selectedId holds that panel's id and this still holds the group id
+// it belongs to (so re-clicking a sibling member switches selectedId
+// without needing to re-select the group first) — null only means
+// "not currently inside any group's context at all".
+export function getSelectedGroupId() {
+  return selectedGroupId;
+}
+
+export function setSelectedGroupId(id) {
+  selectedGroupId = id;
 }

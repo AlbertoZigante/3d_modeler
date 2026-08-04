@@ -18,16 +18,16 @@
  */
 
 import * as THREE from 'three';
-import { MM_TO_UNIT, FACE_ORDER } from './modules.js';
+import { MM_TO_UNIT } from './modules.js';
 import { createOrbitControls } from './orbitControls.js';
 import { createGizmos } from './gizmos.js';
 import { create2DControls } from './view2d.js';
-import { createAxesGizmo } from './axesGizmo.js';
+import { createViewCube } from './viewCube.js';
 
 export function createModellerScene(
   canvas,
   main,
-  { onSelect, onTransformChange, onDimensionChange, onFacePick, axesCanvas } = {}
+  { onSelect, onTransformChange, onDimensionChange, axesCanvas, pipCanvas, onPipModeClick } = {}
 ) {
   // ---- renderer / scene / lights — warm, light palette ----
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -77,8 +77,28 @@ export function createModellerScene(
   camera2d.position.set(0, 0, 10);
   camera2d.lookAt(0, 0, 0);
 
+  // ---- picture-in-picture cameras: always show whichever mode is
+  // NOT currently the main view. These are dedicated cameras, not
+  // reuses of camera3d/camera2d — camera3d gets orbited by the user
+  // and camera2d's aspect is driven by the main viewport's size, so
+  // sharing either with the PiP (which has its own, different aspect
+  // ratio) would mean re-deriving a shared camera's projection twice
+  // per frame. A fixed, independent pair is simpler and can never
+  // fight with the main view for a projection matrix.
+  const camera3dPip = new THREE.PerspectiveCamera(45, 1, 0.1, 2000);
+  camera3dPip.position.set(3.5, 2.5, 3.5); // fixed three-quarter angle, never orbited
+  camera3dPip.lookAt(0, 0, 0);
+
+  const camera2dPip = new THREE.OrthographicCamera(-2, 2, ORTHO_HALF_HEIGHT, -ORTHO_HALF_HEIGHT, 0.1, 100);
+  camera2dPip.position.set(0, 0, 10);
+  camera2dPip.lookAt(0, 0, 0);
+
   let viewMode = '3d';
   let activeCamera = camera3d;
+
+  function pipCameraForCurrentMode() {
+    return viewMode === '2d' ? camera3dPip : camera2dPip;
+  }
 
   // ---- shared conversion: absolute mesh transform -> offset delta ----
   // Both gizmos (3D) and view2d (2D) report an absolute world
@@ -90,21 +110,35 @@ export function createModellerScene(
   function reportTransformToExternal(nodeId, transform) {
     if (!onTransformChange) return;
     const base = autoBaseById.get(nodeId) || { x: 0, y: 0, z: 0 };
-    onTransformChange(nodeId, {
-      offset: {
-        x: (transform.offsetDelta.x - base.x) / MM_TO_UNIT,
-        y: (transform.offsetDelta.y - base.y) / MM_TO_UNIT,
-        z: (transform.offsetDelta.z - base.z) / MM_TO_UNIT,
-      },
-      rotation: transform.rotation,
-    });
+    const proposedOffsetMm = {
+      x: (transform.offsetDelta.x - base.x) / MM_TO_UNIT,
+      y: (transform.offsetDelta.y - base.y) / MM_TO_UNIT,
+      z: (transform.offsetDelta.z - base.z) / MM_TO_UNIT,
+    };
+    // The handler may return a corrected offset (e.g. clamped to a
+    // design limit) — if it does, snap the LIVE mesh to match right
+    // away. Nothing else resets mesh.position between frames during
+    // a continuous move-drag, so without this the mesh would visibly
+    // overshoot the limit until some unrelated later render happened.
+    const correctedOffsetMm = onTransformChange(nodeId, { offset: proposedOffsetMm, rotation: transform.rotation });
+    if (correctedOffsetMm) {
+      const entry = meshRegistry.get(nodeId);
+      if (entry) {
+        entry.mesh.position.set(
+          base.x + correctedOffsetMm.x * MM_TO_UNIT,
+          base.y + correctedOffsetMm.y * MM_TO_UNIT,
+          base.z + correctedOffsetMm.z * MM_TO_UNIT
+        );
+      }
+    }
   }
 
   // ---- THE RECONCILER's data (shared across whichever mode is active) ----
   const meshRegistry = new Map(); // id -> { mesh, edges, lastDims }
   let lastResolvedPanels = [];
   let lastSelectedId = null;
-  let lastFacePicks = null;
+  let lastSelectedGroupId = null;
+  let lastMultiSelectedIds = null;
 
   function meshList() {
     return Array.from(meshRegistry.values()).map((entry) => entry.mesh);
@@ -112,26 +146,6 @@ export function createModellerScene(
 
   // ---- 3D interaction layer ----
   const gestureState = { interactionHandled: false };
-
-  // FACE PICKING (item 11): while `facePickMode` is 'from' or 'to',
-  // the next click is interpreted as picking a FACE (not selecting a
-  // panel) — see reconcile() below for how the picked face gets
-  // colored, and handleClickSelect3D for how a face is identified
-  // from the raycast hit.
-  let facePickMode = null;
-
-  function setFacePickMode(mode) {
-    facePickMode = mode; // 'from' | 'to' | null — used by handleClickSelect3D
-    canvas.style.cursor = mode ? 'crosshair' : 'grab';
-    // delegate to the 2D layer when active — it has its own internal
-    // facePickMode state that governs handlePointerDown branching
-    if (view2d && view2d.setFacePickMode) view2d.setFacePickMode(mode);
-  }
-
-  function faceNameFromHit(hit) {
-    if (!hit.face) return null;
-    return FACE_ORDER[hit.face.materialIndex] ?? null;
-  }
 
   function handleClickSelect3D(e) {
     const rect = canvas.getBoundingClientRect();
@@ -142,21 +156,7 @@ export function createModellerScene(
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(ndc, camera3d);
     const hits = raycaster.intersectObjects(meshList(), false);
-
-    if (facePickMode) {
-      const mode = facePickMode;
-      facePickMode = null; // exit picking mode on any click, hit or miss
-      canvas.style.cursor = 'grab';
-      if (hits.length > 0) {
-        const faceName = faceNameFromHit(hits[0]);
-        if (faceName && onFacePick) {
-          onFacePick(mode, hits[0].object.userData.nodeId, faceName);
-        }
-      }
-      return;
-    }
-
-    onSelect?.(hits.length > 0 ? hits[0].object.userData.nodeId : null);
+    onSelect?.(hits.length > 0 ? hits[0].object.userData.nodeId : null, e.ctrlKey || e.metaKey);
   }
 
   let orbit = null;
@@ -182,7 +182,7 @@ export function createModellerScene(
     view2d = create2DControls(canvas, camera2d, scene, meshRegistry, {
       onSelect,
       onTransformChange: reportTransformToExternal,
-      onFacePick, // item 12 — face picking in the 2D view
+      onDimensionChange,
     });
   }
 
@@ -194,6 +194,50 @@ export function createModellerScene(
 
   activate3D(); // default on load
 
+  // ---- picture-in-picture renderer (own tiny WebGL context, same
+  // shared `scene`) + click-to-swap. The wrapper div (not the canvas)
+  // owns the click and hover styling; the canvas has pointer-events
+  // disabled in CSS so it never fights the wrapper for the click. ----
+  const pipRenderer = pipCanvas
+    ? new THREE.WebGLRenderer({ canvas: pipCanvas, antialias: true })
+    : null;
+  const pipWrapper = pipCanvas ? pipCanvas.parentElement : null;
+  const pipLabel = pipWrapper ? pipWrapper.querySelector('.pip-label') : null;
+  if (pipRenderer) {
+    pipRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    pipRenderer.setClearColor(0xf6ede0);
+  }
+
+  function updatePipLabel() {
+    if (pipLabel) pipLabel.textContent = viewMode === '2d' ? '3D' : '2D';
+  }
+  updatePipLabel();
+
+  if (pipWrapper) {
+    pipWrapper.addEventListener('click', () => {
+      onPipModeClick?.(viewMode === '2d' ? '3d' : '2d');
+    });
+  }
+
+  function onPipResize() {
+    if (!pipRenderer) return;
+    const w = pipCanvas.clientWidth;
+    const h = pipCanvas.clientHeight;
+    if (w === 0 || h === 0) return;
+    pipRenderer.setSize(w, h, false);
+
+    camera3dPip.aspect = w / h;
+    camera3dPip.updateProjectionMatrix();
+
+    const aspect = w / h;
+    camera2dPip.left = -ORTHO_HALF_HEIGHT * aspect;
+    camera2dPip.right = ORTHO_HALF_HEIGHT * aspect;
+    camera2dPip.top = ORTHO_HALF_HEIGHT;
+    camera2dPip.bottom = -ORTHO_HALF_HEIGHT;
+    camera2dPip.updateProjectionMatrix();
+  }
+  onPipResize(); // fixed CSS size — set once, no need to observe
+
   function setViewMode(mode) {
     if (mode === viewMode) return;
     deactivateCurrent();
@@ -202,13 +246,15 @@ export function createModellerScene(
     if (mode === '2d') activate2D();
     else activate3D();
     onResize(); // camera projections depend on the active camera
-    reconcile(lastResolvedPanels, lastSelectedId, lastFacePicks); // re-apply immediately, don't wait for the next external render
+    updatePipLabel();
+    reconcile(lastResolvedPanels, lastSelectedId, lastSelectedGroupId, lastMultiSelectedIds); // re-apply immediately, don't wait for the next external render
   }
 
-  function reconcile(resolvedPanels, selectedId, facePicks = null) {
+  function reconcile(resolvedPanels, selectedId, selectedGroupId, multiSelectedIds) {
     lastResolvedPanels = resolvedPanels;
     lastSelectedId = selectedId;
-    lastFacePicks = facePicks;
+    lastSelectedGroupId = selectedGroupId;
+    lastMultiSelectedIds = multiSelectedIds;
 
     const liveIds = new Set(resolvedPanels.map((p) => p.id));
 
@@ -221,7 +267,7 @@ export function createModellerScene(
         }
         scene.remove(entry.mesh);
         entry.mesh.geometry.dispose();
-        entry.mesh.material.forEach((m) => m.dispose());
+        entry.mesh.material.dispose();
         entry.edges.geometry.dispose();
         meshRegistry.delete(id);
       }
@@ -233,16 +279,17 @@ export function createModellerScene(
       const t = node.thickness * MM_TO_UNIT;
 
       let entry = meshRegistry.get(node.id);
-      const isSelected = node.id === selectedId;
+      const isSelected = node.id === selectedId || (selectedGroupId != null && node.groupId === selectedGroupId);
+      const isMultiSelected = !isSelected && multiSelectedIds && multiSelectedIds.has(node.id);
 
       if (!entry) {
-        const materials = FACE_ORDER.map(() => new THREE.MeshStandardMaterial({
+        const material = new THREE.MeshStandardMaterial({
           color: 0xdcbd8c,
           roughness: 0.75,
           metalness: 0.04,
-        }));
+        });
         const geometry = new THREE.BoxGeometry(w, h, t);
-        const mesh = new THREE.Mesh(geometry, materials);
+        const mesh = new THREE.Mesh(geometry, material);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.userData.nodeId = node.id;
@@ -271,20 +318,25 @@ export function createModellerScene(
       // 2D drag needs to know, per axis, whether it's allowed to move
       // this panel — same lockedFields the 3D gizmo already reads.
       entry.mesh.userData.lockedFields = node.lockedFields || {};
+      entry.mesh.userData.thicknessAxis = node.thicknessAxis;
 
-      const posUnits = {
+      const resolvedPosUnits = {
         x: node.position.x * MM_TO_UNIT,
         y: node.position.y * MM_TO_UNIT,
         z: node.position.z * MM_TO_UNIT,
       };
-      autoBaseById.set(node.id, posUnits);
+      autoBaseById.set(node.id, {
+        x: node.basePosition.x * MM_TO_UNIT,
+        y: node.basePosition.y * MM_TO_UNIT,
+        z: node.basePosition.z * MM_TO_UNIT,
+      });
 
       const isBeingDragged =
         (gizmos && gizmos.controls.some((tc) => tc.object === entry.mesh && tc.dragging)) ||
         (view2d && view2d.isDragging() && view2d.draggedMeshRef() === entry.mesh);
 
       if (!isBeingDragged) {
-        entry.mesh.position.set(posUnits.x, posUnits.y, posUnits.z);
+        entry.mesh.position.set(resolvedPosUnits.x, resolvedPosUnits.y, resolvedPosUnits.z);
 
         const rot = node.rotation || { x: 0, y: 0, z: 0 };
         entry.mesh.rotation.set(
@@ -293,24 +345,11 @@ export function createModellerScene(
           THREE.MathUtils.degToRad(rot.z)
         );
 
-        entry.mesh.scale.set(1, 1, 1); // scale is only ever transient (see gizmos.js)
+        entry.mesh.scale.set(1, 1, 1); // scale is only ever transient (see view2d.js's resize drag)
       }
 
-      const baseColor = isSelected ? 0xe0904a : 0xdcbd8c;
-      entry.mesh.material.forEach((m) => m.color.set(baseColor));
-      entry.edges.material.color.set(isSelected ? 0x8a4a1a : 0x8b6540);
-
-      // FACE PICKING (item 11): tint a specific face green ("from")
-      // or red ("to") when this node's mesh has a picked face —
-      // applied AFTER the base color above so it always wins.
-      if (facePicks?.from?.node === node.id) {
-        const idx = FACE_ORDER.indexOf(facePicks.from.face);
-        if (idx >= 0) entry.mesh.material[idx].color.set(0x2f8a4f); // green
-      }
-      if (facePicks?.to?.node === node.id) {
-        const idx = FACE_ORDER.indexOf(facePicks.to.face);
-        if (idx >= 0) entry.mesh.material[idx].color.set(0xc0392b); // red
-      }
+      entry.mesh.material.color.set(isSelected ? 0xe0904a : isMultiSelected ? 0x4f8cff : 0xdcbd8c);
+      entry.edges.material.color.set(isSelected ? 0x8a4a1a : isMultiSelected ? 0x2a5cc9 : 0x8b6540);
     });
 
     const selectedEntry = meshRegistry.get(selectedId);
@@ -352,13 +391,20 @@ export function createModellerScene(
   resizeObserver.observe(viewportEl);
   onResize();
 
-  const axesGizmo = axesCanvas ? createAxesGizmo(axesCanvas) : null;
+  const viewCube = axesCanvas
+    ? createViewCube(axesCanvas, {
+        onFaceClick: (faceName) => {
+          if (orbit) orbit.snapToFace(faceName); // no-op in 2D mode, where there's no orbit to snap
+        },
+      })
+    : null;
 
   let animationFrameId = null;
   function animate() {
     animationFrameId = requestAnimationFrame(animate);
     renderer.render(scene, activeCamera);
-    if (axesGizmo) axesGizmo.render(activeCamera);
+    if (viewCube) viewCube.render(activeCamera);
+    if (pipRenderer) pipRenderer.render(scene, pipCameraForCurrentMode());
   }
   animate();
 
@@ -367,11 +413,12 @@ export function createModellerScene(
     window.removeEventListener('resize', onResize);
     resizeObserver.disconnect();
     deactivateCurrent();
-    if (axesGizmo) axesGizmo.dispose();
+    if (viewCube) viewCube.dispose();
+    if (pipRenderer) pipRenderer.dispose();
 
     for (const entry of meshRegistry.values()) {
       entry.mesh.geometry.dispose();
-      entry.mesh.material.forEach((m) => m.dispose());
+      entry.mesh.material.dispose();
       entry.edges.geometry.dispose();
     }
     meshRegistry.clear();
@@ -379,5 +426,5 @@ export function createModellerScene(
     renderer.dispose();
   }
 
-  return { reconcile, dispose, setViewMode, setFacePickMode };
+  return { reconcile, dispose, setViewMode };
 }

@@ -55,33 +55,38 @@
  * direction instead of "does this field's face align" direction.
  */
 
-import * as THREE from 'three';
 import {
-  MM_TO_UNIT,
   LOCAL_FACES,
   FACE_TO_DIM_FIELD,
   FIELD_TO_AXIS,
   MIN_PANEL_DIM_MM,
-  computeAutoLayoutPositions,
+  getAlignedAxis,
+  DIM_FIELD_PROBE_FACE,
+  computeWorldHalfExtents,
 } from './modules.js';
 
 const EMPTY_LOCKS = { width: false, height: false, thickness: false, positionX: false, positionY: false, positionZ: false };
-const AXIS_VECTORS = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) };
 
-function emptyResolved(node, autoPos) {
+function emptyResolved(node) {
+  const base = node.basePosition || { x: 0, y: 0, z: 0 };
+  const offset = node.offset || { x: 0, y: 0, z: 0 };
   return {
     id: node.id,
     name: node.name,
     material: node.material,
     quantity: node.quantity,
     rotation: node.rotation || { x: 0, y: 0, z: 0 },
+    thicknessAxis: node.thicknessAxis, // pass through — see modules.js createPanelNode/classifyFacesByThickness
+    groupId: node.groupId || null,
+    hidden: !!node.hidden,
     width: node.width,
     height: node.height,
     thickness: node.thickness,
+    basePosition: base, // pass through unchanged — scene.js reads this directly, never recomputes it
     position: {
-      x: (autoPos.x + (node.offset?.x || 0) * MM_TO_UNIT) / MM_TO_UNIT,
-      y: (autoPos.y + (node.offset?.y || 0) * MM_TO_UNIT) / MM_TO_UNIT,
-      z: (autoPos.z + (node.offset?.z || 0) * MM_TO_UNIT) / MM_TO_UNIT,
+      x: base.x + (offset.x || 0),
+      y: base.y + (offset.y || 0),
+      z: base.z + (offset.z || 0),
     },
     lockedFields: { ...EMPTY_LOCKS },
     warnings: [],
@@ -126,37 +131,11 @@ function topoSort(panels) {
   return { order, cyclic };
 }
 
-/**
- * Which single world axis (if any) a local face lands on, given a
- * node's rotation — the one shared alignment check every constraint
- * (and now the field-inference helper below) is built on.
- * Returns { axis: 'x'|'y'|'z', sign: 1|-1 } or null if the face isn't
- * aligned with any single axis within tolerance.
- */
-export function getAlignedAxis(rotationDeg, faceName) {
-  const local = LOCAL_FACES[faceName];
-  if (!local) return null;
-  const euler = new THREE.Euler(
-    THREE.MathUtils.degToRad(rotationDeg?.x || 0),
-    THREE.MathUtils.degToRad(rotationDeg?.y || 0),
-    THREE.MathUtils.degToRad(rotationDeg?.z || 0)
-  );
-  const worldNormal = new THREE.Vector3(local.x, local.y, local.z).applyEuler(euler);
-  for (const axis of ['x', 'y', 'z']) {
-    const alignment = worldNormal.dot(AXIS_VECTORS[axis]);
-    if (Math.abs(Math.abs(alignment) - 1) <= 0.02) {
-      return { axis, sign: alignment >= 0 ? 1 : -1 };
-    }
-  }
-  return null;
-}
-
-// Representative face for each dimension field — used both to find
-// "which axis does field X line up with" (axisForDimensionField,
-// below applySpansBetween) and "which field lines up with axis Y"
-// (inferSpanField, right below) — one shared table so both
-// directions of this lookup can never quietly drift apart.
-const DIM_FIELD_PROBE_FACE = { width: 'right', height: 'top', thickness: 'front' };
+// DIM_FIELD_PROBE_FACE and computeWorldHalfExtents now live in
+// modules.js (imported above) — used both to find "which axis does
+// field X line up with" (axisForDimensionField, below
+// applySpansBetween) and "which field lines up with axis Y"
+// (inferSpanField, right below).
 
 /**
  * Given a target node and the From/To face references a user picked
@@ -189,7 +168,16 @@ export function inferSpanField(targetNode, fromFaceRef, toFaceRef, byId) {
   const axis = fromAligned.axis;
   for (const [field, probeFace] of Object.entries(DIM_FIELD_PROBE_FACE)) {
     const aligned = getAlignedAxis(targetNode.rotation, probeFace);
-    if (aligned && aligned.axis === axis) return { field, axis };
+    if (aligned && aligned.axis === axis) {
+      if (field === 'thickness') {
+        return {
+          error:
+            'That axis lines up with this panel\'s THICKNESS, which is fixed by its Material ' +
+            '(inspector) and can\'t be set via a relation — pick a different pair of faces.',
+        };
+      }
+      return { field, axis };
+    }
   }
   return { error: `This panel has no dimension that lines up with the ${axis.toUpperCase()} axis at its current rotation.` };
 }
@@ -238,6 +226,10 @@ function axisForDimensionField(node, field) {
 }
 
 function applySpansBetween(node, constraint, resolvedById, byId, r) {
+  if (constraint.field === 'thickness') {
+    r.warnings.push('thickness is fixed by Material now — a spansBetween constraint on it is ignored');
+    return;
+  }
   const axisKey = axisForDimensionField(node, constraint.field);
   if (!axisKey) {
     throw new Error(
@@ -281,11 +273,10 @@ function applyAttachedTo(node, constraint, resolvedById, byId, r) {
 
 export function resolveConstraints(panels) {
   const byId = new Map(panels.map((p) => [p.id, p]));
-  const autoPositions = computeAutoLayoutPositions(panels);
   const resolvedById = new Map();
 
   panels.forEach((node) => {
-    resolvedById.set(node.id, emptyResolved(node, autoPositions.get(node.id)));
+    resolvedById.set(node.id, emptyResolved(node));
   });
 
   const { order, cyclic } = topoSort(panels);

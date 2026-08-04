@@ -1,247 +1,343 @@
 /**
- * 2D (front elevation) view: orthographic camera looking down -Z,
- * plus PowerPoint-style handles for selected panels.
+ * 2D (front elevation) view: an orthographic camera looking down -Z,
+ * plus PowerPoint-style direct manipulation — drag a selected panel's
+ * body to translate it, drag one of its four edge handles to resize
+ * it — instead of the 3D gizmos.
  *
- * HANDLES (item 12+):
- *   Arc-arrow above the panel: click once → rotate +90° CCW on the
- *     XY plane (Z-axis). The arc is positioned above the panel's
- *     world bounding sphere so it never overlaps the panel, and is
- *     always world-upright regardless of the panel's own rotation.
- *   4-directional arrow at panel center: drag to translate.
- *     Dragging the panel body also translates (fallback, kept for
- *     convenience), but the explicit handle makes the intent visible.
+ * ARCHITECTURE: this does NOT duplicate the reconciler, mesh
+ * registry, or selection logic. It's handed the SAME Three.js scene
+ * and mesh registry scene.js already owns, and only swaps which
+ * camera is active and which interaction layer is listening to
+ * pointer events. Every panel is still the same mesh; BOM, relations,
+ * the box preset, and locked-field logic are completely unaffected
+ * by which view is on screen, because none of that ever depended on
+ * a specific camera or interaction style.
  *
- * FACE PICKING (item 12): see faceFromClick2D below — faces whose
- *   world normals lie in the XY plane (perpendicular to the view
- *   direction) are visible as edges and are the only pickable ones.
+ * "Front" means looking down -Z: a vertical panel shows its true
+ * width×height silhouette. A box preset's left/right side panels
+ * (rotated 90° about Y to form the box's sides) will appear as thin
+ * edge-on slivers here — that's physically correct (a cabinet side
+ * really does look like a thin line from the front), not a bug.
+ *
+ * NO ROTATION: orientation is fixed at creation time (the Vertical/
+ * Horizontal buttons in the panel list bake `rotation` in directly —
+ * see modeller-main.js) and is never user-adjustable afterwards, in
+ * either view — see gizmos.js for the same decision on the 3D side.
+ * There is deliberately no rotate handle here.
+ *
+ * RESIZE IS AXIS-RESTRICTED BY ORIENTATION: only a field that
+ * currently lines up with world X or Y is 2D-edge-draggable at all —
+ * a Vertical panel's width lines up with Z (not draggable here, only
+ * its height/Y is); a Horizontal panel's height lines up with Z (only
+ * its width/X is); a Parallel panel (identity rotation) has BOTH
+ * width->X and height->Y, so it gets all four handles. This is
+ * computed directly from rotation via getAlignedAxis (imported from
+ * modules.js) rather than a hardcoded Vertical/Horizontal check, so
+ * it's correct for any current or future orientation, not just two.
+ * Thickness is never 2D-edge-draggable regardless of orientation,
+ * since a front-on view has no way to grab a face lying along its own
+ * view axis — that field stays inspector-only (or, in 3D, a face-drag
+ * if it happens to line up with X/Y/Z there — see gizmos.js).
+ *
+ * RESIZE is ASYMMETRIC — dragging an edge out by X moves only that
+ * edge; the opposite edge's world position stays exactly fixed. That
+ * means a resize here also shifts the panel's `offset` (its center
+ * moves by half the growth, toward the dragged edge) — see
+ * computeResizeResult() below, and modeller-main.js's
+ * onDimensionChange handler for how that shift gets accumulated onto
+ * the node's existing offset rather than replacing it.
  */
-
 import * as THREE from 'three';
-import { LOCAL_FACES } from './modules.js';
+import { MM_TO_UNIT, MIN_PANEL_DIM_MM, getAlignedAxis } from './modules.js';
 
-const HANDLE_GAP = 0.22;   // world units from panel bounding edge to arc center
-const ARC_R      = 0.095;  // arc circle radius
-const ORANGE     = 0xd97742;
-const mat  = () => new THREE.MeshBasicMaterial({ color: ORANGE, side: THREE.DoubleSide });
-const lmat = () => new THREE.LineBasicMaterial({ color: ORANGE });
+const RESIZE_HANDLE_COLOR = 0xd97742; // "this is draggable" accent
 
-// ---- faceFromClick2D ------------------------------------------------
-// Which face was clicked in the 2D XY view? Finds the local face whose
-// world normal (after applying mesh.rotation), projected to XY, best
-// matches the direction from the mesh center to the click point.
-// Faces whose world normals collapse to near-zero in XY (i.e. they
-// point along ±Z = they appear as the filled rectangle, not as an
-// edge) are automatically excluded.
-function faceFromClick2D(mesh, clickWorldPoint) {
-  const dir = new THREE.Vector2(
-    clickWorldPoint.x - mesh.position.x,
-    clickWorldPoint.y - mesh.position.y,
-  );
-  if (dir.length() < 1e-6) return null;
-  dir.normalize();
-
-  let bestFace = null;
-  let bestDot  = -Infinity;
-
-  for (const [faceName, localNormal] of Object.entries(LOCAL_FACES)) {
-    const worldNormal = new THREE.Vector3(localNormal.x, localNormal.y, localNormal.z)
-      .applyEuler(mesh.rotation);
-    const projected = new THREE.Vector2(worldNormal.x, worldNormal.y);
-    if (projected.length() < 0.25) continue; // face parallel to view — not a visible edge
-    projected.normalize();
-    const dot = dir.dot(projected);
-    if (dot > bestDot) { bestDot = dot; bestFace = faceName; }
-  }
-  return bestFace;
+// Which field (if any) currently lines up with a given WORLD axis, for
+// a panel's FIXED rotation (never changes after creation — no rotate
+// UI exists anywhere in the app). Used to decide which edge handles
+// are meaningful to show at all, for whatever orientation this
+// specific panel happens to have.
+function fieldAlignedToAxis(mesh, worldAxis) {
+  const rotationDeg = {
+    x: THREE.MathUtils.radToDeg(mesh.rotation.x),
+    y: THREE.MathUtils.radToDeg(mesh.rotation.y),
+    z: THREE.MathUtils.radToDeg(mesh.rotation.z),
+  };
+  if (getAlignedAxis(rotationDeg, 'right')?.axis === worldAxis) return 'width';
+  if (getAlignedAxis(rotationDeg, 'top')?.axis === worldAxis) return 'height';
+  return null; // thickness lines up with this axis instead — not 2D-editable
 }
-
-// ---- buildRotationArc -----------------------------------------------
-// A ⟲-style circular arc with a filled arrowhead at its open end.
-// Clicking the hit ring rotates the attached panel +90° CCW.
-// Visual style matches PowerPoint's rotation handle.
-function buildRotationArc() {
-  const group = new THREE.Group();
-
-  // Arc: ~300° CCW sweep, leaving a short gap for the arrowhead
-  const gapStart = -Math.PI * 0.28;  // start just past lower-right
-  const sweep    =  Math.PI * 1.72;  // ≈ 310°
-  const pts = [];
-  for (let i = 0; i <= 52; i++) {
-    const a = gapStart + sweep * (i / 52);
-    pts.push(new THREE.Vector3(ARC_R * Math.cos(a), ARC_R * Math.sin(a), 0));
-  }
-  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lmat()));
-
-  // Arrowhead at the END of the arc (filled triangle)
-  const tipA = gapStart + sweep;
-  const tipX = ARC_R * Math.cos(tipA);
-  const tipY = ARC_R * Math.sin(tipA);
-  // CCW tangent direction at the tip: (-sin(a), cos(a)) * length
-  const tLen = 0.055;
-  const tx = -Math.sin(tipA) * tLen;
-  const ty =  Math.cos(tipA) * tLen;
-  // Perpendicular for arrowhead width
-  const pLen = 0.027;
-  const norm = Math.sqrt(tx*tx + ty*ty) || 1;
-  const px = (-ty / norm) * pLen;
-  const py = ( tx / norm) * pLen;
-
-  const sh = new THREE.Shape();
-  sh.moveTo(tipX + tx,             tipY + ty);
-  sh.lineTo(tipX + px - tx * 0.4, tipY + py - ty * 0.4);
-  sh.lineTo(tipX - px - tx * 0.4, tipY - py - ty * 0.4);
-  sh.closePath();
-  group.add(new THREE.Mesh(new THREE.ShapeGeometry(sh), mat()));
-
-  // Stem dot at bottom of arc (visual anchor, like PowerPoint's)
-  const stemDot = new THREE.Mesh(new THREE.CircleGeometry(0.015, 10), mat());
-  stemDot.position.set(0, -ARC_R - 0.025, 0);
-  group.add(stemDot);
-
-  // Invisible hit ring — larger than visual for usability
-  const hitMesh = new THREE.Mesh(
-    new THREE.RingGeometry(ARC_R - 0.08, ARC_R + 0.08, 36),
-    new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }),
-  );
-  group.add(hitMesh);
-
-  return { group, hitMesh };
-}
-
-// ---- buildMoveHandle ------------------------------------------------
-// Four-directional arrow at the panel's center, exactly like the
-// move-cursor in PowerPoint: four arrow heads pointing N/S/E/W, each
-// on a short shaft, sharing a center element.
-function buildMoveHandle() {
-  const group = new THREE.Group();
-  const m = mat();
-  const dist = 0.082;  // shaft+arrowhead total: center to tip
-  const aw   = 0.022;  // arrowhead half-width at base
-  const al   = 0.036;  // arrowhead height
-  const sw   = 0.007;  // shaft half-width
-
-  // One arrow shape pointing +Y, duplicated 4× by Z-rotation
-  for (const deg of [0, 90, 180, 270]) {
-    const s = new THREE.Shape();
-    s.moveTo( 0,   dist);          // tip
-    s.lineTo(-aw,  dist - al);     // arrowhead left base
-    s.lineTo(-sw,  dist - al);     // join shaft
-    s.lineTo(-sw,  sw);            // shaft root (small gap from center)
-    s.lineTo( sw,  sw);
-    s.lineTo( sw,  dist - al);
-    s.lineTo( aw,  dist - al);
-    s.closePath();
-    const mesh = new THREE.Mesh(new THREE.ShapeGeometry(s), m);
-    mesh.rotation.z = -deg * Math.PI / 180;
-    group.add(mesh);
-  }
-
-  // Center square (like PowerPoint's move cursor center dot)
-  const cs = 0.012;
-  const c = new THREE.Shape();
-  c.moveTo(-cs, -cs); c.lineTo(cs, -cs); c.lineTo(cs, cs); c.lineTo(-cs, cs);
-  c.closePath();
-  group.add(new THREE.Mesh(new THREE.ShapeGeometry(c), m));
-
-  // Invisible hit circle
-  const hitMesh = new THREE.Mesh(
-    new THREE.CircleGeometry(dist + 0.01, 16),
-    new THREE.MeshBasicMaterial({ visible: false }),
-  );
-  group.add(hitMesh);
-
-  return { group, hitMesh };
-}
-
-// ---- Stem line from panel top to arc center --------------------------
-function buildStemLine() {
-  const geo = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(0, 0, 0),
-    new THREE.Vector3(0, 1, 0), // will be scaled by positionHandles
-  ]);
-  return new THREE.Line(geo, lmat());
-}
-
-// =====================================================================
 
 export function create2DControls(
-  canvas, camera, scene, meshRegistry,
-  { onSelect, onTransformChange, onFacePick } = {}
+  canvas,
+  camera,
+  scene,
+  meshRegistry,
+  { onSelect, onTransformChange, onDimensionChange, getSelectedId } = {}
 ) {
   const raycaster = new THREE.Raycaster();
   const dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 
-  // Build handles
-  const { group: arcGroup, hitMesh: arcHit } = buildRotationArc();
-  const { group: moveGroup, hitMesh: moveHit } = buildMoveHandle();
-  const stemLine = buildStemLine();
+  // ---- resize-handle visuals: left/right (width) + top/bottom (height) ----
+  // Children of one group so they inherit the panel's rotation for free.
+  const edgeHandleGroup = new THREE.Group();
+  const edgeHandles = {};
+  ['left', 'right'].forEach((key) => {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.05, 0.16),
+      new THREE.MeshBasicMaterial({ color: RESIZE_HANDLE_COLOR, depthTest: false })
+    );
+    mesh.renderOrder = 10;
+    edgeHandleGroup.add(mesh);
+    edgeHandles[key] = mesh;
+  });
+  ['top', 'bottom'].forEach((key) => {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.16, 0.05),
+      new THREE.MeshBasicMaterial({ color: RESIZE_HANDLE_COLOR, depthTest: false })
+    );
+    mesh.renderOrder = 10;
+    edgeHandleGroup.add(mesh);
+    edgeHandles[key] = mesh;
+  });
+  edgeHandleGroup.visible = false;
+  scene.add(edgeHandleGroup);
 
-  arcGroup.visible  = false;
-  moveGroup.visible = false;
-  stemLine.visible  = false;
-  scene.add(arcGroup, moveGroup, stemLine);
+  const EDGE_TO_FIELD = { left: 'width', right: 'width', top: 'height', bottom: 'height' };
 
-  let currentMesh = null;
-  let facePickMode = null;
+  let currentMesh = null; // the mesh the handles currently follow
 
-  function setFacePickMode(mode) {
-    facePickMode = mode;
-    canvas.style.cursor = mode ? 'crosshair' : 'grab';
-  }
-
-  // Position both handles relative to the currently selected mesh.
-  // The arc is placed above the panel's bounding sphere so it never
-  // overlaps the panel regardless of the panel's own 2D rotation.
-  function positionHandles(mesh) {
-    mesh.geometry.computeBoundingSphere();
-    const bsRadius = mesh.geometry.boundingSphere?.radius ?? 0.5;
-    const top = mesh.position.y + bsRadius; // world Y of panel's furthest extent
-
-    arcGroup.position.set(mesh.position.x, top + HANDLE_GAP, mesh.position.z + 0.01);
-    arcGroup.rotation.z = 0; // always world-upright
-
-    moveGroup.position.set(mesh.position.x, mesh.position.y, mesh.position.z + 0.01);
-
-    // Stem: from panel top to arc bottom (the stem dot on the arc is at -ARC_R-0.025 local)
-    const stemBot = top + 0.01;
-    const stemTop = top + HANDLE_GAP - ARC_R - 0.03;
-    stemLine.position.set(mesh.position.x, stemBot, mesh.position.z + 0.01);
-    stemLine.scale.set(1, Math.max(0, stemTop - stemBot), 1);
-  }
-
-  function setSelectedMesh(mesh) {
-    currentMesh = mesh;
-    arcGroup.visible  = !!mesh;
-    moveGroup.visible = !!mesh;
-    stemLine.visible  = !!mesh;
-    if (mesh) positionHandles(mesh);
-  }
-
-  // ---- Utilities ------------------------------------------------------
   function screenToWorld(e) {
     const rect = canvas.getBoundingClientRect();
     const ndc = new THREE.Vector2(
-      ((e.clientX - rect.left) / rect.width)  * 2 - 1,
-      -((e.clientY - rect.top) / rect.height) * 2 + 1,
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1
     );
     raycaster.setFromCamera(ndc, camera);
-    const pt = new THREE.Vector3();
-    raycaster.ray.intersectPlane(dragPlane, pt);
-    return pt;
+    const point = new THREE.Vector3();
+    raycaster.ray.intersectPlane(dragPlane, point);
+    return point;
   }
 
+  function meshHalfExtents(mesh) {
+    // width/height/thickness in WORLD units. Static geometry
+    // parameters alone aren't enough — during a live resize drag,
+    // mesh.scale is what's actually moving the visual edge (geometry
+    // itself isn't rebuilt until the drag ends), so it has to be
+    // factored in or the handle would visibly lag behind the real
+    // edge position while dragging.
+    const params = mesh.geometry.parameters;
+    return {
+      halfW: (params.width / 2) * mesh.scale.x,
+      halfH: (params.height / 2) * mesh.scale.y,
+      depth: params.depth * mesh.scale.z,
+    };
+  }
+
+  function positionHandle(mesh) {
+    const { halfW, halfH } = meshHalfExtents(mesh);
+    const lockedFields = mesh.userData.lockedFields || {};
+    const xEditable = fieldAlignedToAxis(mesh, 'x') === 'width';
+    const yEditable = fieldAlignedToAxis(mesh, 'y') === 'height';
+
+    edgeHandleGroup.position.set(mesh.position.x, mesh.position.y, mesh.position.z + 0.01);
+    edgeHandleGroup.rotation.z = mesh.rotation.z; // panels can still have a FIXED rotation set at creation
+    edgeHandles.left.position.set(-halfW, 0, 0);
+    edgeHandles.right.position.set(halfW, 0, 0);
+    edgeHandles.top.position.set(0, halfH, 0);
+    edgeHandles.bottom.position.set(0, -halfH, 0);
+
+    // Two gates on each handle: (1) hidden if its dimension is
+    // currently derived from a constraint — dragging it would mean
+    // nothing until that link is explicitly broken in the inspector;
+    // (2) hidden if that field doesn't currently line up with the
+    // axis this handle controls — e.g. left/right only make sense
+    // when width lines up with world X. A Parallel panel has both
+    // width->X and height->Y, so it gets all four; Vertical/
+    // Horizontal panels only ever get one axis's pair.
+    edgeHandles.left.visible = !lockedFields.width && xEditable;
+    edgeHandles.right.visible = !lockedFields.width && xEditable;
+    edgeHandles.top.visible = !lockedFields.height && yEditable;
+    edgeHandles.bottom.visible = !lockedFields.height && yEditable;
+  }
+
+  // ---- pointer / drag state ----
+  let mode = null; // null | 'translate' | 'resize'
+  let draggedMesh = null;
+  let dragStartWorld = null;
+  let dragStartMeshPos = null;
+  let resizeEdgeKey = null;
+  let resizeStartMm = null; // { width, height, thickness } at drag start
+  const gestureState = { moved: false, downX: 0, downY: 0 };
+
   function meshList() {
-    return Array.from(meshRegistry.values()).map((e) => e.mesh);
+    return Array.from(meshRegistry.values()).map((entry) => entry.mesh);
+  }
+
+  function visibleEdgeHandleList() {
+    return Object.values(edgeHandles).filter((m) => m.visible);
   }
 
   function hitTest(e, objects) {
     const rect = canvas.getBoundingClientRect();
     const ndc = new THREE.Vector2(
-      ((e.clientX - rect.left) / rect.width)  * 2 - 1,
-      -((e.clientY - rect.top) / rect.height) * 2 + 1,
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1
     );
     raycaster.setFromCamera(ndc, camera);
     return raycaster.intersectObjects(objects, false);
+  }
+
+  function handlePointerDown(e) {
+    gestureState.moved = false;
+    gestureState.downX = e.clientX;
+    gestureState.downY = e.clientY;
+
+    // edge (resize) handles take priority, same "must already be
+    // selected" gate as before
+    if (edgeHandleGroup.visible) {
+      const edgeHits = hitTest(e, visibleEdgeHandleList());
+      if (edgeHits.length > 0) {
+        const hitMesh = edgeHits[0].object;
+        resizeEdgeKey = Object.keys(edgeHandles).find((key) => edgeHandles[key] === hitMesh);
+        mode = 'resize';
+        draggedMesh = currentMesh;
+        const { halfW, halfH, depth } = meshHalfExtents(draggedMesh);
+        resizeStartMm = {
+          width: (halfW * 2) / MM_TO_UNIT,
+          height: (halfH * 2) / MM_TO_UNIT,
+          thickness: depth / MM_TO_UNIT,
+        };
+        dragStartWorld = screenToWorld(e);
+        dragStartMeshPos = draggedMesh.position.clone();
+        return;
+      }
+    }
+
+    const hits = hitTest(e, meshList());
+    if (hits.length > 0) {
+      mode = 'translate';
+      draggedMesh = hits[0].object;
+      dragStartWorld = screenToWorld(e);
+      dragStartMeshPos = draggedMesh.position.clone();
+    } else {
+      mode = null;
+      draggedMesh = null;
+    }
+  }
+
+  // Shared by pointermove (live preview) and pointerup (final commit)
+  // so the two can never disagree. ASYMMETRIC: the dragged edge moves
+  // 1:1 with the cursor; the opposite edge must then stay fixed, so
+  // the panel's center shifts by half the growth, along the same
+  // local axis, in the same outward direction — mirrors gizmos.js's
+  // 3D face-drag math exactly, just rotated by rotation.z instead of
+  // a full 3D quaternion.
+  function computeResizeResult(e) {
+    const world = screenToWorld(e);
+    const rot = draggedMesh.rotation.z;
+    const cosInv = Math.cos(-rot), sinInv = Math.sin(-rot);
+    const dx0 = world.x - dragStartMeshPos.x, dy0 = world.y - dragStartMeshPos.y;
+    const lx = dx0 * cosInv - dy0 * sinInv;
+    const ly = dx0 * sinInv + dy0 * cosInv;
+
+    const isWidthEdge = resizeEdgeKey === 'left' || resizeEdgeKey === 'right';
+    const outwardSign = resizeEdgeKey === 'right' || resizeEdgeKey === 'top' ? 1 : -1;
+    const local = isWidthEdge ? lx : ly;
+    const scalarMm = (outwardSign * local) / MM_TO_UNIT;
+
+    const field = EDGE_TO_FIELD[resizeEdgeKey];
+    const startMm = resizeStartMm[field];
+    const newMm = Math.max(MIN_PANEL_DIM_MM, startMm + scalarMm);
+    const growthMm = newMm - startMm;
+    const shiftMm = (growthMm / 2) * outwardSign; // along the LOCAL outward axis
+
+    const localShiftX = isWidthEdge ? shiftMm : 0;
+    const localShiftY = isWidthEdge ? 0 : shiftMm;
+    const cosFwd = Math.cos(rot), sinFwd = Math.sin(rot);
+    const worldShiftXmm = localShiftX * cosFwd - localShiftY * sinFwd;
+    const worldShiftYmm = localShiftX * sinFwd + localShiftY * cosFwd;
+
+    return { isWidthEdge, field, startMm, newMm, worldShiftXmm, worldShiftYmm };
+  }
+
+  function handlePointerMove(e) {
+    const dx = e.clientX - gestureState.downX;
+    const dy = e.clientY - gestureState.downY;
+    if (Math.abs(dx) + Math.abs(dy) > 3) gestureState.moved = true;
+
+    if (mode === 'translate' && draggedMesh) {
+      const world = screenToWorld(e);
+      let dxWorld = world.x - dragStartWorld.x;
+      let dyWorld = world.y - dragStartWorld.y;
+      if (e.shiftKey) {
+        // constrain to whichever single axis (X or Y) has moved more
+        if (Math.abs(dxWorld) >= Math.abs(dyWorld)) dyWorld = 0;
+        else dxWorld = 0;
+      }
+      const lock = draggedMesh.userData.lockedFields || {};
+      draggedMesh.position.x = lock.positionX ? dragStartMeshPos.x : dragStartMeshPos.x + dxWorld;
+      draggedMesh.position.y = lock.positionY ? dragStartMeshPos.y : dragStartMeshPos.y + dyWorld;
+      if (draggedMesh === currentMesh) positionHandle(draggedMesh);
+      reportTransform(draggedMesh);
+    } else if (mode === 'resize' && draggedMesh) {
+      const { isWidthEdge, startMm, newMm, worldShiftXmm, worldShiftYmm } = computeResizeResult(e);
+
+      draggedMesh.scale[isWidthEdge ? 'x' : 'y'] = newMm / startMm; // live visual feedback only
+      draggedMesh.position.x = dragStartMeshPos.x + worldShiftXmm * MM_TO_UNIT;
+      draggedMesh.position.y = dragStartMeshPos.y + worldShiftYmm * MM_TO_UNIT;
+      positionHandle(draggedMesh); // keep handles glued to the (visually) resizing panel
+    }
+  }
+
+  function handlePointerUp(e) {
+    if (!gestureState.moved && mode !== 'resize') {
+      // plain click (no drag): select whatever's under the pointer,
+      // or deselect if empty space
+      const hits = hitTest(e, meshList());
+      onSelect?.(hits.length > 0 ? hits[0].object.userData.nodeId : null, e.ctrlKey || e.metaKey);
+    }
+
+    if (mode === 'resize' && draggedMesh) {
+      const { field, newMm, worldShiftXmm, worldShiftYmm } = computeResizeResult(e);
+
+      const dims = { ...resizeStartMm };
+      dims[field] = newMm;
+
+      // worldShiftXmm/Ymm are already in mm — no MM_TO_UNIT conversion
+      // needed here (that conversion is only for the transient THREE-
+      // units preview in handlePointerMove).
+      const offsetDeltaMm = { x: worldShiftXmm, y: worldShiftYmm, z: 0 };
+      const nodeId = draggedMesh.userData.nodeId;
+
+      draggedMesh.scale.set(1, 1, 1); // bake into geometry on next reconcile
+      draggedMesh.position.copy(dragStartMeshPos); // reconcile() will set the true final position
+
+      // Clear drag state BEFORE calling onDimensionChange: it
+      // synchronously triggers a full renderAll()/reconcile(), and
+      // reconcile() checks isDragging()/draggedMeshRef() to decide
+      // whether to skip repositioning THIS mesh (on the assumption a
+      // drag is still live and driving it). If mode/draggedMesh were
+      // still 'resize'/this mesh during that render, reconcile would
+      // wrongly skip it and leave the mesh at the transform we just
+      // reset it to above — which is exactly the "only becomes
+      // asymmetric after deselecting" bug: the correct asymmetric
+      // result was already in the graph, it just never got drawn
+      // until some later, unrelated render finally saw isDragging()
+      // as false.
+      mode = null;
+      draggedMesh = null;
+      resizeEdgeKey = null;
+      resizeStartMm = null;
+
+      onDimensionChange?.(nodeId, dims, offsetDeltaMm);
+      return;
+    }
+
+    mode = null;
+    draggedMesh = null;
+    resizeEdgeKey = null;
+    resizeStartMm = null;
   }
 
   function reportTransform(mesh) {
@@ -256,157 +352,71 @@ export function create2DControls(
     });
   }
 
-  // ---- Pointer / drag state -------------------------------------------
-  let dragMode = null;       // null | 'translate'
-  let draggedMesh = null;
-  let dragStartWorld = null;
-  let dragStartMeshPos = null;
-  const gs = { moved: false, downX: 0, downY: 0 };
-
-  // ---- Panel drag / translate -----------------------------------------
-  function handlePointerDown(e) {
-    gs.moved = false;
-    gs.downX = e.clientX;
-    gs.downY = e.clientY;
-
-    // ---- face-pick mode: next click picks a face, no drag ----
-    if (facePickMode) {
-      const which = facePickMode;
-      facePickMode = null;
-      canvas.style.cursor = 'grab';
-      const hits = hitTest(e, meshList());
-      if (hits.length > 0) {
-        const mesh = hits[0].object;
-        const clickPt = screenToWorld(e);
-        const faceName = faceFromClick2D(mesh, clickPt);
-        if (faceName && onFacePick) onFacePick(which, mesh.userData.nodeId, faceName);
-      }
-      return;
-    }
-
-    // ---- rotation arc click: rotate +90° immediately (no drag) ----
-    if (currentMesh && arcGroup.visible) {
-      if (hitTest(e, [arcHit]).length > 0) {
-        const curDeg = THREE.MathUtils.radToDeg(currentMesh.rotation.z);
-        const snapped = Math.round(curDeg / 90) * 90; // snap to nearest 90 first
-        currentMesh.rotation.z = THREE.MathUtils.degToRad(snapped + 90);
-        positionHandles(currentMesh);
-        reportTransform(currentMesh);
-        return; // don't start any drag
-      }
-    }
-
-    // ---- move handle OR body: start translate drag ----
-    const moveHits = currentMesh && moveGroup.visible ? hitTest(e, [moveHit]) : [];
-    const bodyHits = hitTest(e, meshList());
-
-    if (moveHits.length > 0) {
-      dragMode = 'translate';
-      draggedMesh = currentMesh;
-      dragStartWorld = screenToWorld(e);
-      dragStartMeshPos = draggedMesh.position.clone();
-    } else if (bodyHits.length > 0) {
-      dragMode = 'translate';
-      draggedMesh = bodyHits[0].object;
-      dragStartWorld = screenToWorld(e);
-      dragStartMeshPos = draggedMesh.position.clone();
-    } else {
-      dragMode = null;
-      draggedMesh = null;
-    }
-  }
-
-  function handlePointerMove(e) {
-    const dx = e.clientX - gs.downX;
-    const dy = e.clientY - gs.downY;
-    if (Math.abs(dx) + Math.abs(dy) > 3) gs.moved = true;
-
-    if (dragMode === 'translate' && draggedMesh) {
-      const world = screenToWorld(e);
-      let dxW = world.x - dragStartWorld.x;
-      let dyW = world.y - dragStartWorld.y;
-      if (e.shiftKey) {
-        if (Math.abs(dxW) >= Math.abs(dyW)) dyW = 0;
-        else dxW = 0;
-      }
-      const lock = draggedMesh.userData.lockedFields || {};
-      draggedMesh.position.x = lock.positionX ? dragStartMeshPos.x : dragStartMeshPos.x + dxW;
-      draggedMesh.position.y = lock.positionY ? dragStartMeshPos.y : dragStartMeshPos.y + dyW;
-      if (draggedMesh === currentMesh) positionHandles(draggedMesh);
-      reportTransform(draggedMesh);
-    }
-  }
-
-  function handlePointerUp(e) {
-    if (!gs.moved && dragMode !== null) {
-      // Was a non-drag click on a panel body (not on a handle): select it
-      const hits = hitTest(e, meshList());
-      onSelect?.(hits.length > 0 ? hits[0].object.userData.nodeId : null);
-    } else if (!gs.moved && dragMode === null) {
-      // Click on empty space: deselect
-      const hits = hitTest(e, meshList());
-      onSelect?.(hits.length > 0 ? hits[0].object.userData.nodeId : null);
-    }
-    dragMode = null;
-    draggedMesh = null;
-  }
-
   canvas.addEventListener('pointerdown', handlePointerDown);
   window.addEventListener('pointermove', handlePointerMove);
   window.addEventListener('pointerup', handlePointerUp);
 
-  // ---- Pan (drag empty space) + zoom ----------------------------------
+  // ---- pan (drag empty space) + zoom (adjust ortho frustum) ----
   let panning = false;
   let panStartWorld = null;
 
-  function handlePanDown(e) {
-    if (dragMode || facePickMode) return;
-    const arcOrMove = [
-      ...(arcGroup.visible ? [arcHit] : []),
-      ...(moveGroup.visible ? [moveHit] : []),
-    ];
-    if (hitTest(e, meshList()).length === 0 && hitTest(e, arcOrMove).length === 0) {
+  function handlePanPointerDown(e) {
+    if (mode) return; // a panel/handle drag already claimed this gesture
+    const hits = hitTest(e, meshList());
+    const edgeHit = edgeHandleGroup.visible ? hitTest(e, visibleEdgeHandleList()) : [];
+    if (hits.length === 0 && edgeHit.length === 0) {
       panning = true;
       panStartWorld = screenToWorld(e);
     }
   }
-  function handlePanMove(e) {
+  function handlePanPointerMove(e) {
     if (!panning) return;
     const world = screenToWorld(e);
     camera.position.x -= world.x - panStartWorld.x;
     camera.position.y -= world.y - panStartWorld.y;
     camera.updateProjectionMatrix();
   }
-  function handlePanUp() { panning = false; }
-
-  canvas.addEventListener('pointerdown', handlePanDown);
-  window.addEventListener('pointermove', handlePanMove);
-  window.addEventListener('pointerup', handlePanUp);
+  function handlePanPointerUp() {
+    panning = false;
+  }
+  canvas.addEventListener('pointerdown', handlePanPointerDown);
+  window.addEventListener('pointermove', handlePanPointerMove);
+  window.addEventListener('pointerup', handlePanPointerUp);
 
   function handleWheel(e) {
     e.preventDefault();
-    camera.zoom = Math.max(0.2, Math.min(6, camera.zoom * Math.exp(e.deltaY * 0.001)));
+    const zoomFactor = Math.exp(e.deltaY * 0.001);
+    camera.zoom = Math.max(0.2, Math.min(6, camera.zoom * zoomFactor));
     camera.updateProjectionMatrix();
   }
   canvas.addEventListener('wheel', handleWheel, { passive: false });
 
-  // ---- Public API ------------------------------------------------------
-  function isDragging() { return dragMode !== null; }
-  function draggedMeshRef() { return draggedMesh; }
+  function isDragging() {
+    return mode !== null;
+  }
+
+  // called by scene.js's reconcile() every pass with the currently
+  // selected mesh (or null) so the handles follow selection/edits
+  function setSelectedMesh(mesh) {
+    currentMesh = mesh;
+    edgeHandleGroup.visible = !!mesh;
+    if (mesh) positionHandle(mesh);
+  }
 
   function dispose() {
     canvas.removeEventListener('pointerdown', handlePointerDown);
     window.removeEventListener('pointermove', handlePointerMove);
     window.removeEventListener('pointerup', handlePointerUp);
-    canvas.removeEventListener('pointerdown', handlePanDown);
-    window.removeEventListener('pointermove', handlePanMove);
-    window.removeEventListener('pointerup', handlePanUp);
+    canvas.removeEventListener('pointerdown', handlePanPointerDown);
+    window.removeEventListener('pointermove', handlePanPointerMove);
+    window.removeEventListener('pointerup', handlePanPointerUp);
     canvas.removeEventListener('wheel', handleWheel);
-    scene.remove(arcGroup, moveGroup, stemLine);
-    arcHit.geometry.dispose();
-    moveHit.geometry.dispose();
-    stemLine.geometry.dispose();
+    scene.remove(edgeHandleGroup);
+    Object.values(edgeHandles).forEach((m) => {
+      m.geometry.dispose();
+      m.material.dispose();
+    });
   }
 
-  return { isDragging, setSelectedMesh, setFacePickMode, draggedMeshRef, dispose };
+  return { isDragging, setSelectedMesh, draggedMeshRef: () => draggedMesh, dispose };
 }

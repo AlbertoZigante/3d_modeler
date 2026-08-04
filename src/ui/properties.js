@@ -24,25 +24,69 @@
  * is renamed to.
  */
 
-import { getDisplayName } from '../modeller/modules.js';
+import { getDisplayName, MATERIAL_CATALOG } from '../modeller/modules.js';
 
-const DIM_FIELDS = ['width', 'height', 'thickness'];
+const DIM_FIELDS = ['width', 'height']; // thickness is derived from material — see below, never a typed field
 
 export function renderProperties(
   container,
   {
     selectedPanel,
     resolvedPanel,
+    selectedGroupId,
+    groupMemberCount,
+    groupMaterial,
+    hiddenGroupMembers,
     onFieldChange,
     onTransformFieldChange,
-    onResetTransform,
-    onSetOrientation,
-    onCreateBox,
     onUnlinkConstraint,
     onRename,
     onRemove,
+    onUngroup,
+    onGroupMaterialChange,
+    onRestoreFace,
   }
 ) {
+  if (selectedGroupId && !selectedPanel) {
+    // Group-level selection (level 1, nothing drilled into) — no
+    // per-panel dimension/position fields make sense for "the whole
+    // box" as one thing, so this is a deliberately different, simpler
+    // view: Material (applies to every member at once — groupMaterial
+    // is null when members currently have DIFFERENT materials, shown
+    // as a distinct "mixed" option rather than silently picking one),
+    // Restore buttons for any hidden (soft-deleted) faces, plus the
+    // two group-wide actions. Drilling into an individual member
+    // (click it in the panel list, or click it again in the 3D/2D
+    // view) switches back to the normal per-panel view below.
+    const hiddenList = hiddenGroupMembers || [];
+    container.innerHTML = `
+      <div class="section-title">Group selected — ${groupMemberCount} panels</div>
+      <div class="field-row">
+        <label>Material (all ${groupMemberCount} panels)</label>
+        <select id="group-material-field" class="field-input">
+          ${!groupMaterial ? '<option value="" selected disabled>— Mixed materials —</option>' : ''}
+          ${MATERIAL_CATALOG.map((m) => `<option value="${escapeHtml(m.name)}" ${m.name === groupMaterial ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+        </select>
+      </div>
+      ${hiddenList.length > 0 ? `
+        <div class="section-title">Deleted faces — ${hiddenList.length}</div>
+        <div class="restore-face-list">
+          ${hiddenList.map((p) => `<button class="add-btn restore-face-btn" data-restore-id="${p.id}">↺ Restore ${escapeHtml(getDisplayName(p))}</button>`).join('')}
+        </div>
+      ` : ''}
+      <div class="empty-state">Click a member panel — in the list, or in the 3D/2D view — to select and edit it individually.</div>
+      <button class="remove-btn" id="ungroup-btn">Ungroup (keep all ${groupMemberCount} panels)</button>
+      <button class="remove-btn" id="delete-group-btn">Delete whole group (${groupMemberCount} panels)</button>
+    `;
+    container.querySelectorAll('.restore-face-btn').forEach((btn) => {
+      btn.addEventListener('click', () => onRestoreFace(btn.dataset.restoreId));
+    });
+    container.querySelector('#group-material-field').addEventListener('change', (e) => onGroupMaterialChange(e.target.value));
+    container.querySelector('#ungroup-btn').addEventListener('click', onUngroup);
+    container.querySelector('#delete-group-btn').addEventListener('click', onRemove);
+    return;
+  }
+
   if (!selectedPanel || !resolvedPanel) {
     container.innerHTML = `<div class="empty-state">No panel selected</div>`;
     return;
@@ -51,34 +95,34 @@ export function renderProperties(
   const locked = resolvedPanel.lockedFields || {};
   const displayName = getDisplayName(selectedPanel);
 
-  const rx = (((Math.round(selectedPanel.rotation.x / 90) * 90) % 360) + 360) % 360;
-  const isVertical = rx === 0 || rx === 180;
-  const isHorizontal = rx === 90 || rx === 270;
-
   container.innerHTML = `
     <div class="node-header-row">
       <span class="section-title" id="node-name-label">Node: ${escapeHtml(displayName)}</span>
       <button class="rename-btn" id="rename-node-btn" title="Rename this panel">✏️</button>
     </div>
 
+    ${selectedPanel.groupId ? `<div class="group-member-note">Part of a group — Remove here deletes just this panel</div>` : ''}
+
     ${resolvedPanel.warnings && resolvedPanel.warnings.length > 0 ? `
       <div class="warning-banner">
         ${resolvedPanel.warnings.map((w) => `⚠ ${escapeHtml(w)}`).join('<br/>')}
       </div>` : ''}
 
-    <div class="section-title">Panel type</div>
-    <div class="type-toggle">
-      <button class="type-btn ${isVertical ? 'active' : ''}" data-orientation="vertical">Vertical panel</button>
-      <button class="type-btn ${isHorizontal ? 'active' : ''}" data-orientation="horizontal">Horizontal panel</button>
-    </div>
-    <button class="box-preset-btn" id="create-box-btn">+ Box (4 sides + back, open front)</button>
-
     <div class="dims-row">
       ${DIM_FIELDS.map((f) => dimFieldHTML(f, selectedPanel, resolvedPanel, locked[f])).join('')}
     </div>
     <div class="field-row">
+      <label>Thickness 🔒</label>
+      <div class="field-input-wrap locked">
+        <input type="text" value="${resolvedPanel.thickness.toFixed(1)}" disabled class="field-input" title="Set by Material, below — not directly editable" />
+        <span class="field-unit">mm</span>
+      </div>
+    </div>
+    <div class="field-row">
       <label>Material</label>
-      <input type="text" value="${escapeHtml(selectedPanel.material)}" id="material-field" class="field-input" />
+      <select id="material-field" class="field-input">
+        ${MATERIAL_CATALOG.map((m) => `<option value="${escapeHtml(m.name)}" ${m.name === selectedPanel.material ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+      </select>
     </div>
     ${numberFieldHTML('Quantity', 'quantity', selectedPanel.quantity, 'pc', { min: 1 })}
     <button class="remove-btn" id="remove-btn">Remove panel</button>
@@ -97,7 +141,6 @@ export function renderProperties(
       ${axisFieldHTML('rotation', 'z', selectedPanel.rotation.z)}
     </div>
     <div class="transform-label">Rotation (degrees)</div>
-    <button class="reset-btn" id="reset-transform-btn">Reset to original position</button>
   `;
 
   // ---- rename (pencil icon) ----
@@ -152,13 +195,8 @@ export function renderProperties(
       else e.target.value = selectedPanel[group][axis];
     });
   });
-  container.querySelector('#reset-transform-btn').addEventListener('click', onResetTransform);
 
   // ---- presets ----
-  container.querySelectorAll('.type-btn').forEach((btn) => {
-    btn.addEventListener('click', () => onSetOrientation(btn.dataset.orientation));
-  });
-  container.querySelector('#create-box-btn').addEventListener('click', onCreateBox);
   container.querySelector('#remove-btn').addEventListener('click', onRemove);
 }
 
