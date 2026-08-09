@@ -19,10 +19,14 @@ import {
   computeWorldHalfExtents,
   FLOOR_MM,
   DESIGN_LIMITS_MM,
+  PANEL_SIZE_LIMITS_MM,
   MATERIAL_CATALOG,
   nextConstraintId,
+  FACE_TO_DIM_FIELD,
+  getAlignedAxis,
+  LOCAL_FACES,
 } from './modeller/modules.js';
-import { resolveConstraints, inferSpanField } from './modeller/snap.js';
+import { resolveConstraints } from './modeller/snap.js';
 import { createModellerScene } from './modeller/scene.js';
 import { getSelectedId, setSelectedId, getSelectedGroupId, setSelectedGroupId } from './modeller/selection.js';
 import { computeBom } from './engine/bom.js';
@@ -34,25 +38,12 @@ import { initResizableLayout } from './ui/layout.js';
 initResizableLayout();
 
 // ---- THE GRAPH ----
-// Seeded by hand here (rather than via computeNextBasePosition off an
-// empty array + a real resolve) since there's no existing scene yet
-// to resolve against — this is just the two-panel starting point,
-// placed left-to-right with the same 300mm margin new panels always
-// get afterward.
-const SEED_ROTATION = { x: 0, y: 90, z: 0 }; // matches createPanelNode's own default
-const seed1Dims = { width: 600, height: 720, thickness: 18, rotation: SEED_ROTATION };
-const seed1BasePosition = computeNextBasePosition([], seed1Dims);
-const seed1 = createPanelNode({ width: 600, height: 720, basePosition: seed1BasePosition });
-
-const seed2Dims = { width: 560, height: 400, thickness: 18, rotation: SEED_ROTATION };
-const seed2BasePosition = computeNextBasePosition(
-  [{ position: seed1BasePosition, width: seed1.width, height: seed1.height, thickness: seed1.thickness, rotation: seed1.rotation }],
-  seed2Dims
-);
-const seed2 = createPanelNode({ width: 560, height: 400, basePosition: seed2BasePosition });
-
-let panels = [seed1, seed2];
-setSelectedId(panels[0].id);
+// Initial state: one box, rather than two bare panels — see addBox()
+// below and the addBox() call at the very end of this file (after
+// every other module-level const/function this needs has been
+// defined; addBox() itself calls renderAll(), so nothing else is
+// needed here).
+let panels = [];
 
 // Ctrl/Cmd-click — in the panel list OR either 2D/3D view — toggles
 // membership here; "Group selected" (see groupSelectedPanels below)
@@ -82,12 +73,28 @@ const AXIS_LABEL = { x: 'width (X)', y: 'height (Y)', z: 'depth (Z)' };
 const designLimitToastEl = document.getElementById('design-limit-toast');
 let designLimitHideTimer = null;
 
-function showDesignLimitError(axis) {
-  // const limit = DESIGN_LIMITS_MM[axis];
-  designLimitToastEl.textContent = `Design limit reached for ${AXIS_LABEL[axis]}`; // can't exceed ${limit.max - limit.min}mm.`;
+// Shared toast plumbing for every short-lived status/error message in
+// this file (design-limit hits, panel-size hits, and — see
+// startCollinearMode below — the collinear tool's own "select a
+// face..." guidance). `autoHide` distinguishes a self-clearing error
+// flash from a STATUS message that should stay up until the caller
+// explicitly changes or clears it (e.g. while a multi-step pick is
+// still in progress).
+function showToast(text, autoHide = true) {
+  designLimitToastEl.textContent = text;
   designLimitToastEl.classList.add('visible');
   clearTimeout(designLimitHideTimer);
-  designLimitHideTimer = setTimeout(() => designLimitToastEl.classList.remove('visible'), 2200);
+  if (autoHide) {
+    designLimitHideTimer = setTimeout(() => designLimitToastEl.classList.remove('visible'), 2200);
+  }
+}
+function hideToast() {
+  clearTimeout(designLimitHideTimer);
+  designLimitToastEl.classList.remove('visible');
+}
+
+function showDesignLimitError(axis) {
+  showToast(`Design limit reached for ${AXIS_LABEL[axis]}`);
 }
 
 // Move-drags: clamps the PROPOSED offset per axis against the panel's
@@ -116,6 +123,57 @@ function clampOffsetToDesignLimits(node, proposedOffset) {
   return { offset: clamped, hitAxis };
 }
 
+// Group move-drags: like clampOffsetToDesignLimits above, but for a
+// RIGID multi-member move. Finds each member's own allowed per-axis
+// delta range (from its own world half-extents and drag-start
+// position), intersects those ranges across every member to get the
+// single most restrictive range for the whole group, then clamps the
+// proposed delta to THAT — so all members are held to the exact same
+// reduced delta and the group never loses its rigidity at the
+// boundary (as opposed to each member independently clamping to its
+// own limit and drifting apart from the others).
+function clampGroupOffsetToDesignLimits(members, startOffsets, proposedDeltaMm) {
+  const clamped = { ...proposedDeltaMm };
+  let hitAxis = null;
+  ['x', 'y', 'z'].forEach((axis) => {
+    const limit = DESIGN_LIMITS_MM[axis];
+    let groupMin = -Infinity;
+    let groupMax = Infinity;
+    members.forEach((node) => {
+      const start = startOffsets.get(node.id);
+      if (!start) return;
+      const halfExtents = computeWorldHalfExtents(node);
+      const baseAbs = node.basePosition[axis] + start[axis]; // this member's absolute position at drag-start (delta is applied on top of this)
+      groupMin = Math.max(groupMin, limit.min + halfExtents[axis] - baseAbs);
+      groupMax = Math.min(groupMax, limit.max - halfExtents[axis] - baseAbs);
+    });
+    const proposed = proposedDeltaMm[axis] || 0;
+    if (proposed < groupMin) {
+      clamped[axis] = groupMin;
+      hitAxis = axis;
+    } else if (proposed > groupMax) {
+      clamped[axis] = groupMax;
+      hitAxis = axis;
+    }
+  });
+  return { delta: clamped, hitAxis };
+}
+
+// Resize-drags and typed fields: outright rejects if a panel's own
+// width/height would exceed PANEL_SIZE_LIMITS_MM — returns the
+// offending field ('width'|'height'), or null if within limits.
+// Separate from findDesignLimitViolation below, which bounds the
+// overall scene rather than any single panel's own dimensions.
+function findPanelSizeViolation(dims) {
+  if (dims.width > PANEL_SIZE_LIMITS_MM.width) return 'width';
+  if (dims.height > PANEL_SIZE_LIMITS_MM.height) return 'height';
+  return null;
+}
+
+function showPanelSizeLimitError(field) {
+  showToast(`Maximum panel ${field} is ${PANEL_SIZE_LIMITS_MM[field]}mm`);
+}
+
 // Resize-drags and typed fields: outright rejects if the FINAL
 // position + dimensions would violate any axis — returns the
 // offending axis, or null if the edit is fine as proposed.
@@ -142,7 +200,7 @@ const axesCanvas = document.getElementById('axes-gizmo-canvas');
 const pipCanvas = document.getElementById('pip-canvas');
 
 // ---- Scene (view layer). Consumes RESOLVED panels only. ----
-const { reconcile, setViewMode } = createModellerScene(canvas, main, {
+const { reconcile, setViewMode, setFacePickMode, setFaceHighlight } = createModellerScene(canvas, main, {
   axesCanvas,
   pipCanvas,
   onPipModeClick: (mode) => switchView(mode),
@@ -174,51 +232,508 @@ const { reconcile, setViewMode } = createModellerScene(canvas, main, {
     // High-frequency during drag, same lightweight-patch approach as
     // onTransformChange — just fanned out to every member at once,
     // each replaced from ITS OWN drag-start snapshot + the shared
-    // delta (see groupDragStartOffsets above for why this must be a
-    // replace, not an accumulate).
+    // (now scene-bounds-clamped) delta (see groupDragStartOffsets
+    // above for why this must be a replace, not an accumulate).
     if (!groupDragStartOffsets) return; // drag start snapshot missing — ignore rather than guess
-    // Design-limit enforcement is intentionally NOT applied to group
-    // moves in this pass (see clampOffsetToDesignLimits for the
-    // single-panel case) — correctly clamping a RIGID multi-member
-    // move means finding the most restrictive limit across every
-    // member and applying that SAME reduced delta to all of them,
-    // which is a real design problem in its own right rather than a
-    // small addition. Flagging as a known gap, not a silent omission.
+
+    const members = nodeIds.map((id) => panels.find((p) => p.id === id)).filter(Boolean);
+    const { delta: clampedDeltaMm, hitAxis } = clampGroupOffsetToDesignLimits(
+      members,
+      groupDragStartOffsets,
+      deltaMm
+    );
+
     panels = panels.map((p) => {
       const start = groupDragStartOffsets.get(p.id);
       if (!start) return p;
       return {
         ...p,
-        offset: { x: start.x + deltaMm.x, y: start.y + deltaMm.y, z: start.z + deltaMm.z },
+        offset: {
+          x: start.x + clampedDeltaMm.x,
+          y: start.y + clampedDeltaMm.y,
+          z: start.z + clampedDeltaMm.z,
+        },
       };
     });
-  },
-  onDimensionChange: (nodeId, dims, offsetDeltaMm) => {
-    const current = panels.find((p) => p.id === nodeId);
-    if (!current) return;
-    const proposedOffset = offsetDeltaMm
-      ? {
-          x: current.offset.x + (offsetDeltaMm.x || 0),
-          y: current.offset.y + (offsetDeltaMm.y || 0),
-          z: current.offset.z + (offsetDeltaMm.z || 0),
-        }
-      : current.offset;
-    const proposedPositionMm = {
-      x: current.basePosition.x + proposedOffset.x,
-      y: current.basePosition.y + proposedOffset.y,
-      z: current.basePosition.z + proposedOffset.z,
-    };
-    const hitAxis = findDesignLimitViolation(current.rotation, proposedPositionMm, dims);
+
     if (hitAxis) {
-      // Reject outright — gizmos.js/view2d.js already reset the
-      // mesh's transient scale/position to pre-drag values before
-      // calling this, so there's nothing further to visually correct.
       showDesignLimitError(hitAxis);
-      return;
+      return clampedDeltaMm; // tells gizmos.js/view2d.js to snap the live meshes back to this clamped value
     }
-    updateNode(nodeId, { width: dims.width, height: dims.height, thickness: dims.thickness, offset: proposedOffset });
-    renderAll();
   },
+  onDimensionChange: (nodeId, dims, offsetDeltaMm) => applyDimensionChange(nodeId, dims, offsetDeltaMm),
+});
+
+// Shared by the gizmo/edge-drag onDimensionChange callback above AND
+// the collinear tool below (applyCollinear) — validates a proposed
+// width/height/thickness + offset delta against both per-panel size
+// caps and the overall scene bounds, and only then commits it.
+// Returns true if applied, false if rejected (a toast has already
+// been shown either way it's rejected).
+function applyDimensionChange(nodeId, dims, offsetDeltaMm) {
+  const current = panels.find((p) => p.id === nodeId);
+  if (!current) return false;
+  const proposedOffset = offsetDeltaMm
+    ? {
+        x: current.offset.x + (offsetDeltaMm.x || 0),
+        y: current.offset.y + (offsetDeltaMm.y || 0),
+        z: current.offset.z + (offsetDeltaMm.z || 0),
+      }
+    : current.offset;
+  const sizeViolation = findPanelSizeViolation(dims);
+  if (sizeViolation) {
+    // Same rejection path as a design-limit hit — gizmos.js/view2d.js
+    // already reset the mesh's transient scale/position to pre-drag
+    // values before calling this.
+    showPanelSizeLimitError(sizeViolation);
+    return false;
+  }
+  const proposedPositionMm = {
+    x: current.basePosition.x + proposedOffset.x,
+    y: current.basePosition.y + proposedOffset.y,
+    z: current.basePosition.z + proposedOffset.z,
+  };
+  const hitAxis = findDesignLimitViolation(current.rotation, proposedPositionMm, dims);
+  if (hitAxis) {
+    // Reject outright — gizmos.js/view2d.js already reset the mesh's
+    // transient scale/position to pre-drag values before calling
+    // this, so there's nothing further to visually correct.
+    showDesignLimitError(hitAxis);
+    return false;
+  }
+  updateNode(nodeId, { width: dims.width, height: dims.height, thickness: dims.thickness, offset: proposedOffset });
+  renderAll();
+  return true;
+}
+
+// -------------------------------------------------------------
+// COLLINEAR TOOL — pick a face/edge on panel A, then a PARALLEL
+// face/edge on panel B.
+//
+// Prefers MOVING panel A: adds an ordinary `attachedTo` constraint on
+// whichever positionX/Y/Z field the shared axis corresponds to (the
+// same constraint type/math the box preset's own top/bottom already
+// use internally, see snap.js's applyAttachedTo) — live and
+// persistent, so if panel B is later moved or resized, panel A's
+// picked face keeps re-resolving to stay collinear with it.
+//
+// But if panel A's position on that axis is already spoken for —
+// either an existing constraint on that field (e.g. a previous
+// collinear link), or a box panel's own structural lockedMoveAxes
+// (e.g. Top/Bottom's X/Z, Left/Right's Y/Z — see addBox) — moving it
+// would either silently override something else or fight the box's
+// own geometry, so it falls back to a PERSISTENT RESIZE constraint
+// instead: a `spansBetween` on panel A's dimension field, anchored
+// between a captured SNAPSHOT of its opposite face's position (a
+// literal `{ mm }` endpoint — see snap.js's resolveFacePointMm) and a
+// live reference to panel B's picked face. The snapshot side never
+// moves again, but because the OTHER side is live, panel A's picked
+// face keeps re-resolving to stay collinear whenever panel B moves or
+// resizes later — the same "adjusts automatically" guarantee as the
+// move case above, just via a dimension instead of a position. What
+// it does NOT track: if the SNAPSHOT side's own anchor later moves
+// too (e.g. because the box's Left/Right get resized after the fact),
+// that motion isn't followed — only continued changes to panel B are.
+// This fallback can NEVER apply to a thickness face — if the blocked
+// axis is also this panel's thickness, there is no way to satisfy the
+// request at all (moving is blocked, and thickness can't be resized),
+// and the pick is rejected outright.
+//
+// (A live constraint for the MOVE case works because it references
+// panel B, an already-resolved OTHER node. The resize-fallback's
+// snapshot anchor exists because the alternative — a live reference
+// back to panel A's own not-yet-resolved current position — is a
+// self-referential dependency; topoSort above would just flag it
+// circular. The snapshot sidesteps that by not depending on ANY
+// node's resolution at all.)
+// -------------------------------------------------------------
+let collinearActive = false;
+let collinearPick1 = null; // { nodeId, faceName, axis, sign, dimField } | null
+let collinearGapMm = 0; // user-editable, see the toolbar's own gap input — read fresh at commit time, not captured per-pick, so changing it mid-pick before the second click still applies
+const AXIS_TO_POSITION_FIELD = { x: 'positionX', y: 'positionY', z: 'positionZ' };
+
+function startCollinearMode() {
+  if (shelfMode) cancelShelfMode(); // mutually exclusive — both are single-slot pick-mode tools sharing setFacePickMode
+  collinearActive = true;
+  collinearPick1 = null;
+  setSelectedId(null);
+  setSelectedGroupId(null);
+  multiSelectedIds.clear();
+  setFaceHighlight(null, null); // clean start, in case a prior session was interrupted before clearing this itself
+  setFacePickMode(true, handleFacePick);
+  showToast(
+    collinearGapMm ? `Collinear (${collinearGapMm}mm gap): pick a face or edge on the panel to constrain` : 'Collinear: pick a face or edge on the panel to constrain',
+    false
+  );
+  renderAll();
+}
+
+function cancelCollinearMode() {
+  collinearActive = false;
+  collinearPick1 = null;
+  setSelectedId(null);
+  setFacePickMode(false, null);
+  hideToast();
+  renderAll();
+}
+
+// -------------------------------------------------------------
+// SHELF TOOL — box-only. Pick two BOUNDARY panels on the same axis and
+// creates a new shelf spanning between them, joined into the SAME box
+// group, with its depth automatically spanning to the box's Back/
+// Front. A boundary panel for a HORIZONTAL shelf (spans the X axis)
+// is Left, Right, or any EXISTING Vertical-rotation shelf already in
+// that box — so e.g. picking Right + an existing vertical divider
+// creates a shelf filling just that one compartment, not the whole
+// box. Symmetrically, a VERTICAL shelf's boundary is Top, Bottom, or
+// any existing Horizontal-rotation shelf. Reuses the exact same
+// pick-mode plumbing as the collinear tool (setFacePickMode/
+// setFaceHighlight) — the two are mutually exclusive single-slot
+// tools, never active together.
+//
+// Like collinear, this is built entirely from live constraints
+// (spansBetween referencing whichever two boundary panels were
+// picked, plus the box's own Back/Front for depth), never a one-time
+// snapshot — so if either boundary is resized or moved afterward
+// (an ordinary drag, the resizeProxy redirect, collinear, or another
+// shelf being dragged), this shelf's width/height re-resolves right
+// along with it. No cycle risk: a shelf only ever depends on
+// panels that existed before it — it can be a boundary for a LATER
+// shelf, but never for one that already depends on it (the pick
+// flow can't reference a not-yet-created node), so the dependency
+// graph only ever grows forward, never back on itself.
+// -------------------------------------------------------------
+let shelfMode = null; // 'horizontal' | 'vertical' | null
+let shelfPick1 = null; // the raw panel node (from `panels`, not resolved) of the first pick
+
+// A panel's ROTATION, not its name, is what makes it a valid boundary
+// — this is what lets an existing shelf stand in for Left/Right/Top/
+// Bottom. Left/Right and any "Shelf (V)" all share the same rotation
+// as VERTICAL_ROTATION (declared further down, alongside
+// createAndSelectPanel — safe to reference here since this is only
+// ever read once these functions are actually CALLED, well after the
+// whole module has finished loading); Top/Bottom and any "Shelf (H)"
+// share HORIZONTAL_ROTATION.
+const SHELF_BOUNDARY_ROTATION = { horizontal: () => VERTICAL_ROTATION, vertical: () => HORIZONTAL_ROTATION };
+
+function rotationsMatch(a, b) {
+  return a.x === b.x && a.y === b.y && a.z === b.z;
+}
+
+function startShelfMode(mode) {
+  if (collinearActive) cancelCollinearMode(); // mutually exclusive — see collinear's own note above
+  shelfMode = mode;
+  shelfPick1 = null;
+  setSelectedId(null);
+  setSelectedGroupId(null);
+  multiSelectedIds.clear();
+  setFaceHighlight(null, null);
+  setFacePickMode(true, handleShelfPick);
+  const kind = mode === 'horizontal' ? 'Left/Right (or an existing vertical shelf)' : 'Top/Bottom (or an existing horizontal shelf)';
+  showToast(`${mode === 'horizontal' ? 'Horizontal' : 'Vertical'} shelf: pick a box's ${kind}`, false);
+  renderAll();
+}
+
+function cancelShelfMode() {
+  shelfMode = null;
+  shelfPick1 = null;
+  setSelectedId(null);
+  setFaceHighlight(null, null);
+  setFacePickMode(false, null);
+  hideToast();
+  renderAll();
+}
+
+// `faceName` is accepted (same callback shape setFacePickMode always
+// uses) but deliberately unused for anything functional beyond the
+// highlight — this tool only cares WHICH PANEL was picked, not which
+// specific face; the actual touching faces get computed dynamically
+// in addShelf below, from the two panels' real resolved positions.
+function handleShelfPick(nodeId, faceName) {
+  const node = panels.find((p) => p.id === nodeId);
+  if (!node) return;
+
+  const wantRotation = SHELF_BOUNDARY_ROTATION[shelfMode]();
+  const kindLabel = shelfMode === 'horizontal' ? 'a Left/Right panel or an existing vertical shelf' : 'a Top/Bottom panel or an existing horizontal shelf';
+  if (!node.groupId || !rotationsMatch(node.rotation, wantRotation)) {
+    showToast(`Pick ${kindLabel}`);
+    return; // stays armed — an invalid pick doesn't cancel the tool, just doesn't register
+  }
+
+  if (!shelfPick1) {
+    shelfPick1 = node;
+    setFaceHighlight(nodeId, faceName);
+    showToast(`Now pick the OTHER boundary of the SAME box (${kindLabel})`, false);
+    renderAll();
+    return;
+  }
+
+  if (shelfPick1.id === nodeId) {
+    showToast('Pick a DIFFERENT panel, not the same one again');
+    return;
+  }
+  if (shelfPick1.groupId !== node.groupId) {
+    showToast('Both panels must belong to the same box');
+    return;
+  }
+
+  addShelf(shelfPick1, node);
+  cancelShelfMode();
+}
+
+// Box siblings are found by groupId + role name (see addBox — every
+// box panel is named exactly 'Left'/'Right'/'Top'/'Bottom'/'Back'/
+// 'Front') rather than by any stored per-role id list, since that's
+// already the single source of truth addBox itself relies on. Always
+// the box's REAL Back/Front — a shelf's depth always reaches the
+// actual box walls/door, never another shelf, regardless of which
+// two boundary panels were picked for width/height.
+function findBoxSibling(groupId, name) {
+  return panels.find((p) => p.groupId === groupId && p.name === name);
+}
+
+// Which of a resolved node's LOCAL faces both (a) aligns with `axis`
+// and (b) points TOWARD `otherResolved` — i.e. the one face of the
+// two possible (+/-) candidates that actually faces the other picked
+// boundary, determined from their real current positions rather than
+// assumed from role/name. This is what makes picking an existing
+// shelf as a boundary work exactly like picking Left/Right/Top/Bottom
+// — it doesn't matter which literal side of the box either one is on.
+function facingFace(resolved, axis, otherResolved) {
+  const towardSign = Math.sign(otherResolved.position[axis] - resolved.position[axis]) || 1;
+  for (const faceName of Object.keys(LOCAL_FACES)) {
+    const aligned = getAlignedAxis(resolved.rotation, faceName);
+    if (aligned && aligned.axis === axis && aligned.sign === towardSign) return faceName;
+  }
+  return null; // defensive — every panel in this app is axis-aligned, so one of the two candidate faces always matches
+}
+
+function addShelf(pick1, pick2) {
+  const groupId = pick1.groupId;
+  const back = findBoxSibling(groupId, 'Back');
+  const front = findBoxSibling(groupId, 'Front');
+  if (!back || !front) return; // defensive — shouldn't happen given handleShelfPick's own same-box validation
+
+  const resolved = resolveConstraints(panels);
+  const r1 = resolved.find((r) => r.id === pick1.id);
+  const r2 = resolved.find((r) => r.id === pick2.id);
+  if (!r1 || !r2) return;
+
+  const spanAxis = shelfMode === 'horizontal' ? 'x' : 'y';
+  const face1 = facingFace(r1, spanAxis, r2); // pick1's face pointing toward pick2
+  const face2 = facingFace(r2, spanAxis, r1); // pick2's face pointing toward pick1
+  if (!face1 || !face2) return;
+
+  const spanFieldForBoundary = shelfMode === 'horizontal' ? 'width' : 'height'; // which field ON THE BOUNDARY PANELS this axis corresponds to — used only to size the shelf's OWN starting dims below, the live constraint itself just spans face-to-face
+  const startWidthOrHeight = Math.abs(r2.position[spanAxis] - r1.position[spanAxis]); // rough starting size, purely cosmetic — the spansBetween constraint below immediately recomputes the true value on first resolve regardless
+
+  const rotation = shelfMode === 'horizontal' ? HORIZONTAL_ROTATION : VERTICAL_ROTATION;
+  const material = pick1.material;
+  const thickness = pick1.thickness;
+
+  const spanToBoundaries = {
+    field: spanFieldForBoundary,
+    type: 'spansBetween', overridden: false,
+    from: { node: pick1.id, face: face1, offset: 0 },
+    to: { node: pick2.id, face: face2, offset: 0 },
+    id: nextConstraintId(),
+  };
+  const spanToDepth = shelfMode === 'horizontal'
+    // Depth (this rotation's `height` field) spans directly to
+    // Back/Front's own INNER faces — reaches from the back panel to
+    // the front door automatically, and re-resolves live if either
+    // ever moves.
+    ? { field: 'height', type: 'spansBetween', overridden: false,
+        from: { node: back.id, face: 'front', offset: 0 }, to: { node: front.id, face: 'back', offset: 0 }, id: nextConstraintId() }
+    // Depth (this rotation's `width` field) — same idea, mirrored.
+    : { field: 'width', type: 'spansBetween', overridden: false,
+        from: { node: back.id, face: 'front', offset: 0 }, to: { node: front.id, face: 'back', offset: 0 }, id: nextConstraintId() };
+
+  const shelf = createPanelNode({
+    name: shelfMode === 'horizontal' ? 'Shelf (H)' : 'Shelf (V)',
+    width: shelfMode === 'horizontal' ? startWidthOrHeight : DEFAULT_BOX_DEPTH_MM,
+    height: shelfMode === 'horizontal' ? DEFAULT_BOX_DEPTH_MM : startWidthOrHeight,
+    thickness, material, rotation,
+    groupId,
+    // Only the axis PERPENDICULAR to both constraints above (Y for a
+    // horizontal shelf, X for a vertical one) is left free — that's
+    // the whole point of this tool: where the shelf sits on that
+    // axis isn't otherwise determined by the pick, so it stays a
+    // literal, user-draggable field.
+    lockedMoveAxes: shelfMode === 'horizontal' ? ['x', 'z'] : ['y', 'z'],
+    constraints: [spanToBoundaries, spanToDepth],
+  });
+
+  // Default position on the free axis: the midpoint between the two
+  // picked boundaries' CURRENT positions — reasonable regardless of
+  // which two panels (box walls or existing shelves) were picked.
+  // The other two axes get auto-centered by the constraints above on
+  // the very first resolve regardless of what's set here.
+  const anchor = pick1.basePosition;
+  const freeAxis = shelfMode === 'horizontal' ? 'y' : 'x';
+  const midpointMm = (r1.position[freeAxis] + r2.position[freeAxis]) / 2;
+  shelf.basePosition = anchor;
+  shelf.offset = { x: 0, y: 0, z: 0 };
+  shelf.offset[freeAxis] = midpointMm - anchor[freeAxis];
+
+  panels = [...panels, shelf];
+  setSelectedGroupId(groupId);
+  setSelectedId(shelf.id);
+  renderAll();
+}
+
+
+// other than the collinear tool itself — an explicit constraint on
+// that field, or a box panel's static structural lock? If so, MOVING
+// it would either override that other relation or fight the box's
+// own geometry, so applyCollinear should resize instead.
+function isAxisPositionLocked(node, axis) {
+  const field = AXIS_TO_POSITION_FIELD[axis];
+  const hasConstraint = (node.constraints || []).some((c) => !c.overridden && c.field === field);
+  const hasStaticBoxLock = (node.lockedMoveAxes || []).includes(axis);
+  return hasConstraint || hasStaticBoxLock;
+}
+
+function handleFacePick(nodeId, faceName) {
+  const resolved = resolveConstraints(panels).find((r) => r.id === nodeId);
+  if (!resolved) return;
+
+  // Any face is a valid PICK — whether it ends up moving or resizing
+  // panel A is decided later, in applyCollinear, once we know both
+  // panels and can check isAxisPositionLocked.
+  const dimField = FACE_TO_DIM_FIELD[faceName];
+  const aligned = getAlignedAxis(resolved.rotation, faceName);
+  if (!aligned) return; // defensive: every panel in this app is axis-aligned, this should never actually happen
+
+  if (!collinearPick1) {
+    collinearPick1 = { nodeId, faceName, axis: aligned.axis, sign: aligned.sign, dimField };
+    setFaceHighlight(nodeId, faceName); // highlights exactly the picked face/edge, not the whole panel — see scene.js's setFaceHighlight
+    showToast(
+      collinearGapMm ? `Now pick a PARALLEL face/edge on a different panel (${collinearGapMm}mm gap)` : 'Now pick a PARALLEL face/edge on a different panel',
+      false
+    );
+    renderAll();
+    return;
+  }
+
+  if (collinearPick1.nodeId === nodeId) {
+    showToast('Pick a face/edge on a DIFFERENT panel');
+    return; // keep pick1 as-is, let them retry
+  }
+
+  if (collinearPick1.axis !== aligned.axis) {
+    showToast('Those faces are not parallel — try again');
+    collinearPick1 = null;
+    setFaceHighlight(null, null);
+    renderAll();
+    return; // stay in collinear mode, just reset back to step 1
+  }
+
+  const applied = applyCollinear(collinearPick1, { nodeId, faceName, axis: aligned.axis, sign: aligned.sign, dimField });
+  if (applied) cancelCollinearMode(); // one-shot PICKING tool — done after a single successful pair; a rejection (see applyCollinear) leaves pick1 as-is so they can retry with a different second pick
+}
+
+function applyCollinear(pick1, pick2) {
+  const node1 = panels.find((p) => p.id === pick1.nodeId);
+  if (!node1) return false;
+
+  const axis = pick1.axis;
+
+  if (!isAxisPositionLocked(node1, axis)) {
+    // MOVE — live attachedTo constraint on the position field. `myFace`
+    // and `from.face` don't need to be the SAME named face (e.g. panel
+    // A's "right" face can be made collinear with panel B's "left"
+    // face) — only that they resolve to the same world axis, already
+    // guaranteed by the axis-match check in handleFacePick above.
+    const newConstraint = {
+      field: AXIS_TO_POSITION_FIELD[axis],
+      type: 'attachedTo',
+      overridden: false,
+      myFace: pick1.faceName,
+      from: { node: pick2.nodeId, face: pick2.faceName, offset: collinearGapMm },
+    };
+    // A field can only be governed by one constraint at a time — if
+    // this panel already had some other constraint on this exact
+    // field, replace it rather than stacking a second, conflicting
+    // one (isAxisPositionLocked above already ruled out that case
+    // here, so in practice this filter is a no-op today, but it keeps
+    // this function correct if that check's rules ever change).
+    const otherConstraints = (node1.constraints || []).filter((c) => c.field !== newConstraint.field);
+    updateNode(pick1.nodeId, { constraints: [...otherConstraints, newConstraint] });
+    renderAll(); // resolveConstraints picks up the new constraint immediately — if it happens to create a dependency cycle, the resolver already handles that gracefully (a warning on the affected node, not a crash) rather than needing special-cased detection here
+    return true;
+  }
+
+  // BLOCKED — fall back to a PERSISTENT RESIZE constraint. Never
+  // allowed to touch thickness: if the blocked axis is also this
+  // panel's thickness face, there's genuinely no way to satisfy the
+  // request.
+  if (pick1.dimField === 'thickness') {
+    showToast("Can't satisfy that — this panel can't move on this axis, and thickness can't be resized");
+    return false;
+  }
+
+  const resolved = resolveConstraints(panels);
+  const resolved1 = resolved.find((r) => r.id === pick1.nodeId);
+  if (!resolved1) return false;
+
+  const sign1 = pick1.sign;
+  // pick1's OPPOSITE face — captured as a literal, fixed SNAPSHOT (see
+  // the `{ mm }` literal-endpoint support added to snap.js's
+  // resolveFacePointMm specifically for this), not re-derived from
+  // anything. Only pick2's side of the constraint below is a live
+  // reference — which is exactly what makes "resized once now, then
+  // keeps adjusting automatically if panel B moves again later" work,
+  // without needing a self-referential (and therefore circular)
+  // constraint back onto this panel's own current position.
+  const oppositeMm = resolved1.position[axis] - sign1 * (resolved1[pick1.dimField] / 2);
+
+  const newConstraint = {
+    field: pick1.dimField,
+    type: 'spansBetween',
+    overridden: false,
+    from: { mm: oppositeMm },
+    to: { node: pick2.nodeId, face: pick2.faceName, offset: collinearGapMm },
+  };
+  // A field can only be governed by one constraint at a time — replace
+  // any existing one on this exact dimension field rather than
+  // stacking a second, conflicting one.
+  const otherConstraints = (node1.constraints || []).filter((c) => c.field !== pick1.dimField);
+
+  // Validate BEFORE committing — same PANEL_SIZE_LIMITS_MM / scene
+  // bounds checks every other resize path uses — by test-resolving a
+  // scratch copy of `panels` with the constraint already applied,
+  // since a constraint-derived dimension doesn't go through
+  // applyDimensionChange the way a literal offset/dims edit does.
+  const testPanels = panels.map((p) =>
+    p.id === pick1.nodeId ? { ...p, constraints: [...otherConstraints, newConstraint] } : p
+  );
+  const testResolved1 = resolveConstraints(testPanels).find((r) => r.id === pick1.nodeId);
+  if (!testResolved1) return false;
+  const testDims = { width: testResolved1.width, height: testResolved1.height, thickness: testResolved1.thickness };
+  const sizeViolation = findPanelSizeViolation(testDims);
+  if (sizeViolation) {
+    showPanelSizeLimitError(sizeViolation);
+    return false;
+  }
+  const hitAxis = findDesignLimitViolation(testResolved1.rotation, testResolved1.position, testDims);
+  if (hitAxis) {
+    showDesignLimitError(hitAxis);
+    return false;
+  }
+
+  updateNode(pick1.nodeId, { constraints: [...otherConstraints, newConstraint] });
+  renderAll();
+  showToast('Movement was blocked — resized instead. This will keep re-adjusting automatically if the other panel changes.', false);
+  return true;
+}
+
+// Escape cancels an in-progress collinear pick, same as it already
+// does for nothing else in this app (no other modal/multi-step tool
+// exists yet) — scoped narrowly so it can't interfere with anything.
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && collinearActive) cancelCollinearMode();
+  if (e.key === 'Escape' && shelfMode) cancelShelfMode();
 });
 
 // -------------------------------------------------------------
@@ -402,6 +917,13 @@ function renderAll() {
     onAddHorizontal: addHorizontalPanel,
     onAddParallel: addParallelPanel,
     onAddBox: addBox,
+    onCollinear: () => (collinearActive ? cancelCollinearMode() : startCollinearMode()),
+    collinearActive,
+    collinearGapMm,
+    onCollinearGapChange: (mm) => { collinearGapMm = mm; }, // deliberately no renderAll() here — see toolbar.js's own comment on why
+    onShelfHorizontal: () => (shelfMode === 'horizontal' ? cancelShelfMode() : startShelfMode('horizontal')),
+    onShelfVertical: () => (shelfMode === 'vertical' ? cancelShelfMode() : startShelfMode('vertical')),
+    shelfMode,
   });
 
   renderInspectorOnly();
@@ -462,8 +984,6 @@ function renderInspectorOnly() {
   renderRelations(relationsMountEl, {
     selectedPanel,
     allPanels: panels,
-    onAddConstraint: addConstraintToSelected,
-    onUpdateConstraint: updateConstraintOnSelected,
     onUnlinkConstraint: unlinkOrRemoveConstraint,
   });
 }
@@ -509,6 +1029,12 @@ function updateSelectedField(field, value) {
       height: field === 'height' ? value : node.height,
       thickness: node.thickness,
     };
+    const sizeViolation = findPanelSizeViolation(proposedDims);
+    if (sizeViolation) {
+      showPanelSizeLimitError(sizeViolation);
+      renderAll(); // revert the inspector's input back to the stored (unchanged) value
+      return;
+    }
     const positionMm = {
       x: node.basePosition.x + node.offset.x,
       y: node.basePosition.y + node.offset.y,
@@ -663,87 +1189,17 @@ function restoreFace(nodeId) {
 }
 
 // -------------------------------------------------------------
-// Relation (constraint) CRUD — the dropdown-based creation UI in
-// relations.js calls these. No drag-to-snap in this pass: explicit,
-// deterministic selection of node + face + offset is easier to get
-// right and easier to test than proximity-based snapping, and can
-// be layered on top of this exact same data later without changing
-// the schema.
-//
-// Every create/update goes through `tryApplyConstraints`, which
-// resolves a HYPOTHETICAL version of the graph first and only
-// commits if that produces no warnings on the affected node — a
-// relation that would come out broken (misaligned face, missing
-// reference, etc.) is never actually created. relations.js shows
-// the rejection reason inline and leaves the form as-is so the user
-// can adjust and retry, rather than silently creating a broken
-// relation the way it worked before this check existed.
+// Relation (constraint) CRUD — manual spansBetween/attachedTo
+// creation used to live here (via a dropdown form in relations.js),
+// but that's now fully superseded by the collinear tool (and the
+// shelf tool, built on the same live-constraint approach) as the way
+// to create these relations — see startCollinearMode/addShelf above.
+// unlinkOrRemoveConstraint below is the one piece that's still
+// needed: both the properties panel's "Unlink" control and the
+// relations list's own remove (×) button use it to detach/delete an
+// EXISTING relation, which is a distinct concern from authoring a new
+// one by hand.
 // -------------------------------------------------------------
-function tryApplyConstraints(nodeId, nextConstraintsForNode) {
-  const hypothetical = panels.map((p) =>
-    p.id === nodeId ? { ...p, constraints: nextConstraintsForNode } : p
-  );
-  const resolved = resolveConstraints(hypothetical);
-  const resolvedNode = resolved.find((r) => r.id === nodeId);
-  if (resolvedNode && resolvedNode.warnings.length > 0) {
-    return { ok: false, error: resolvedNode.warnings.join(' ') };
-  }
-  panels = hypothetical;
-  renderAll();
-  return { ok: true };
-}
-
-// spansBetween relations no longer ask which field they set — panels
-// are mostly a 2D shape (thickness is a small, fixed board value, not
-// something you'd span between two other panels), so the field is
-// inferred from the chosen From/To faces themselves. See snap.js's
-// inferSpanField for the actual geometry.
-function resolveConstraintField(node, draft) {
-  if (draft.type !== 'spansBetween' || draft.field) return { ok: true, field: draft.field };
-  const byId = new Map(panels.map((p) => [p.id, p]));
-  const result = inferSpanField(node, draft.from, draft.to, byId);
-  if (result.error) return { ok: false, error: result.error };
-  return { ok: true, field: result.field };
-}
-
-function addConstraintToSelected(constraintDraft) {
-  const selectedId = getSelectedId();
-  const node = panels.find((p) => p.id === selectedId);
-  if (!node) return { ok: false, error: 'No panel selected.' };
-
-  const fieldResult = resolveConstraintField(node, constraintDraft);
-  if (!fieldResult.ok) return fieldResult;
-
-  const withId = { ...constraintDraft, field: fieldResult.field, id: nextConstraintId(), overridden: false };
-  // one active constraint per field at a time — adding a new one
-  // for a field replaces rather than stacks
-  const nextConstraints = [
-    ...(node.constraints || []).filter((c) => c.field !== withId.field),
-    withId,
-  ];
-  return tryApplyConstraints(selectedId, nextConstraints);
-}
-
-// Replaces an EXISTING constraint's definition in place (same id, so
-// the relations list's "editing" highlight and click-to-toggle state
-// in relations.js keep referring to the same row) — used by the
-// "Update" button when editing a relation, as opposed to
-// addConstraintToSelected's "Apply", which always creates a new one.
-// Re-activates it (overridden: false) even if it had been unlinked,
-// since updating it is the user's way of consciously re-linking.
-function updateConstraintOnSelected(constraintId, newConstraintDraft) {
-  const selectedId = getSelectedId();
-  const node = panels.find((p) => p.id === selectedId);
-  if (!node) return { ok: false, error: 'No panel selected.' };
-
-  const fieldResult = resolveConstraintField(node, newConstraintDraft);
-  if (!fieldResult.ok) return fieldResult;
-
-  const nextConstraints = (node.constraints || []).map((c) =>
-    c.id === constraintId ? { ...newConstraintDraft, field: fieldResult.field, id: constraintId, overridden: false } : c
-  );
-  return tryApplyConstraints(selectedId, nextConstraints);
-}
 
 // identifier is either a FIELD NAME (soft "Unlink" — mark the active
 // constraint on that field overridden, keep its definition) or a
@@ -814,8 +1270,35 @@ function addBox() {
   const material = MATERIAL_CATALOG[0].name;
   const T = MATERIAL_CATALOG[0].thicknessMm;
 
-  const left = createPanelNode({ name: 'Left', width: D, height: H, thickness: T, material, rotation: { x: 0, y: 90, z: 0 } });
-  const right = createPanelNode({ name: 'Right', width: D, height: H, thickness: T, material, rotation: { x: 0, y: 90, z: 0 } });
+  // NOTE ON AN EARLIER ATTEMPT AT THIS: a fully symmetric design (every
+  // one of the 6 panels literal/free on its own outward normal, with
+  // width/height fields cross-derived from the other four) was tried
+  // and numerically verified against the real resolver — it produced
+  // exactly correct geometry, but ALSO produced a per-node dependency
+  // cycle (Left depends on Top for its height field; Top depends on
+  // Left for its width field — two DIFFERENT fields, but the
+  // resolver's cycle check is per-NODE, not per-field, so it can't
+  // tell those apart and flags it circular regardless). The resolver
+  // then falls back to frozen "last literal values" for every affected
+  // panel — meaning it LOOKED right only because the initial values
+  // happened to already be correct, not because it would actually
+  // re-solve live if anything moved again. That's a real, tested dead
+  // end, not a hunch — hence keeping left/right as the sole literal
+  // "source of truth" below, unchanged from the original design.
+  const collinearTo = (field, myFace, targetNode, targetFace, gapMm = 0) => ({
+    field, type: 'attachedTo', overridden: false, myFace,
+    from: { node: targetNode.id, face: targetFace, offset: gapMm },
+    id: nextConstraintId(),
+  });
+
+  const left = createPanelNode({ name: 'Left', width: D, height: H, thickness: T, material, rotation: { x: 0, y: 90, z: 0 }, lockedMoveAxes: ['y', 'z'] });
+  const right = createPanelNode({ name: 'Right', width: D, height: H, thickness: T, material, rotation: { x: 0, y: 90, z: 0 }, lockedMoveAxes: ['y', 'z'],
+                                  constraints: [
+                                    collinearTo('positionY', 'top', left, 'top'),
+                                    collinearTo('positionY', 'bottom', left, 'bottom'),
+                                    collinearTo('positionZ', 'back', left, 'back'),
+                                    collinearTo('positionZ', 'front', left, 'front'),
+                                  ] });
 
   // Face choices verified directly against the resolver (see the
   // standalone test run while building this — with both side panels
@@ -831,8 +1314,9 @@ function addBox() {
   // per-field, so even though "top depends on left for width" and "a
   // hypothetical left-depends-on-top for height" wouldn't actually
   // conflict value-wise, the resolver can't tell that and flags it as
-  // circular anyway. Left/right stay the sole literal "source of
-  // truth" panels; everything else derives from them.
+  // circular anyway (see the note above — this was tested, not
+  // assumed). Left/right stay the sole literal "source of truth"
+  // panels; everything else derives from them.
   const nextId = () => nextConstraintId();
 
   // top/bottom span the OUTER faces — full width W, covering over
@@ -843,8 +1327,8 @@ function addBox() {
     to: { node: right.id, face: 'front', offset: 0 },
     id: nextId(),
   }];
-  // back keeps the ORIGINAL inner-fitted width (grooved between the
-  // sides) — not part of this change, W-2T as before.
+  // front keeps the original inner-fitted width (grooved between the
+  // sides), W-2T.
   const innerWidthSpan = () => [{
     field: 'width', type: 'spansBetween', overridden: false,
     from: { node: left.id, face: 'front', offset: 0 },
@@ -865,6 +1349,16 @@ function addBox() {
   const top = createPanelNode({
     name: 'Top',
     width: W, height: D, thickness: T, material, rotation: { x: 90, y: 0, z: 0 },
+    lockedMoveAxes: ['x', 'z'],
+    // Its own outward-normal axis (Y) is deliberately left OUT of
+    // lockedMoveAxes even though positionY is ALSO attachedTo-derived
+    // (and therefore already showY=false on the move gizmo) — see
+    // resizeProxy below, which is what actually makes Y meaningfully
+    // draggable: not by freeing positionY itself (that would reopen
+    // the cycle problem above), but by redirecting a drag along it to
+    // edit LEFT's own `height` field instead, which is what positionY
+    // is derived FROM in the first place.
+    resizeProxy: { targetNodeId: left.id, targetField: 'height' },
     constraints: [
       ...outerWidthSpan(),
       ...depthMatchesLeft(),
@@ -876,6 +1370,8 @@ function addBox() {
   const bottom = createPanelNode({
     name: 'Bottom',
     width: W, height: D, thickness: T, material, rotation: { x: 90, y: 0, z: 0 },
+    lockedMoveAxes: ['x', 'z'],
+    resizeProxy: { targetNodeId: left.id, targetField: 'height' }, // same target/field as Top — dragging EITHER one resizes the same H
     constraints: [
       ...outerWidthSpan(),
       ...depthMatchesLeft(),
@@ -892,18 +1388,20 @@ function addBox() {
     // real cabinet's solid back sheet, nailed across the whole
     // carcass rather than let into it.
     width: W, height: H + 2 * T, thickness: T, material, rotation: { x: 0, y: 0, z: 0 },
+    lockedMoveAxes: ['x', 'y'],
+    resizeProxy: { targetNodeId: left.id, targetField: 'width' }, // left/right's OWN "width" field is their depth (D) — Vertical rotation maps it there
     constraints: [
-      ...outerWidthSpan(),
+      ...innerWidthSpan(),
       // height spans top's OUTER (upper) edge to bottom's OUTER
       // (lower) edge — 'back'/'front' here are top/bottom's own
       // thickness-axis faces (their topside/underside respectively).
       { field: 'height', type: 'spansBetween', overridden: false,
-        from: { node: top.id, face: 'back', offset: 0 },
-        to: { node: bottom.id, face: 'front', offset: 0 }, id: nextId() },
+        from: { node: top.id, face: 'back', offset: -T },
+        to: { node: bottom.id, face: 'front', offset: -T }, id: nextId() },
       // flush against left's BACK edge, extending further back —
       // tracks depth (D) automatically, unlike a literal Z offset.
       { field: 'positionZ', type: 'attachedTo', overridden: false,
-        myFace: 'front', from: { node: left.id, face: 'right', offset: 0 }, id: nextId() },
+        myFace: 'front', from: { node: left.id, face: 'right', offset: -T }, id: nextId() },
     ],
   });
   const front = createPanelNode({
@@ -913,6 +1411,8 @@ function addBox() {
     // them, unlike the new back above. Height still tracks H (via
     // left's own top/bottom faces) so it isn't left stale on resize.
     width: W - 2 * T, height: H, thickness: T, material, rotation: { x: 0, y: 0, z: 0 },
+    lockedMoveAxes: ['x', 'y'],
+    resizeProxy: { targetNodeId: left.id, targetField: 'width' }, // same target/field as Back — dragging EITHER one resizes the same D
     constraints: [
       ...innerWidthSpan(),
       { field: 'height', type: 'spansBetween', overridden: false,
@@ -920,7 +1420,7 @@ function addBox() {
         to: { node: left.id, face: 'bottom', offset: 0 }, id: nextId() },
       // flush against left's FRONT edge, extending further forward.
       { field: 'positionZ', type: 'attachedTo', overridden: false,
-        myFace: 'back', from: { node: left.id, face: 'left', offset: 0 }, id: nextId() },
+        myFace: 'back', from: { node: left.id, face: 'left', offset: -T }, id: nextId() },
     ],
   });
 
@@ -948,12 +1448,21 @@ function addBox() {
   // entirely — the box would always land near local/origin
   // coordinates no matter where the anchor said it should go.)
 
-  const desired = new Map([ // top/bottom/back/front are all positioned relative to the box's anchor, which is at the bottom of the box (floor level) rather than halfway up like the old version did
-    [left.id, { x: -(W / 2 - T / 2), y: H/2 + FLOOR_MM, z: 0 }], //  y: H/2 + FLOOR_MM, z: 0 }]
-    [right.id, { x: W / 2 - T / 2, y: H/2 + FLOOR_MM, z: 0 }],
+  const desired = new Map([ // top/bottom/back/front are all positioned relative to the box's anchor. `anchor.y` (computed below) is ALREADY the box's correct floor-resting center height — H/2 + FLOOR_MM — so left/right's own Y offset relative to that anchor is 0, not H/2 + FLOOR_MM again. Adding it a second time here used to double-count it and push the whole box below the floor plane.
+    [left.id, { x: -(W / 2 - T / 2), y: 0, z: 0 }],
+    [right.id, { x: W / 2 - T / 2, y: 0, z: 0 }],
   ]);
 
   const anchor = computeNextBasePosition(resolveConstraints(panels), { width: W, height: H, thickness: T, rotation: { x: 0, y: 0, z: 0 } });
+  // Every new box's BOTTOM EXTERIOR surface (bottom panel's underside,
+  // one thickness below left/right's own bottom edge — see "bottom"
+  // panel's attachedTo constraint above) must land at y=0, not just
+  // "on the floor" (FLOOR_MM). left/right's own center sits H/2 above
+  // their bottom edge, and the bottom panel extends a further T below
+  // that edge, so left/right's center — which computeNextBasePosition
+  // would otherwise place at H/2 + FLOOR_MM — must instead be at
+  // exactly H/2 + T for the exterior bottom face to hit y=0.
+  anchor.y = H / 2 + T;
   boxPanels.forEach((p) => { p.basePosition = anchor; });
   [left, right].forEach((p) => {
     const want = desired.get(p.id);
@@ -964,12 +1473,17 @@ function addBox() {
   // remaining position axis by an attachedTo — so their literal
   // offset is just a zeroed placeholder, never actually read while
   // those constraints stay linked.
-  [top, bottom, back, front].forEach((p) => { p.offset = { x: 0, y: 0, z: 0 }; }); // 
+  [top, bottom, back, front].forEach((p) => { p.offset = { x: 0, y: 0, z: 0 }; });
 
   panels = [...panels, ...boxPanels]; // always appended — never replaces an existing panel
   setSelectedGroupId(left.id);
+  setSelectedId(front.id); // land somewhere sensible rather than deselecting entirely
+  removeSelected()
   setSelectedId(null);
   renderAll();
 }
 
-renderAll();
+// Initial state: a full box (addBox() calls renderAll() itself at
+// its end, so this alone replaces the old seed1/seed2 + renderAll()
+// startup).
+addBox();

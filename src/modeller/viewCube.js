@@ -44,16 +44,16 @@ const CUBE_SIZE = 0.62;
 const FACE_BG = '#2a2a3e';
 const FACE_BORDER = '#5a5a7e';
 const FACE_TEXT = '#e8e8f0';
-const AXIS_LENGTH = CUBE_SIZE * 0.85; // extends past the cube's half-size so tips poke out both sides
+const AXIS_LENGTH = CUBE_SIZE * 1.2; // extends past the cube's half-size so tips poke out both sides
 
 // BoxGeometry's own face/material order — do not reorder this array.
 const FACE_LABELS_IN_GEOMETRY_ORDER = ['RIGHT', 'LEFT', 'TOP', 'BOTTOM', 'FRONT', 'BACK'];
 const FACE_NAME_BY_MATERIAL_INDEX = ['right', 'left', 'top', 'bottom', 'front', 'back'];
 
 const AXES = [
-  { axis: 'x', color: 0xd94f4f, dir: new THREE.Vector3(1, 0, 0) },
-  { axis: 'y', color: 0x4fd97a, dir: new THREE.Vector3(0, 1, 0) },
-  { axis: 'z', color: 0x4f8cd9, dir: new THREE.Vector3(0, 0, 1) },
+  { axis: 'x', color: 0xff0000, dir: new THREE.Vector3(1, 0, 0) },//0xd94f4f
+  { axis: 'y', color: 0x00ff00, dir: new THREE.Vector3(0, 1, 0) }, //0x4fd97a,
+  { axis: 'z', color: 0x0000ff, dir: new THREE.Vector3(0, 0, 1) },
 ];
 
 export function createViewCube(canvasEl, { onFaceClick } = {}) {
@@ -72,7 +72,7 @@ export function createViewCube(canvasEl, { onFaceClick } = {}) {
     ctx.fillStyle = FACE_BG;
     ctx.fillRect(0, 0, size, size);
     ctx.strokeStyle = FACE_BORDER;
-    ctx.lineWidth = 5;
+    ctx.lineWidth = 10;
     ctx.strokeRect(3, 3, size - 6, size - 6);
     ctx.font = 'bold 20px -apple-system, sans-serif';
     ctx.fillStyle = FACE_TEXT;
@@ -84,6 +84,7 @@ export function createViewCube(canvasEl, { onFaceClick } = {}) {
   }
 
   const materials = FACE_LABELS_IN_GEOMETRY_ORDER.map(makeFaceMaterial);
+
   const cubeGeometry = new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE);
   const cube = new THREE.Mesh(cubeGeometry, materials);
   scene.add(cube);
@@ -104,16 +105,15 @@ export function createViewCube(canvasEl, { onFaceClick } = {}) {
     tex.width = size;
     tex.height = size;
     const ctx = tex.getContext('2d');
-    ctx.font = 'bold 30px -apple-system, sans-serif';
+    ctx.font = 'bold 60px -apple-system, sans-serif';
     ctx.fillStyle = color;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, size / 2, size / 2 + 1);
     const texture = new THREE.CanvasTexture(tex);
-    const material = new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true });
+    const material = new THREE.SpriteMaterial({ map: texture, depthTest: true, transparent: true, depthWrite: false });
     const sprite = new THREE.Sprite(material);
     sprite.scale.set(0.16, 0.16, 0.16);
-    sprite.renderOrder = 1000;
     disposables.push(texture, material);
     return sprite;
   }
@@ -121,13 +121,13 @@ export function createViewCube(canvasEl, { onFaceClick } = {}) {
   AXES.forEach(({ axis, color, dir }) => {
     const points = [dir.clone().multiplyScalar(-AXIS_LENGTH), dir.clone().multiplyScalar(AXIS_LENGTH)];
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const material = new THREE.LineBasicMaterial({ color, depthTest: false });
+    const material = new THREE.LineBasicMaterial({ color, depthTest: true, depthWrite: true });
     const line = new THREE.Line(geometry, material);
-    line.renderOrder = 999;
+    // line.renderOrder = 999;
     axisGroup.add(line);
     disposables.push(geometry, material);
 
-    const label = makeAxisLabel(axis.toUpperCase(), `#${color.toString(16).padStart(6, '0')}`);
+    const label = makeAxisLabel(axis.toUpperCase(), `#${color.toString(16).padStart(6, '0')}`); 
     label.position.copy(dir).multiplyScalar(AXIS_LENGTH + 0.12);
     axisGroup.add(label);
   });
@@ -178,6 +178,8 @@ export function createViewCube(canvasEl, { onFaceClick } = {}) {
     materials.forEach((m) => {
       m.map.dispose();
       m.dispose();
+      m.depthTest = true;
+      m.depthWrite = true;
     });
     disposables.forEach((d) => d.dispose());
   }

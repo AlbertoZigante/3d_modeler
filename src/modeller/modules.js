@@ -257,7 +257,7 @@ export function computeWorldHalfExtents(node) {
 }
 
 const NEW_PANEL_MARGIN_MM = 300;
-export const FLOOR_MM = -0.5 / MM_TO_UNIT; // preserves the old auto-layout's "sits on the floor" convention
+export const FLOOR_MM = 0.0 //-0.5 / MM_TO_UNIT; // preserves the old auto-layout's "sits on the floor" convention
 
 /**
  * DESIGN limits — the overall space a design is allowed to occupy,
@@ -275,6 +275,31 @@ export const DESIGN_LIMITS_MM = {
   y: { min: FLOOR_MM, max: FLOOR_MM + 3000 },
   z: { min: -3000, max: 3000 },
 };
+
+/**
+ * PANEL size limits — caps on a single panel's own `width`/`height`
+ * fields, independent of DESIGN_LIMITS_MM above (which bounds the
+ * overall scene, not any one panel). Checked at every width/height
+ * edit entry point in modeller-main.js: typed inspector fields and
+ * resize drags (3D face-drag + 2D edge-drag), both of which funnel
+ * through onDimensionChange/updateSelectedField.
+ */
+export const PANEL_SIZE_LIMITS_MM = {
+  width: 1500,
+  height: 2000,
+};
+
+/**
+ * Floor safety clamp — guarantees an object's floor-resting center Y
+ * (halfExtentY + FLOOR_MM) is never pushed below FLOOR_MM itself,
+ * i.e. its bottom edge never sinks below the floor plane. Kept as a
+ * standalone export so any caller assembling its own basePosition by
+ * hand (e.g. addBox's shared multi-panel anchor) can apply the same
+ * guarantee instead of trusting arithmetic to stay correct.
+ */
+export function clampToFloor(y, halfExtentY) {
+  return Math.max(y, halfExtentY + FLOOR_MM);
+}
 
 export function computeNextBasePosition(resolvedPanels, newDims) {
   let maxRightEdgeMm = null;

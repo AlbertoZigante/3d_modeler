@@ -68,6 +68,10 @@ export function createOrbitControls(canvas, camera, { isBlocked, onClick, gestur
     pointer.x = e.clientX;
     pointer.y = e.clientY;
     pointer.moved = false;
+    // Only show a "hand" while actually panning/orbiting (an active
+    // camera drag) — not while idle, since idle is exactly when the
+    // person is about to SELECT something (a panel, a face-pick
+    // target, etc.), which reads as an arrow, not a grab hand.
     canvas.style.cursor = e.button === 0 ? 'grabbing' : 'move';
   }
 
@@ -77,7 +81,7 @@ export function createOrbitControls(canvas, camera, { isBlocked, onClick, gestur
       onClick?.(e);
     }
     pointer.down = false;
-    canvas.style.cursor = 'grab';
+    canvas.style.cursor = 'default';
   }
 
   function handlePointerMove(e) {
@@ -122,7 +126,7 @@ export function createOrbitControls(canvas, camera, { isBlocked, onClick, gestur
   window.addEventListener('pointermove', handlePointerMove);
   canvas.addEventListener('wheel', handleWheel, { passive: false });
   canvas.addEventListener('contextmenu', handleContextMenu);
-  canvas.style.cursor = 'grab';
+  canvas.style.cursor = 'default'; // idle state — this is when the person is choosing what to select (a panel, a face-pick target...), so an arrow reads right; 'grab' only appears during an actual orbit/pan drag (see handlePointerDown above)
 
   function snapToFace(faceName) {
     const angles = VIEW_ANGLES[faceName];

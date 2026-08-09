@@ -18,7 +18,7 @@
  */
 
 import * as THREE from 'three';
-import { MM_TO_UNIT } from './modules.js';
+import { MM_TO_UNIT, LOCAL_FACES, FACE_TO_DIM_FIELD } from './modules.js';
 import { createOrbitControls } from './orbitControls.js';
 import { createGizmos } from './gizmos.js';
 import { create2DControls } from './view2d.js';
@@ -27,7 +27,16 @@ import { createViewCube } from './viewCube.js';
 export function createModellerScene(
   canvas,
   main,
-  { onSelect, onTransformChange, onDimensionChange, axesCanvas, pipCanvas, onPipModeClick } = {}
+  {
+    onSelect,
+    onTransformChange,
+    onDimensionChange,
+    onGroupDragStart,
+    onGroupTransformChange,
+    axesCanvas,
+    pipCanvas,
+    onPipModeClick,
+  } = {}
 ) {
   // ---- renderer / scene / lights — warm, light palette ----
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -57,16 +66,110 @@ export function createModellerScene(
   scene.add(fillLight);
 
   const grid = new THREE.GridHelper(20, 20, 0xcdbfa5, 0xe6dac6);
-  grid.position.y = -0.5;
+  // y=0 — matches where addBox() actually places a box's bottom
+  // exterior surface (see its own anchor.y comment), NOT the older
+  // FLOOR_MM convention (-0.5 units) this used to sit at. FLOOR_MM
+  // itself is unchanged and still governs DESIGN_LIMITS_MM's lower Y
+  // bound (how far down a panel is ALLOWED to be dragged) — a
+  // separate concern from where this purely-visual reference plane is
+  // drawn, so it wasn't touched.
+  grid.position.y = 0;
   scene.add(grid);
 
   const groundGeo = new THREE.PlaneGeometry(40, 40);
   const groundMat = new THREE.ShadowMaterial({ opacity: 0.15 });
   const ground = new THREE.Mesh(groundGeo, groundMat);
   ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -0.5;
+  ground.position.y = 0; // see the grid's own comment just above
   ground.receiveShadow = true;
   scene.add(ground);
+
+  // ---- single-FACE highlight (not a whole-panel tint) — used while
+  // picking a face/edge for the collinear tool (see modeller-main.js's
+  // handleFacePick), so what's confirmed as "picked" is exactly the
+  // one face/edge the person clicked, not the entire panel it belongs
+  // to. A single reusable plane, repositioned/reoriented/rescaled to
+  // sit flush against whichever face is currently targeted, and
+  // hidden otherwise.
+  //
+  // Every face's orientation is built from an EXPLICIT right/up/normal
+  // basis (not a generic "rotate default normal to face normal"
+  // shortcut) — that shortcut leaves an unconstrained "roll" around
+  // the target axis, which would size/orient the highlight using the
+  // WRONG pair of the panel's two in-plane dimensions for a
+  // non-square face. Each basis must be right-handed (right×up =
+  // normal) for THREE.Matrix4.makeBasis + setFromRotationMatrix to
+  // produce a valid rotation at all — verified against a brute-force
+  // corner-position ground truth for all 6 faces before shipping this
+  // (see the standalone test run while building this), not assumed.
+  const FACE_HIGHLIGHT_BASIS = {
+    right:  { right: new THREE.Vector3(0, 0, -1), up: new THREE.Vector3(0, 1, 0), normal: new THREE.Vector3(1, 0, 0) },
+    left:   { right: new THREE.Vector3(0, 0, 1), up: new THREE.Vector3(0, 1, 0), normal: new THREE.Vector3(-1, 0, 0) },
+    top:    { right: new THREE.Vector3(1, 0, 0), up: new THREE.Vector3(0, 0, -1), normal: new THREE.Vector3(0, 1, 0) },
+    bottom: { right: new THREE.Vector3(1, 0, 0), up: new THREE.Vector3(0, 0, 1), normal: new THREE.Vector3(0, -1, 0) },
+    front:  { right: new THREE.Vector3(1, 0, 0), up: new THREE.Vector3(0, 1, 0), normal: new THREE.Vector3(0, 0, 1) },
+    back:   { right: new THREE.Vector3(-1, 0, 0), up: new THREE.Vector3(0, 1, 0), normal: new THREE.Vector3(0, 0, -1) },
+  };
+  // Which of the node's OWN width/height/thickness fields lies along
+  // each face's right/up/normal direction — 'right'/'left' span
+  // (thickness, height); 'top'/'bottom' span (width, thickness);
+  // 'front'/'back' span (width, height) — with the normal axis always
+  // being the ONE field FACE_TO_DIM_FIELD already gives directly.
+  const FACE_PLANE_DIMS = {
+    right: ['thickness', 'height'], left: ['thickness', 'height'],
+    top: ['width', 'thickness'], bottom: ['width', 'thickness'],
+    front: ['width', 'height'], back: ['width', 'height'],
+  };
+
+  const faceHighlightGeo = new THREE.PlaneGeometry(1, 1);
+  const faceHighlightMat = new THREE.MeshBasicMaterial({
+    color: 0xff8a1e, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthTest: true,
+  });
+  const faceHighlightMesh = new THREE.Mesh(faceHighlightGeo, faceHighlightMat);
+  faceHighlightMesh.renderOrder = 10; // draw on top — depthTest:false already avoids z-fighting with the panel surface it sits flush against, this just also keeps it visually on top of other overlapping panels
+  faceHighlightMesh.visible = false;
+  scene.add(faceHighlightMesh);
+
+  let faceHighlightTarget = null; // { nodeId, faceName } | null
+
+  function setFaceHighlight(nodeId, faceName) {
+    faceHighlightTarget = nodeId && faceName ? { nodeId, faceName } : null;
+    faceHighlightMesh.visible = false; // reconcile() below turns it back on once it finds the matching resolved node — avoids a stale-position flash if the target node doesn't (yet) exist
+  }
+
+  function updateFaceHighlight(resolvedPanels) {
+    if (!faceHighlightTarget) { faceHighlightMesh.visible = false; return; }
+    const node = resolvedPanels.find((p) => p.id === faceHighlightTarget.nodeId);
+    const basis = FACE_HIGHLIGHT_BASIS[faceHighlightTarget.faceName];
+    if (!node || !basis) { faceHighlightMesh.visible = false; return; }
+
+    const nodeQuat = new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(
+        THREE.MathUtils.degToRad(node.rotation.x),
+        THREE.MathUtils.degToRad(node.rotation.y),
+        THREE.MathUtils.degToRad(node.rotation.z),
+        'XYZ'
+      )
+    );
+    const localBasisQuat = new THREE.Quaternion().setFromRotationMatrix(
+      new THREE.Matrix4().makeBasis(basis.right, basis.up, basis.normal)
+    );
+
+    const normalDimField = FACE_TO_DIM_FIELD[faceHighlightTarget.faceName];
+    const halfExtentMm = node[normalDimField] / 2;
+    const worldOffsetUnits = basis.normal.clone().multiplyScalar(halfExtentMm * MM_TO_UNIT).applyQuaternion(nodeQuat);
+
+    const [rightField, upField] = FACE_PLANE_DIMS[faceHighlightTarget.faceName];
+
+    faceHighlightMesh.position.set(
+      node.position.x * MM_TO_UNIT + worldOffsetUnits.x,
+      node.position.y * MM_TO_UNIT + worldOffsetUnits.y,
+      node.position.z * MM_TO_UNIT + worldOffsetUnits.z
+    );
+    faceHighlightMesh.quaternion.copy(nodeQuat).multiply(localBasisQuat);
+    faceHighlightMesh.scale.set(node[rightField] * MM_TO_UNIT, node[upField] * MM_TO_UNIT, 1);
+    faceHighlightMesh.visible = true;
+  }
 
   // ---- two cameras, one scene ----
   const camera3d = new THREE.PerspectiveCamera(45, 1, 0.1, 2000);
@@ -144,6 +247,34 @@ export function createModellerScene(
     return Array.from(meshRegistry.values()).map((entry) => entry.mesh);
   }
 
+  // Matches a BoxGeometry face-intersection's LOCAL normal (from
+  // Three.js's own raycast hit, already in the mesh's own unrotated
+  // object space) against LOCAL_FACES to recover which named face
+  // ('right'/'left'/'top'/'bottom'/'front'/'back') was actually
+  // clicked — used by collinear face-picking below.
+  function faceNameFromLocalNormal(normal) {
+    let best = null;
+    let bestDot = -Infinity;
+    for (const [name, v] of Object.entries(LOCAL_FACES)) {
+      const dot = normal.x * v.x + normal.y * v.y + normal.z * v.z;
+      if (dot > bestDot) { bestDot = dot; best = name; }
+    }
+    return best;
+  }
+
+  // ---- collinear face-pick mode: while active, ordinary select/drag
+  // is suspended in BOTH views and clicks report (nodeId, faceName)
+  // to onFacePick instead — see modeller-main.js's handleFacePick.
+  let facePickMode = false;
+  let onFacePickCallback = null;
+  function setFacePickMode(active, onFacePick) {
+    facePickMode = active;
+    onFacePickCallback = onFacePick || null;
+    if (gizmos) gizmos.detachAll(); // no move/resize handles while picking — see reconcile()'s gate below too
+    if (view2d) view2d.setSelectedMesh(null);
+    if (!active) setFaceHighlight(null, null); // leaving pick mode always clears any lingering highlight from that session
+  }
+
   // ---- 3D interaction layer ----
   const gestureState = { interactionHandled: false };
 
@@ -156,6 +287,15 @@ export function createModellerScene(
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(ndc, camera3d);
     const hits = raycaster.intersectObjects(meshList(), false);
+
+    if (facePickMode) {
+      if (hits.length > 0 && hits[0].face) {
+        const faceName = faceNameFromLocalNormal(hits[0].face.normal);
+        onFacePickCallback?.(hits[0].object.userData.nodeId, faceName);
+      }
+      return; // ordinary selection is suspended entirely while picking
+    }
+
     onSelect?.(hits.length > 0 ? hits[0].object.userData.nodeId : null, e.ctrlKey || e.metaKey);
   }
 
@@ -174,8 +314,11 @@ export function createModellerScene(
       gestureState,
       onDimensionChange,
       onTransformChange: reportTransformToExternal,
+      onGroupDragStart,
+      onGroupTransformChange,
     });
     gizmos.setMeshEntryLookup((mesh) => meshRegistry.get(mesh.userData.nodeId));
+    gizmos.setNodeEntryLookup((nodeId) => meshRegistry.get(nodeId)); // used by the resize-proxy redirect (box Top/Bottom/Back/Front dragging Left/Right's own field) — see gizmos.js's handleFacePointerDown
   }
 
   function activate2D() {
@@ -183,6 +326,10 @@ export function createModellerScene(
       onSelect,
       onTransformChange: reportTransformToExternal,
       onDimensionChange,
+      onGroupDragStart,
+      onGroupTransformChange,
+      isFacePickMode: () => facePickMode,
+      onFacePick: (nodeId, faceName) => onFacePickCallback?.(nodeId, faceName),
     });
   }
 
@@ -256,6 +403,8 @@ export function createModellerScene(
     lastSelectedGroupId = selectedGroupId;
     lastMultiSelectedIds = multiSelectedIds;
 
+    updateFaceHighlight(resolvedPanels);
+
     const liveIds = new Set(resolvedPanels.map((p) => p.id));
 
     for (const [id, entry] of meshRegistry.entries()) {
@@ -319,6 +468,7 @@ export function createModellerScene(
       // this panel — same lockedFields the 3D gizmo already reads.
       entry.mesh.userData.lockedFields = node.lockedFields || {};
       entry.mesh.userData.thicknessAxis = node.thicknessAxis;
+      entry.mesh.userData.resizeProxy = node.resizeProxy || null; // see gizmos.js's handleFacePointerDown
 
       const resolvedPosUnits = {
         x: node.position.x * MM_TO_UNIT,
@@ -333,7 +483,9 @@ export function createModellerScene(
 
       const isBeingDragged =
         (gizmos && gizmos.controls.some((tc) => tc.object === entry.mesh && tc.dragging)) ||
-        (view2d && view2d.isDragging() && view2d.draggedMeshRef() === entry.mesh);
+        (gizmos && gizmos.isDragging() && gizmos.isGroupMember(entry.mesh)) ||
+        (view2d && view2d.isDragging() && view2d.draggedMeshRef() === entry.mesh) ||
+        (view2d && view2d.isDragging() && view2d.isGroupMember(entry.mesh));
 
       if (!isBeingDragged) {
         entry.mesh.position.set(resolvedPosUnits.x, resolvedPosUnits.y, resolvedPosUnits.z);
@@ -353,16 +505,40 @@ export function createModellerScene(
     });
 
     const selectedEntry = meshRegistry.get(selectedId);
+    // A WHOLE group is selected when there's a selectedGroupId but no
+    // drilled-into selectedId (the two-level selection: first click
+    // selects the group, a second click on a member drills in — see
+    // modeller-main.js's handleCanvasSelectClick).
+    const isWholeGroupSelected = !selectedId && selectedGroupId != null;
+    const groupMemberMeshes = isWholeGroupSelected
+      ? resolvedPanels
+          .filter((p) => p.groupId === selectedGroupId)
+          .map((p) => meshRegistry.get(p.id)?.mesh)
+          .filter(Boolean)
+      : null;
+
     if (gizmos) {
-      if (selectedEntry) {
+      if (facePickMode) {
+        gizmos.detachAll(); // no move/resize handles while a collinear pick is in progress
+      } else if (selectedEntry) {
         const node = resolvedPanels.find((p) => p.id === selectedId);
         gizmos.attachTo(selectedEntry.mesh, node?.lockedFields || {});
+      } else if (groupMemberMeshes) {
+        gizmos.attachToGroup(groupMemberMeshes);
       } else {
         gizmos.detachAll();
       }
     }
     if (view2d) {
-      view2d.setSelectedMesh(selectedEntry ? selectedEntry.mesh : null);
+      if (facePickMode) {
+        view2d.setSelectedMesh(null); // no resize handles while a collinear pick is in progress
+      } else if (selectedEntry) {
+        view2d.setSelectedMesh(selectedEntry.mesh);
+      } else if (groupMemberMeshes) {
+        view2d.setSelectedGroup(groupMemberMeshes);
+      } else {
+        view2d.setSelectedMesh(null);
+      }
     }
   }
 
@@ -422,9 +598,11 @@ export function createModellerScene(
       entry.edges.geometry.dispose();
     }
     meshRegistry.clear();
+    faceHighlightGeo.dispose();
+    faceHighlightMat.dispose();
 
     renderer.dispose();
   }
 
-  return { reconcile, dispose, setViewMode };
+  return { reconcile, dispose, setViewMode, setFacePickMode, setFaceHighlight };
 }

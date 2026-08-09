@@ -32,6 +32,13 @@ export function renderPanelList(
     onAddHorizontal,
     onAddParallel,
     onAddBox,
+    onCollinear,
+    collinearActive,
+    collinearGapMm,
+    onCollinearGapChange,
+    onShelfHorizontal,
+    onShelfVertical,
+    shelfMode, // 'horizontal' | 'vertical' | null
   }
 ) {
   container.innerHTML = `
@@ -42,6 +49,19 @@ export function renderPanelList(
     <button class="add-btn" id="add-horizontal-btn">+ Horizontal panel</button>
     <button class="add-btn" id="add-parallel-btn">+ Parallel panel</button>
     <button class="add-btn" id="add-box-btn">+ Box (6 sides, fully enclosed)</button>
+    <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+      <label for="collinear-gap-input" style="font-size:12px; white-space:nowrap;" title="Gap between the two picked faces, in mm — 0 means flush contact, same as before">Gap (mm)</label>
+      <input type="number" id="collinear-gap-input" value="${collinearGapMm ?? 0}" step="1" style="width:64px;">
+    </div>
+    <button class="add-btn ${collinearActive ? 'remove-btn' : ''}" id="collinear-btn">${
+      collinearActive ? 'Cancel Collinear (Esc)' : '⛓ Collinear'
+    }</button>
+    <button class="add-btn ${shelfMode === 'horizontal' ? 'remove-btn' : ''}" id="shelf-h-btn" title="Pick a box's Left panel, then its Right panel">${
+      shelfMode === 'horizontal' ? 'Cancel Horizontal Shelf (Esc)' : '📚 Horizontal shelf'
+    }</button>
+    <button class="add-btn ${shelfMode === 'vertical' ? 'remove-btn' : ''}" id="shelf-v-btn" title="Pick a box's Top panel, then its Bottom panel">${
+      shelfMode === 'vertical' ? 'Cancel Vertical Shelf (Esc)' : '📚 Vertical shelf'
+    }</button>
   `;
 
   const listEl = container.querySelector('#panel-list-items');
@@ -92,6 +112,17 @@ export function renderPanelList(
   container.querySelector('#add-horizontal-btn').addEventListener('click', onAddHorizontal);
   container.querySelector('#add-parallel-btn').addEventListener('click', onAddParallel);
   container.querySelector('#add-box-btn').addEventListener('click', onAddBox);
+  container.querySelector('#collinear-btn').addEventListener('click', onCollinear);
+  container.querySelector('#shelf-h-btn').addEventListener('click', onShelfHorizontal);
+  container.querySelector('#shelf-v-btn').addEventListener('click', onShelfVertical);
+  // 'input' (not 'change') so it stays live as the user types, and
+  // deliberately does NOT trigger a re-render itself (the caller just
+  // stores the value) — this container is fully rebuilt via innerHTML
+  // on every renderPanelList call, so re-rendering per keystroke would
+  // wipe the field's own focus/cursor while typing.
+  container.querySelector('#collinear-gap-input').addEventListener('input', (e) => {
+    onCollinearGapChange?.(parseFloat(e.target.value) || 0);
+  });
 }
 
 function appendPanelRow(listEl, p, { indented, isSelected, isMultiSelected, onSelectPanel }) {

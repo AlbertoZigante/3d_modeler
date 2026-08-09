@@ -66,10 +66,31 @@ import {
 } from './modules.js';
 
 const EMPTY_LOCKS = { width: false, height: false, thickness: false, positionX: false, positionY: false, positionZ: false };
+const AXIS_TO_POSITION_FIELD = { x: 'positionX', y: 'positionY', z: 'positionZ' };
 
 function emptyResolved(node) {
   const base = node.basePosition || { x: 0, y: 0, z: 0 };
   const offset = node.offset || { x: 0, y: 0, z: 0 };
+
+  const lockedFields = { ...EMPTY_LOCKS };
+  // Some panels (e.g. the box preset's derived faces — see
+  // modeller-main.js's addBox) declare up front which move-gizmo
+  // axes should always stay locked, REGARDLESS of whether that exact
+  // axis happens to carry its own explicit position constraint below.
+  // This matters because a width/height spansBetween constraint
+  // already implicitly RECENTERS the node on its own axis on every
+  // resolve (see applySpansBetween's `hasOwnPositionConstraint`
+  // check) even when nothing ever flips that axis's lockedFields —
+  // without this, the move gizmo would show a "draggable" handle for
+  // an axis whose value silently snaps back to its derived center on
+  // the very next render, or — for an axis with no constraint touching
+  // it at all (e.g. left/right's own Y/Z) — one that drags freely but
+  // visually breaks the assembly's alignment with nothing to stop it.
+  (node.lockedMoveAxes || []).forEach((axis) => {
+    const field = AXIS_TO_POSITION_FIELD[axis];
+    if (field) lockedFields[field] = true;
+  });
+
   return {
     id: node.id,
     name: node.name,
@@ -78,6 +99,7 @@ function emptyResolved(node) {
     rotation: node.rotation || { x: 0, y: 0, z: 0 },
     thicknessAxis: node.thicknessAxis, // pass through — see modules.js createPanelNode/classifyFacesByThickness
     groupId: node.groupId || null,
+    resizeProxy: node.resizeProxy || null, // pass through — see modeller-main.js's addBox and gizmos.js's resize-proxy redirect
     hidden: !!node.hidden,
     width: node.width,
     height: node.height,
@@ -88,7 +110,7 @@ function emptyResolved(node) {
       y: base.y + (offset.y || 0),
       z: base.z + (offset.z || 0),
     },
-    lockedFields: { ...EMPTY_LOCKS },
+    lockedFields,
     warnings: [],
   };
 }
@@ -182,8 +204,20 @@ export function inferSpanField(targetNode, fromFaceRef, toFaceRef, byId) {
   return { error: `This panel has no dimension that lines up with the ${axis.toUpperCase()} axis at its current rotation.` };
 }
 
-// World-space position (mm, along axisKey) of a referenced face.
+// World-space position (mm, along axisKey) of a referenced face — OR,
+// if faceRef has no `.node` and instead carries a literal `.mm`, that
+// fixed constant directly. This literal form exists specifically for
+// the collinear tool's resize-fallback in modeller-main.js: it lets a
+// spansBetween constraint anchor one endpoint to "wherever this
+// panel's opposite face already was" as a captured SNAPSHOT — a
+// value, not a live reference — which is what makes it possible at
+// all (the alternative, a live reference to the panel's OWN
+// not-yet-resolved face, is a self-referential dependency; topoSort
+// above would just flag it circular).
 function resolveFacePointMm(faceRef, axisKey, resolvedById, byId) {
+  if (faceRef.node == null && typeof faceRef.mm === 'number') {
+    return faceRef.mm;
+  }
   const targetNode = byId.get(faceRef.node);
   const targetResolved = resolvedById.get(faceRef.node);
   if (!targetNode || !targetResolved) {
@@ -290,7 +324,22 @@ export function resolveConstraints(panels) {
       return;
     }
 
-    (node.constraints || []).forEach((constraint) => {
+    // Dimension constraints (spansBetween) must be applied before
+    // position constraints (attachedTo) on the SAME node — attachedTo
+    // reads r[dimField] (via myFace) to compute position, so if a
+    // spansBetween on that same field runs AFTER it, position ends up
+    // computed from a STALE dimension. This never surfaced from the
+    // box preset's own constraints (its attachedTo always keys off
+    // `thickness`, which no spansBetween ever touches), but the
+    // collinear tool's resize-fallback (see modeller-main.js's
+    // applyCollinear) is a real case where a spansBetween and an
+    // attachedTo on the same node both matter, in exactly this
+    // dependency direction — caught by simulating it against this
+    // resolver directly, not by inspection.
+    const orderedConstraints = [...(node.constraints || [])].sort(
+      (a, b) => (a.type === 'attachedTo' ? 1 : 0) - (b.type === 'attachedTo' ? 1 : 0)
+    );
+    orderedConstraints.forEach((constraint) => {
       if (constraint.overridden) return;
       try {
         if (constraint.type === 'spansBetween') {

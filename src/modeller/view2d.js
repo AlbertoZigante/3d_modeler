@@ -73,7 +73,7 @@ export function create2DControls(
   camera,
   scene,
   meshRegistry,
-  { onSelect, onTransformChange, onDimensionChange, getSelectedId } = {}
+  { onSelect, onTransformChange, onDimensionChange, onGroupDragStart, onGroupTransformChange, isFacePickMode, onFacePick, getSelectedId } = {}
 ) {
   const raycaster = new THREE.Raycaster();
   const dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -106,6 +106,7 @@ export function create2DControls(
   const EDGE_TO_FIELD = { left: 'width', right: 'width', top: 'height', bottom: 'height' };
 
   let currentMesh = null; // the mesh the handles currently follow
+  let groupMembers = null; // array of meshes when a WHOLE group (not a drilled-into member) is selected
 
   function screenToWorld(e) {
     const rect = canvas.getBoundingClientRect();
@@ -162,12 +163,13 @@ export function create2DControls(
   }
 
   // ---- pointer / drag state ----
-  let mode = null; // null | 'translate' | 'resize'
+  let mode = null; // null | 'translate' | 'group-translate' | 'resize'
   let draggedMesh = null;
   let dragStartWorld = null;
   let dragStartMeshPos = null;
   let resizeEdgeKey = null;
   let resizeStartMm = null; // { width, height, thickness } at drag start
+  let groupDragStart = null; // { nodeIds, startWorld, startPositions: Map<mesh, Vector3> } — set only during 'group-translate'
   const gestureState = { moved: false, downX: 0, downY: 0 };
 
   function meshList() {
@@ -176,6 +178,28 @@ export function create2DControls(
 
   function visibleEdgeHandleList() {
     return Object.values(edgeHandles).filter((m) => m.visible);
+  }
+
+  // Collinear face-pick mode (2D): no drag handles exist here — a
+  // click is mapped straight to whichever of the panel's 4 screen
+  // edges (left/right/top/bottom) is CLOSEST to the click point in
+  // the panel's own local frame, normalized by that edge's own half-
+  // extent so it works regardless of the panel's aspect ratio.
+  // Thickness (front/back) is never reachable this way, since a
+  // front-elevation view has no edge lying along its own view axis —
+  // naturally satisfies "never touch thickness" for the 2D path.
+  function nearestEdgeFaceName(mesh, worldPoint) {
+    const { halfW, halfH } = meshHalfExtents(mesh);
+    const rot = mesh.rotation.z;
+    const cosInv = Math.cos(-rot), sinInv = Math.sin(-rot);
+    const dx = worldPoint.x - mesh.position.x;
+    const dy = worldPoint.y - mesh.position.y;
+    const lx = dx * cosInv - dy * sinInv;
+    const ly = dx * sinInv + dy * cosInv;
+    const nx = halfW > 0 ? Math.abs(lx) / halfW : 0;
+    const ny = halfH > 0 ? Math.abs(ly) / halfH : 0;
+    if (nx >= ny) return lx >= 0 ? 'right' : 'left';
+    return ly >= 0 ? 'top' : 'bottom';
   }
 
   function hitTest(e, objects) {
@@ -192,6 +216,8 @@ export function create2DControls(
     gestureState.moved = false;
     gestureState.downX = e.clientX;
     gestureState.downY = e.clientY;
+
+    if (isFacePickMode?.()) return; // suspend all normal drag-start logic — the pick itself happens on pointerup, click-only
 
     // edge (resize) handles take priority, same "must already be
     // selected" gate as before
@@ -216,10 +242,24 @@ export function create2DControls(
 
     const hits = hitTest(e, meshList());
     if (hits.length > 0) {
-      mode = 'translate';
-      draggedMesh = hits[0].object;
-      dragStartWorld = screenToWorld(e);
-      dragStartMeshPos = draggedMesh.position.clone();
+      const hitMesh = hits[0].object;
+      if (groupMembers && groupMembers.includes(hitMesh)) {
+        // The whole group is currently selected (not drilled into one
+        // member) — drag every member rigidly as a single unit instead
+        // of just the one panel under the cursor.
+        mode = 'group-translate';
+        groupDragStart = {
+          nodeIds: groupMembers.map((m) => m.userData.nodeId),
+          startWorld: screenToWorld(e),
+          startPositions: new Map(groupMembers.map((m) => [m, m.position.clone()])),
+        };
+        onGroupDragStart?.(groupDragStart.nodeIds);
+      } else {
+        mode = 'translate';
+        draggedMesh = hitMesh;
+        dragStartWorld = screenToWorld(e);
+        dragStartMeshPos = draggedMesh.position.clone();
+      }
     } else {
       mode = null;
       draggedMesh = null;
@@ -280,6 +320,25 @@ export function create2DControls(
       draggedMesh.position.y = lock.positionY ? dragStartMeshPos.y : dragStartMeshPos.y + dyWorld;
       if (draggedMesh === currentMesh) positionHandle(draggedMesh);
       reportTransform(draggedMesh);
+    } else if (mode === 'group-translate' && groupDragStart) {
+      const world = screenToWorld(e);
+      let dxWorld = world.x - groupDragStart.startWorld.x;
+      let dyWorld = world.y - groupDragStart.startWorld.y;
+      if (e.shiftKey) {
+        if (Math.abs(dxWorld) >= Math.abs(dyWorld)) dyWorld = 0;
+        else dxWorld = 0;
+      }
+      const deltaMm = { x: dxWorld / MM_TO_UNIT, y: dyWorld / MM_TO_UNIT, z: 0 };
+      // The caller may return a CORRECTED delta (e.g. clamped to the
+      // scene's design limits) — if so, use that for the live mesh
+      // positions instead of the raw drag delta, same reasoning as
+      // gizmos.js's 3D group-drag branch.
+      const corrected = onGroupTransformChange?.(groupDragStart.nodeIds, deltaMm);
+      const finalDeltaMm = corrected || deltaMm;
+      groupDragStart.startPositions.forEach((startPos, mesh) => {
+        mesh.position.x = startPos.x + finalDeltaMm.x * MM_TO_UNIT;
+        mesh.position.y = startPos.y + finalDeltaMm.y * MM_TO_UNIT;
+      });
     } else if (mode === 'resize' && draggedMesh) {
       const { isWidthEdge, startMm, newMm, worldShiftXmm, worldShiftYmm } = computeResizeResult(e);
 
@@ -291,6 +350,18 @@ export function create2DControls(
   }
 
   function handlePointerUp(e) {
+    if (isFacePickMode?.()) {
+      if (!gestureState.moved) {
+        const hits = hitTest(e, meshList());
+        if (hits.length > 0) {
+          const mesh = hits[0].object;
+          const faceName = nearestEdgeFaceName(mesh, screenToWorld(e));
+          onFacePick?.(mesh.userData.nodeId, faceName);
+        }
+      }
+      return; // pick mode suspends select/resize/translate entirely
+    }
+
     if (!gestureState.moved && mode !== 'resize') {
       // plain click (no drag): select whatever's under the pointer,
       // or deselect if empty space
@@ -334,10 +405,15 @@ export function create2DControls(
       return;
     }
 
+    // group-translate needs no special commit step, same reasoning as
+    // plain 'translate': onGroupTransformChange already patched the
+    // graph live on every pointermove, and the meshes are already at
+    // their final visual position — nothing further to reconcile.
     mode = null;
     draggedMesh = null;
     resizeEdgeKey = null;
     resizeStartMm = null;
+    groupDragStart = null;
   }
 
   function reportTransform(mesh) {
@@ -396,11 +472,31 @@ export function create2DControls(
   }
 
   // called by scene.js's reconcile() every pass with the currently
-  // selected mesh (or null) so the handles follow selection/edits
+  // selected mesh (or null) so the handles follow selection/edits.
+  // Mutually exclusive with setSelectedGroup below — drilling into a
+  // specific member always clears any whole-group drag eligibility.
   function setSelectedMesh(mesh) {
     currentMesh = mesh;
-    edgeHandleGroup.visible = !!mesh;
+    groupMembers = null;
+    edgeHandleGroup.visible = !!mesh; //
     if (mesh) positionHandle(mesh);
+  }
+
+  // Called instead of setSelectedMesh when a GROUP is selected as a
+  // whole (not drilled into one member) — no resize handles (resizing
+  // a whole group isn't supported), but clicking-and-dragging any
+  // member's body now moves the whole group rigidly (see
+  // handlePointerDown above).
+  function setSelectedGroup(memberMeshes) {
+    groupMembers = memberMeshes && memberMeshes.length > 0 ? memberMeshes : null;
+    currentMesh = null;
+    edgeHandleGroup.visible = false;
+  }
+
+  // Used by scene.js's reconcile() to skip forcibly repositioning a
+  // mesh currently being live-driven by an in-progress group drag.
+  function isGroupMember(mesh) {
+    return !!(groupDragStart && groupDragStart.startPositions.has(mesh));
   }
 
   function dispose() {
@@ -418,5 +514,5 @@ export function create2DControls(
     });
   }
 
-  return { isDragging, setSelectedMesh, draggedMeshRef: () => draggedMesh, dispose };
+  return { isDragging, setSelectedMesh, setSelectedGroup, isGroupMember, draggedMeshRef: () => draggedMesh, dispose };
 }
