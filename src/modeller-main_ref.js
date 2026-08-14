@@ -12,26 +12,11 @@
  * since the inspector is the one place that needs to know a
  * constraint exists at all (to render it locked, and to offer
  * "Unlink").
- *
- * STAGE 3: box walls (isBoxWall) no longer carry spansBetween/
- * attachedTo constraints at all. A fully cross-referential 6-panel
- * box (every wall's cross-axis fields derived from its neighbors)
- * is impossible through resolveConstraints — its cycle check is
- * per-NODE, not per-field, so "Left depends on Top for height; Top
- * depends on Left for width" gets flagged circular even though the
- * two fields don't actually conflict (this was tried and is a real,
- * tested dead end — see the old addBox() history). Box internals are
- * now plain arithmetic instead: see computeBoxLayout() in modules.js
- * and relayoutBox() below, which every box-wall drag/resize/material
- * change funnels through.
  */
 import {
   createPanelNode,
   computeNextBasePosition,
   computeWorldHalfExtents,
-  computeBoxLayout,
-  MM_TO_UNIT,
-  MIN_PANEL_DIM_MM,
   FLOOR_MM,
   DESIGN_LIMITS_MM,
   PANEL_SIZE_LIMITS_MM,
@@ -247,33 +232,6 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
     const node = panels.find((p) => p.id === nodeId);
     if (!node) return;
 
-    // -----------------------------------------------------------
-    // BOX WALLS: bypass the ordinary single-node clamp entirely.
-    // Moving one wall changes one of the box's three "sizes" (W/H/D)
-    // and every other wall has to re-fit around it — see
-    // relayoutBox() below. The whole box is validated as ONE unit;
-    // if it fails, this wall's own drag is rejected and reverted too
-    // (a partially-updated box is worse than no update at all).
-    // -----------------------------------------------------------
-    if (node.isBoxWall) {
-      const priorOffset = node.offset;
-      updateNode(nodeId, { offset: transform.offset, rotation: transform.rotation });
-
-      const applied = relayoutBox(node.groupId);
-      if (!applied) {
-        updateNode(nodeId, { offset: priorOffset });
-        renderAll();
-        return {
-          x: (node.basePosition.x + priorOffset.x) * MM_TO_UNIT,
-          y: (node.basePosition.y + priorOffset.y) * MM_TO_UNIT,
-          z: (node.basePosition.z + priorOffset.z) * MM_TO_UNIT,
-        };
-      }
-
-      renderAll(); // the other 5 walls all just changed — full reconcile, not just this node
-      return;
-    }
-
     const offset = transform.offset
     // const offset = {
     //   x: transform.position.x / MM_TO_UNIT - node.basePosition.x,
@@ -485,11 +443,6 @@ function cancelCollinearMode() {
 // shelf, but never for one that already depends on it (the pick
 // flow can't reference a not-yet-created node), so the dependency
 // graph only ever grows forward, never back on itself.
-//
-// NOTE: this tool still attaches shelves to Left/Right/Top/Bottom via
-// live constraints, unrelated to the box-WALL relayout above — a
-// shelf isn't a box wall (isBoxWall is never set on it), so it goes
-// through the ordinary resolveConstraints() path exactly as before.
 // -------------------------------------------------------------
 let shelfMode = null; // 'horizontal' | 'vertical' | null
 let shelfPick1 = null; // the raw panel node (from `panels`, not resolved) of the first pick
@@ -875,74 +828,6 @@ function updateNode(id, patch) {
 }
 
 // -------------------------------------------------------------
-// BOX RELAYOUT (Stage 3) — replaces the old spansBetween/attachedTo
-// constraint web the box used to run its 6 walls through (see the
-// file-header comment for why that approach hits a hard wall in
-// resolveConstraints' per-node cycle check). Box walls carry NO
-// constraints anymore: each keeps its own literal offset on its one
-// free axis, and this function recomputes every OTHER field on all
-// six of them, straight from computeBoxLayout() in modules.js.
-//
-// Called after any box-wall move, typed offset edit, or material
-// (thickness) change — see the three call sites below. Validates the
-// WHOLE resulting box (every wall's size + design-limit position)
-// before committing anything; a single wall's edit can never leave
-// the box in a partially-updated, visually broken state. Returns
-// true if applied, false if rejected (a toast has already been shown
-// either way).
-// -------------------------------------------------------------
-function relayoutBox(groupId) {
-  const roles = {
-    left: findBoxSibling(groupId, 'Left'),
-    right: findBoxSibling(groupId, 'Right'),
-    top: findBoxSibling(groupId, 'Top'),
-    bottom: findBoxSibling(groupId, 'Bottom'),
-    back: findBoxSibling(groupId, 'Back'),
-    front: findBoxSibling(groupId, 'Front'),
-  };
-  if (Object.values(roles).some((n) => !n)) return true; // not a full box (e.g. mid-ungroup) — nothing to relayout, not an error
-
-  const layout = computeBoxLayout(roles);
-
-  // Validate every wall BEFORE touching any of them.
-  for (const [role, node] of Object.entries(roles)) {
-    const dims = { width: layout[role].width, height: layout[role].height, thickness: node.thickness };
-
-    if (dims.width < MIN_PANEL_DIM_MM || dims.height < MIN_PANEL_DIM_MM) {
-      showToast("Can't shrink the box that far — walls would overlap");
-      return false;
-    }
-
-    const sizeViolation = findPanelSizeViolation(dims);
-    if (sizeViolation) {
-      showPanelSizeLimitError(sizeViolation);
-      return false;
-    }
-
-    const positionMm = {
-      x: node.basePosition.x + layout[role].offset.x,
-      y: node.basePosition.y + layout[role].offset.y,
-      z: node.basePosition.z + layout[role].offset.z,
-    };
-    const hitAxis = findDesignLimitViolation(node.rotation, positionMm, dims);
-    if (hitAxis) {
-      showDesignLimitError(hitAxis);
-      return false;
-    }
-  }
-
-  // All clear — commit all six at once.
-  for (const [role, node] of Object.entries(roles)) {
-    updateNode(node.id, {
-      width: layout[role].width,
-      height: layout[role].height,
-      offset: layout[role].offset,
-    });
-  }
-  return true;
-}
-
-// -------------------------------------------------------------
 // Two-level selection: a group (e.g. the box) selects as a WHOLE
 // unit first; clicking one of its members while already "inside"
 // that group's context drills down to that specific panel. Standalone
@@ -1168,14 +1053,6 @@ function updateSelectedField(field, value) {
   const node = panels.find((p) => p.id === selectedId);
   if (!node) return;
 
-  // A box wall's width/height are derived by relayoutBox() now, not
-  // user-editable directly — the only way to change them is to drag
-  // the wall itself (changes the offset) or change its material
-  // (changes thickness, handled in the 'material' branch below).
-  if (node.isBoxWall && (field === 'width' || field === 'height')) {
-    return;
-  }
-
   if (field === 'material') {
     // The ONLY way thickness is allowed to change after a panel is
     // created — selecting a different material carries its own fixed
@@ -1183,24 +1060,6 @@ function updateSelectedField(field, value) {
     // separate typed thickness field anywhere in the inspector.
     const catalogEntry = MATERIAL_CATALOG.find((m) => m.name === value);
     if (!catalogEntry) return; // dropdown only ever offers catalog entries — defensive, shouldn't happen
-
-    if (node.isBoxWall) {
-      // Thickness feeds directly into computeBoxLayout()'s inner/
-      // outer face math for every wall, not just this one — so a
-      // material swap here has to go through the same whole-box
-      // validate-then-commit path as a drag, not the single-node
-      // design-limit check below.
-      const priorMaterial = node.material;
-      const priorThickness = node.thickness;
-      updateNode(selectedId, { material: catalogEntry.name, thickness: catalogEntry.thicknessMm });
-      const applied = relayoutBox(node.groupId);
-      if (!applied) {
-        updateNode(selectedId, { material: priorMaterial, thickness: priorThickness });
-      }
-      renderAll();
-      return;
-    }
-
     const proposedDims = { width: node.width, height: node.height, thickness: catalogEntry.thicknessMm };
     const positionMm = {
       x: node.basePosition.x + node.offset.x,
@@ -1255,27 +1114,6 @@ function updateGroupMaterial(materialName) {
 
   const members = panels.filter((p) => p.groupId === groupId);
 
-  // Box groups: every member's thickness feeds computeBoxLayout(), so
-  // a whole-group material swap has to be validated as ONE relayout,
-  // not per-member — a change that's fine for Left in isolation could
-  // still push Top/Bottom/Back/Front out of bounds once every wall's
-  // thickness moves together.
-  if (members.some((p) => p.isBoxWall)) {
-    const priorMaterials = new Map(members.map((p) => [p.id, { material: p.material, thickness: p.thickness }]));
-    panels = panels.map((p) =>
-      p.groupId === groupId ? { ...p, material: catalogEntry.name, thickness: catalogEntry.thicknessMm } : p
-    );
-    const applied = relayoutBox(groupId);
-    if (!applied) {
-      panels = panels.map((p) => {
-        const prior = priorMaterials.get(p.id);
-        return prior ? { ...p, material: prior.material, thickness: prior.thickness } : p;
-      });
-    }
-    renderAll();
-    return;
-  }
-
   // Pre-commit validation: check EVERY member before applying to ANY
   // of them. Thickness maps to a different world axis depending on
   // each member's own rotation (e.g. the box's left/right panels vs.
@@ -1307,22 +1145,6 @@ function updateSelectedTransformField(group, axis, value) {
   const selectedId = getSelectedId();
   const node = panels.find((p) => p.id === selectedId);
   if (!node) return;
-
-  // Box walls: a typed offset edit is exactly the same kind of change
-  // as a drag on that same axis (the other two axes are locked
-  // out already, via lockedFields/lockedMoveAxes upstream in the
-  // inspector) — route it through relayoutBox rather than the plain
-  // single-node clamp below, so the rest of the box re-fits too.
-  if (node.isBoxWall && group === 'offset') {
-    const priorOffset = node.offset;
-    updateNode(selectedId, { offset: { ...node.offset, [axis]: value } });
-    const applied = relayoutBox(node.groupId);
-    if (!applied) {
-      updateNode(selectedId, { offset: priorOffset });
-    }
-    renderAll();
-    return;
-  }
 
   if (group === 'offset') {
     const proposedOffset = { ...node.offset, [axis]: value };
@@ -1395,14 +1217,12 @@ function removeSelected() {
   if (node.groupId) {
     // panel-level selection WITHIN a group — HIDE it rather than
     // removing it from the graph. It stays fully present (constraints
-    // involving it keep resolving normally, and — for a box wall —
-    // relayoutBox still reads its position/thickness normally too)
-    // but is excluded from rendering, the panel list, and the BOM —
-    // see renderAll's `!p.hidden` filters. Restorable via a button in
-    // the group-level inspector view (see properties.js's Group view
-    // + restoreFace below). Step back up to group-level selection
-    // either way, since there's nothing left to show for the now-
-    // hidden panel.
+    // involving it keep resolving normally) but is excluded from
+    // rendering, the panel list, and the BOM — see renderAll's
+    // `!p.hidden` filters. Restorable via a button in the group-level
+    // inspector view (see properties.js's Group view + restoreFace
+    // below). Step back up to group-level selection either way, since
+    // there's nothing left to show for the now-hidden panel.
     panels = panels.map((p) => (p.id === selectedId ? { ...p, hidden: true } : p));
     setSelectedGroupId(node.groupId);
     setSelectedId(null);
@@ -1432,9 +1252,7 @@ function restoreFace(nodeId) {
 // needed: both the properties panel's "Unlink" control and the
 // relations list's own remove (×) button use it to detach/delete an
 // EXISTING relation, which is a distinct concern from authoring a new
-// one by hand. Box walls never have entries here (they carry no
-// constraints — see relayoutBox above), so this never has to
-// special-case isBoxWall.
+// one by hand.
 // -------------------------------------------------------------
 
 // identifier is either a FIELD NAME (soft "Unlink" — mark the active
@@ -1479,19 +1297,21 @@ function unlinkOrRemoveConstraint(identifier, opts = {}) {
 }
 
 /**
- * Box preset: replaces the selected panel with 6 real panel nodes —
- * left, right, top, bottom, back, front — forming an open-front box.
+ * Box preset: replaces the selected panel with 5 real panel nodes —
+ * left, right, top, bottom, back — forming an open-front box.
  *
- * STAGE 3 REWRITE: top/bottom/back/front's width/height/position used
- * to be governed by spansBetween/attachedTo constraints resolved by
- * snap.js. That's gone now — see relayoutBox() above and
- * computeBoxLayout() in modules.js. Every wall is created as a plain
- * literal panel (constraints: [] via createPanelNode's own default),
- * with a starting width/height/offset that's already numerically
- * correct for the requested W/H/D — and then relayoutBox() is called
- * once immediately after, purely to run every field through the
- * exact same math a later drag will use, so the box starts out
- * indistinguishable from "just been dragged into this shape".
+ * STAGE 2 REWRITE: top/bottom/back's WIDTH used to be a literal
+ * number baked in once at creation time (Stage 1), computed by
+ * hand-cancelling the auto-layout placeholder. It's now a REAL
+ * `spansBetween` constraint against left/right — resize or drag
+ * left/right apart later (via the width field, or the move gizmo)
+ * and all three follow automatically. This is deliberately the
+ * acceptance test for the resolver: it's the first real, useful
+ * consumer of a constraint, not just a synthetic example.
+ *
+ * Depth positioning (Y/Z) is still literal offset + auto-layout, same
+ * as the Stage 1 version — converting every dimension of the box to
+ * a constraint is future work once this pattern is proven out.
  */
 const DEFAULT_BOX_DEPTH_MM = 400;
 const DEFAULT_BOX_WIDTH_MM = 500;
@@ -1537,6 +1357,27 @@ function addBox() {
   const material = MATERIAL_CATALOG[0].name;
   const T = MATERIAL_CATALOG[0].thicknessMm;
 
+  // NOTE ON AN EARLIER ATTEMPT AT THIS: a fully symmetric design (every
+  // one of the 6 panels literal/free on its own outward normal, with
+  // width/height fields cross-derived from the other four) was tried
+  // and numerically verified against the real resolver — it produced
+  // exactly correct geometry, but ALSO produced a per-node dependency
+  // cycle (Left depends on Top for its height field; Top depends on
+  // Left for its width field — two DIFFERENT fields, but the
+  // resolver's cycle check is per-NODE, not per-field, so it can't
+  // tell those apart and flags it circular regardless). The resolver
+  // then falls back to frozen "last literal values" for every affected
+  // panel — meaning it LOOKED right only because the initial values
+  // happened to already be correct, not because it would actually
+  // re-solve live if anything moved again. That's a real, tested dead
+  // end, not a hunch — hence keeping left/right as the sole literal
+  // "source of truth" below, unchanged from the original design.
+  const collinearTo = (field, myFace, targetNode, targetFace, gapMm = 0) => ({
+    field, type: 'attachedTo', overridden: false, myFace,
+    from: { node: targetNode.id, face: targetFace, offset: gapMm },
+    id: nextConstraintId(),
+  });
+
   const left = createPanelNode({
     name: 'Left',
     width: D, height: H, thickness: T, material,
@@ -1545,7 +1386,7 @@ function addBox() {
     isBoxWall: true,
     lockedMoveAxes: BOX_GIZMO_LOCKS.leftRight.lockedMoveAxes,
     lockedResizeAxes: BOX_GIZMO_LOCKS.leftRight.lockedResizeAxes,
-    lockedFields: { ...BOX_GIZMO_LOCKS.leftRight.lockedFields },
+    lockedFields: {...BOX_GIZMO_LOCKS.leftRight.lockedFields},
   });
   const right = createPanelNode({
     name: 'Right',
@@ -1555,86 +1396,206 @@ function addBox() {
     isBoxWall: true,
     lockedMoveAxes: BOX_GIZMO_LOCKS.leftRight.lockedMoveAxes,
     lockedResizeAxes: BOX_GIZMO_LOCKS.leftRight.lockedResizeAxes,
-    lockedFields: { ...BOX_GIZMO_LOCKS.leftRight.lockedFields },
+    lockedFields: {...BOX_GIZMO_LOCKS.leftRight.lockedFields},
   });
+
+  // Face choices verified directly against the resolver (see the
+  // standalone test run while building this — with both side panels
+  // rotated 90° about Y, LOCAL 'front'/'back' are the INNER faces
+  // (facing into the box) and 'back'/'front' respectively are the
+  // OUTER faces; LOCAL 'right'/'left' are the faces spanning each
+  // side panel's OWN depth; LOCAL 'top'/'bottom' are their top/bottom
+  // edges). Getting one wrong doesn't silently break — the resolver
+  // rejects a genuinely misaligned face with a clear warning.
+  //
+  // Dependencies only ever flow FROM top/bottom/back TO left/right,
+  // never the reverse — the resolver's cycle check is per-NODE, not
+  // per-field, so even though "top depends on left for width" and "a
+  // hypothetical left-depends-on-top for height" wouldn't actually
+  // conflict value-wise, the resolver can't tell that and flags it as
+  // circular anyway (see the note above — this was tested, not
+  // assumed). Left/right stay the sole literal "source of truth"
+  // panels; everything else derives from them.
+  // For X, the literal source is the side-wall position rather than a
+  // panel dimension (Left/Right width is the box depth after rotation).
+
+  const nextId = () => nextConstraintId();
+
+  // top/bottom span the OUTER faces — full width W, covering over
+  // left/right's edges rather than being tucked between them.
+  const outerWidthSpan = () => [{
+    field: 'width', type: 'spansBetween', overridden: false,
+    from: { node: left.id, face: 'back', offset: 0 },
+    to: { node: right.id, face: 'front', offset: 0 },
+    id: nextId(),
+  }];
+  // front keeps the original inner-fitted width (grooved between the
+  // sides), W-2T.
+  const innerWidthSpan = () => [{
+    field: 'width', type: 'spansBetween', overridden: false,
+    from: { node: left.id, face: 'back', offset: -T },
+    to: { node: right.id, face: 'front', offset: -T },
+    id: nextId(),
+  }];
+  // top/bottom's depth (their `height` field, since Horizontal
+  // rotation maps height->Z) matches left's own depth directly —
+  // spanning a single panel's own two opposite faces works fine, the
+  // resolver doesn't require from/to to be different nodes.
+  const depthMatchesLeft = () => [{
+    field: 'height', type: 'spansBetween', overridden: false,
+    from: { node: left.id, face: 'right', offset: 0 },
+    to: { node: left.id, face: 'left', offset: 0 },
+    id: nextId(),
+  }];
+
   const top = createPanelNode({
     name: 'Top',
-    width: W, height: D, thickness: T, material,
-    rotation: { x: 90, y: 0, z: 0 },
-    isBoxPanel: true,
+    width: W, height: D, thickness: T, material, rotation: { x: 90, y: 0, z: 0 },
+    isBoxPanel: true, 
     isBoxWall: true,
     lockedMoveAxes: BOX_GIZMO_LOCKS.topBottom.lockedMoveAxes,
     lockedResizeAxes: BOX_GIZMO_LOCKS.topBottom.lockedResizeAxes,
-    lockedFields: { ...BOX_GIZMO_LOCKS.topBottom.lockedFields },
+    lockedFields: {...BOX_GIZMO_LOCKS.topBottom.lockedFields},
+    constraints: [
+      ...outerWidthSpan(),
+      ...depthMatchesLeft(),
+    ],
   });
   const bottom = createPanelNode({
     name: 'Bottom',
-    width: W, height: D, thickness: T, material,
-    rotation: { x: 90, y: 0, z: 0 },
-    isBoxPanel: true,
+    width: W, height: D, thickness: T, material, rotation: { x: 90, y: 0, z: 0 },
+    isBoxPanel: true, 
     isBoxWall: true,
     lockedMoveAxes: BOX_GIZMO_LOCKS.topBottom.lockedMoveAxes,
     lockedResizeAxes: BOX_GIZMO_LOCKS.topBottom.lockedResizeAxes,
-    lockedFields: { ...BOX_GIZMO_LOCKS.topBottom.lockedFields },
+    lockedFields: {...BOX_GIZMO_LOCKS.topBottom.lockedFields},
+    constraints: [
+      ...outerWidthSpan(),
+      ...depthMatchesLeft(),
+    ],
   });
   const back = createPanelNode({
     name: 'Back',
-    // Covers all 4 outer edges of the assembly (H+2T) — like a real
-    // cabinet's solid back sheet, nailed across the whole carcass
-    // rather than let into it. Same as the old design; now just a
-    // starting value instead of a fixed literal, since relayoutBox()
-    // will recompute it (to this exact number, for these inputs) the
-    // moment it runs.
-    width: W, height: H + 2 * T, thickness: T, material,
-    rotation: { x: 0, y: 0, z: 0 },
+    // Covers ALL FOUR outer edges of the assembly — full width
+    // (spans left/right's outer faces, same as top/bottom) and full
+    // height (spans top/bottom's own OUTER edges, so it also covers
+    // the T-thick overhang top/bottom add above/below H) — like a
+    // real cabinet's solid back sheet, nailed across the whole
+    // carcass rather than let into it.
+    width: W, height: H + 2 * T, thickness: T, material, rotation: { x: 0, y: 0, z: 0 },
     isBoxPanel: true,
     isBoxWall: true,
     lockedMoveAxes: BOX_GIZMO_LOCKS.frontBack.lockedMoveAxes,
     lockedResizeAxes: BOX_GIZMO_LOCKS.frontBack.lockedResizeAxes,
-    lockedFields: { ...BOX_GIZMO_LOCKS.frontBack.lockedFields },
+    lockedFields: {...BOX_GIZMO_LOCKS.frontBack.lockedFields},
+    constraints: [
+      ...innerWidthSpan(),
+      // height spans top's OUTER (upper) edge to bottom's OUTER
+      // (lower) edge — 'back'/'front' here are top/bottom's own
+      // thickness-axis faces (their topside/underside respectively).
+      { field: 'height', type: 'spansBetween', overridden: false,
+        from: { node: top.id, face: 'back', offset: -T },
+        to: { node: bottom.id, face: 'front', offset: -T }, id: nextId() },
+    ],
   });
   const front = createPanelNode({
     name: 'Front',
-    // Inner-fitted footprint — grooved between the sides, W-2T.
-    width: W - 2 * T, height: H, thickness: T, material,
-    rotation: { x: 0, y: 0, z: 0 },
+    // Inner-fitted, same footprint the original single-panel back
+    // used to have — grooved between the sides rather than covering
+    // them, unlike the new back above. Height still tracks H (via
+    // left's own top/bottom faces) so it isn't left stale on resize.
+    width: W - 2 * T, height: H, thickness: T, material, rotation: { x: 0, y: 0, z: 0 },
     isBoxPanel: true,
     isBoxWall: true,
     lockedMoveAxes: BOX_GIZMO_LOCKS.frontBack.lockedMoveAxes,
     lockedResizeAxes: BOX_GIZMO_LOCKS.frontBack.lockedResizeAxes,
-    lockedFields: { ...BOX_GIZMO_LOCKS.frontBack.lockedFields },
+    lockedFields: {...BOX_GIZMO_LOCKS.frontBack.lockedFields},
+    constraints: [
+      ...innerWidthSpan(),
+      { field: 'height', type: 'spansBetween', overridden: false,
+        from: { node: top.id, face: 'top', offset: 0 },
+        to: { node: bottom.id, face: 'bottom', offset: 0 }, id: nextId() },
+    ],
   });
 
   const boxPanels = [left, right, top, bottom, back, front];
-  boxPanels.forEach((p) => { p.groupId = left.id; }); // left's own id doubles as the group's identifier — no separate id generator needed
+  boxPanels.forEach((p) => { p.groupId = left.id; p.isBoxPanel = true;p.isBoxWall = true}); // left's own id doubles as the group's identifier — no separate id generator needed
 
+  // left/right are the sole literal panels, positioned via `offset`
+  // alone — everything else derives from them (see the constraint
+  // definitions above: top/bottom's width, depth, and Y-position, and
+  // back/front's width, height, and Z-position, all trace back to
+  // left/right — directly, or via top/bottom which themselves trace
+  // back to left/right — never the reverse).
+  //
   // All 6 box panels share ONE basePosition — the box's own single
   // far-right placement slot (treating its WxH front footprint like
   // one panel for that purpose) — rather than each independently
-  // claiming its own row slot the way plain "add panel" does.
-  // computeBoxLayout() (and therefore relayoutBox()) works entirely
-  // in offset-space relative to this shared anchor, so the anchor
-  // itself is never touched again after this.
-  const anchor = computeNextBasePosition(resolveConstraints(panels), { width: W, height: H, thickness: T, rotation: { x: 0, y: 0, z: 0 } });
-  anchor.y = H / 2 + T;
-  boxPanels.forEach((p) => { p.basePosition = anchor; });
+  // claiming its own row slot the way plain "add panel" does. `desired`
+  // is each panel's position relative to that shared anchor (e.g.
+  // left sits (W/2-T/2) to the anchor's left) — `offset` is set
+  // directly to those LOCAL deltas, since basePosition already
+  // carries the anchor's absolute placement; resolved position ends
+  // up as basePosition + offset = anchor + local-delta, which is
+  // exactly what's wanted. (An earlier version subtracted anchor from
+  // `want` here too, which canceled the anchor out of the result
+  // entirely — the box would always land near local/origin
+  // coordinates no matter where the anchor said it should go.)
 
-  // Starting offsets — each wall's OWN driving axis, same numbers the
-  // old design used. Every other offset field gets overwritten by
-  // relayoutBox() immediately below regardless of what's set here.
-  left.offset = { x: -(W / 2 - T / 2), y: 0, z: 0 };
-  right.offset = { x: +(W / 2 - T / 2), y: 0, z: 0 };
-  bottom.offset = { x: 0, y: -H / 2 - T / 2, z: 0 };
-  top.offset = { x: 0, y: +H / 2 + T / 2, z: 0 };
-  back.offset = { x: 0, y: 0, z: -D / 2 - T / 2 };
-  front.offset = { x: 0, y: 0, z: +D / 2 + T / 2 };
+  const desired = new Map([
+    [left.id, {
+      x: -(W / 2 - T / 2),
+      y: 0,
+      z: 0,
+    }],
+
+    [right.id, {
+      x: +(W / 2 - T / 2),
+      y: 0,
+      z: 0,
+    }],
+
+    [bottom.id, {
+      x: 0,
+      y: -H / 2 - T / 2,
+      z: 0,
+    }],
+
+    [top.id, {
+      x: 0,
+      y: +H / 2 + T / 2,
+      z: 0,
+    }],
+
+    [back.id, {
+      x: 0,
+      y: 0,
+      z: -D / 2 - T / 2,
+    }],
+
+    [front.id, {
+      x: 0,
+      y: 0,
+      z: +D / 2 + T / 2,
+    }],
+  ]);
+
+  const anchor = computeNextBasePosition(resolveConstraints(panels), { width: W, height: H, thickness: T, rotation: { x: 0, y: 0, z: 0 } });
+
+  anchor.y = H / 2 + T;
+
+  boxPanels.forEach((p) => {
+    p.basePosition = anchor;
+    const want = desired.get(p.id);
+    p.offset = want
+      ? { x: want.x, y: want.y, z: want.z }
+      : { x: 0, y: 0, z: 0 };
+  });
 
   panels = [...panels, ...boxPanels]; // always appended — never replaces an existing panel
-  relayoutBox(left.id); // normalizes every non-driving width/height/offset through the exact same math a later drag will use
-
-  updateNode(front.id, { hidden: true }); // open-front box by default — restorable via the group inspector's "restore" button
-
   setSelectedGroupId(left.id);
+  setSelectedId(front.id); // land somewhere sensible rather than deselecting entirely
+  removeSelected()
   setSelectedId(null);
   renderAll();
 }

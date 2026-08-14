@@ -423,6 +423,20 @@
     .dims-row .field-input { padding: 6px 4px; font-size: 12px; }
     .dims-row .field-unit { width: auto; }
 
+    .edge-banding-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 12px;
+    }
+    .edge-banding-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #4a4030;
+      cursor: pointer;
+    }
+
     .field-input-wrap { display: flex; align-items: center; gap: 6px; }
     .field-input {
       flex: 1;
@@ -731,10 +745,10 @@
     <div id="inspector">
       <div id="properties-container"></div>
       <div class="divider"></div>
-      <div class="section-title">BOM (derived, grouped by material + thickness)</div>
+      <div class="section-title">Cut List (derived, per piece)</div>
       <table class="bom">
         <thead>
-          <tr><th>Material</th><th class="right">Qty</th><th class="right">m²</th></tr>
+          <tr><th>Piece</th><th class="right">W × H (mm)</th><th>Material</th><th class="right">Thk</th><th>Grain</th><th>Edges</th><th class="right">Qty</th><th class="right">m²</th></tr>
         </thead>
         <tbody id="bom-body"></tbody>
       </table>

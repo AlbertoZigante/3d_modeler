@@ -157,40 +157,66 @@ export function nextConstraintId() {
  * updateSelectedField('material', ...), the ONLY place thickness is
  * ever allowed to change after a panel is created.
  */
+// Each material's STOCK SHEET size (mm) is what a cut list actually
+// nests pieces onto — without it, a piece list has no sheet to be
+// laid out on at all. `hasGrain` flags whether this material has a
+// visible directional grain (wood-look melamine, veneered plywood)
+// that makes a 90°-rotated cut a genuinely different piece, versus a
+// material with no visible direction (most raw MDF, most solid-color
+// melamine) where a piece can be freely rotated for nesting. Sizes
+// are the common European sheet size (2440×1220) except where a
+// material is more commonly sold smaller (the 6mm hardboard back
+// panel stock).
 export const MATERIAL_CATALOG = [
-  { name: 'Melamine White 18mm', thicknessMm: 18 },
-  { name: 'Melamine Oak 18mm', thicknessMm: 18 },
-  { name: 'MDF Raw 18mm', thicknessMm: 18 },
-  { name: 'MDF Raw 25mm', thicknessMm: 25 },
-  { name: 'Plywood Birch 12mm', thicknessMm: 12 },
-  { name: 'Plywood Birch 18mm', thicknessMm: 18 },
-  { name: 'Hardboard Back Panel 6mm', thicknessMm: 6 },
+  { name: 'Melamine White 18mm', thicknessMm: 18, stockSheetMm: { width: 2440, height: 1220 }, hasGrain: false },
+  { name: 'Melamine Oak 18mm', thicknessMm: 18, stockSheetMm: { width: 2440, height: 1220 }, hasGrain: true },
+  { name: 'MDF Raw 18mm', thicknessMm: 18, stockSheetMm: { width: 2440, height: 1220 }, hasGrain: false },
+  { name: 'MDF Raw 25mm', thicknessMm: 25, stockSheetMm: { width: 2440, height: 1220 }, hasGrain: false },
+  { name: 'Plywood Birch 12mm', thicknessMm: 12, stockSheetMm: { width: 2440, height: 1220 }, hasGrain: true },
+  { name: 'Plywood Birch 18mm', thicknessMm: 18, stockSheetMm: { width: 2440, height: 1220 }, hasGrain: true },
+  { name: 'Hardboard Back Panel 6mm', thicknessMm: 6, stockSheetMm: { width: 2440, height: 1220 }, hasGrain: false },
 ];
+
+// Single lookup point for a material's catalog entry by name — used
+// anywhere something needs to know a panel's stock sheet size or
+// grain flag (the cut-list engine, the inspector's grain-direction
+// control) without re-implementing the Array.find each time.
+export function getMaterialInfo(materialName) {
+  return MATERIAL_CATALOG.find((m) => m.name === materialName) || null;
+}
 
 export function createPanelNode(overrides = {}) {
   const rotation = overrides.rotation || { x: 0, y: 90, z: 0 };
   const node = {
     id: nextId(),
     type: 'panel',
-    name: null,
-    width: 350,
-    height: 350,
-    thickness: 18,
+    name: null,                          // optional friendly label; id stays the stable reference key
+    width: 350,     // mm — maps to world Z ("depth") once rotated into the YZ plane below
+    height: 350,    // mm — maps to world Y; equal to width by default, so the visible face is square
+    thickness: 18,  // mm — the small, BOM-fixed board thickness; maps to world X once rotated
     material: 'Melamine White 18mm',
     quantity: 1,
-    offset: { x: 0, y: 0, z: 0 },
-    basePosition: { x: 0, y: 0, z: 0 },
-    rotation,
-    constraints: [],
-    groupId: null,
-    isBoxWall: false,
-    hidden: false,
+    offset: { x: 0, y: 0, z: 0 },       // mm, delta from basePosition (see below) — this is what drags/resizes ever touch
+    basePosition: { x: 0, y: 0, z: 0 }, // mm — set ONCE at creation (see computeNextBasePosition) and never recomputed afterward, by anything. This is what makes existing panels immune to being nudged by later edits elsewhere in the scene.
+    rotation,                           // degrees — default orientation lies in the YZ plane (see above)
+    constraints: [],                    // Stage 2: see file header
+    groupId: null,                      // shared by all panels of a preset-created group (e.g. the box) — null for a standalone panel. Deleting a member of a group HIDES it (see below) rather than removing it; deleting the whole group is a real, permanent removal — see modeller-main.js's removeSelected.
+    hidden: false,                      // soft-delete: excluded from rendering, the panel list, and the BOM, but still fully present in the graph (constraints still resolve against it) — restorable via the group-selected inspector view's per-face buttons. Only ever set on a panel that belongs to a group; a standalone panel's Delete is a real removal.
+    // Cut-list fields (see engine/bom.js) — neither affects geometry
+    // or resolution at all, both are pure fabrication metadata.
+    grainDirection: null,                // null | 'width' | 'height' — which of THIS panel's own width/height must run parallel to its material's grain. Only meaningful when the material's own MATERIAL_CATALOG entry has hasGrain:true; null means "no constraint" (free to rotate for nesting), which is also the only sensible value for a non-grained material.
+    edgeBanding: { top: false, bottom: false, left: false, right: false }, // which of the panel's 4 long edges (the two along its width, the two along its height) get banded — 'top'/'bottom' band the width-length edges, 'left'/'right' band the height-length edges, matching the same names the 2D view's own edge handles already use for those sides
+    edgeBandingMaterial: null,           // single banding material/color shared by every banded edge on this panel (e.g. "PVC White 0.4mm") — null if edgeBanding is all-false. Per-edge banding material is a possible future refinement; scoped to one material per panel for now, since mixed banding on a single piece is uncommon
     ...overrides,
   };
-
-  node.thicknessAxis =
-    getAlignedAxis(node.rotation, 'front')?.axis || 'z';
-
+  // Always derived from the node's OWN final rotation, never taken
+  // from overrides directly — thicknessAxis must never disagree with
+  // rotation, so it isn't independently settable. Since rotation is
+  // fixed for the node's whole lifetime (no rotation UI exists
+  // anywhere in the app), this is computed once, here, and then just
+  // read everywhere else — see classifyFacesByThickness() above for
+  // "which faces have thickness as an edge" given this axis.
+  node.thicknessAxis = getAlignedAxis(node.rotation, 'front')?.axis || 'z';
   return node;
 }
 
@@ -254,7 +280,7 @@ export function computeWorldHalfExtents(node) {
 }
 
 const NEW_PANEL_MARGIN_MM = 300;
-export const FLOOR_MM = 0.0 //-0.5 / MM_TO_UNIT; // preserves the old auto-layout's "sits on the floor" convention
+export const FLOOR_MM = -0.5 / MM_TO_UNIT; // preserves the old auto-layout's "sits on the floor" convention
 
 /**
  * DESIGN limits — the overall space a design is allowed to occupy,
@@ -312,48 +338,5 @@ export function computeNextBasePosition(resolvedPanels, newDims) {
     x: leftEdgeMm + newHalfExtents.x,
     y: newHalfExtents.y + FLOOR_MM, // sits on the floor
     z: 0,
-  };
-}
-
-// ---- BOX LAYOUT (Stage 3) ----
-// Pure function: given the box's 6 wall nodes (each just needs
-// .thickness and .offset), returns each wall's new width/height/
-// offset so the assembly stays airtight no matter which wall(s) were
-// dragged. Only left.offset.x / right.offset.x / top.offset.y /
-// bottom.offset.y / back.offset.z / front.offset.z are ever treated
-// as "driving" values — everything else here is derived. All
-// measurements are in OFFSET space (relative to the box's shared
-// basePosition anchor) — it cancels out of every difference used
-// here, so the anchor itself is never read.
-export function computeBoxLayout({ left, right, top, bottom, back, front }) {
-  const lx = left.offset.x, rx = right.offset.x;
-  const ty = top.offset.y, by = bottom.offset.y;
-  const bz = back.offset.z, fz = front.offset.z;
-
-  const xOuterMin = lx - left.thickness / 2, xOuterMax = rx + right.thickness / 2;
-  const xInnerMin = lx + left.thickness / 2, xInnerMax = rx - right.thickness / 2;
-  const yOuterMin = by - bottom.thickness / 2, yOuterMax = ty + top.thickness / 2;
-  const yInnerMin = by + bottom.thickness / 2, yInnerMax = ty - top.thickness / 2;
-  const zInnerMin = bz + back.thickness / 2, zInnerMax = fz - front.thickness / 2;
-
-  const outerWidth = xOuterMax - xOuterMin;
-  const innerWidth = xInnerMax - xInnerMin;
-  const outerHeight = yOuterMax - yOuterMin;
-  const innerHeight = yInnerMax - yInnerMin;
-  const innerDepth = zInnerMax - zInnerMin;
-
-  const outerWidthCenterX = (xOuterMin + xOuterMax) / 2;
-  const innerWidthCenterX = (xInnerMin + xInnerMax) / 2;
-  const outerHeightCenterY = (yOuterMin + yOuterMax) / 2;
-  const innerHeightCenterY = (yInnerMin + yInnerMax) / 2;
-  const innerDepthCenterZ = (zInnerMin + zInnerMax) / 2;
-
-  return {
-    left:   { width: innerDepth, height: innerHeight, offset: { x: lx, y: innerHeightCenterY, z: innerDepthCenterZ } },
-    right:  { width: innerDepth, height: innerHeight, offset: { x: rx, y: innerHeightCenterY, z: innerDepthCenterZ } },
-    top:    { width: outerWidth, height: innerDepth,  offset: { x: outerWidthCenterX, y: ty, z: innerDepthCenterZ } },
-    bottom: { width: outerWidth, height: innerDepth,  offset: { x: outerWidthCenterX, y: by, z: innerDepthCenterZ } },
-    back:   { width: innerWidth, height: outerHeight, offset: { x: innerWidthCenterX, y: outerHeightCenterY, z: bz } },
-    front:  { width: innerWidth, height: innerHeight, offset: { x: innerWidthCenterX, y: innerHeightCenterY, z: fz } },
   };
 }

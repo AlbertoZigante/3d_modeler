@@ -50,7 +50,10 @@
 import * as THREE from 'three';
 import { MM_TO_UNIT, MIN_PANEL_DIM_MM, getAlignedAxis } from './modules.js';
 
-const RESIZE_HANDLE_COLOR = 0xd97742; // "this is draggable" accent
+const RESIZE_HANDLE_COLOR = 0x454441; // "this is draggable" accent
+
+const PANEL_OUTLINE_COLOR = 0x30302e;
+const PANEL_OUTLINE_OPACITY = 0.95;
 
 // Which field (if any) currently lines up with a given WORLD axis, for
 // a panel's FIXED rotation (never changes after creation — no rotate
@@ -80,28 +83,130 @@ export function create2DControls(
 
   // ---- resize-handle visuals: left/right (width) + top/bottom (height) ----
   // Children of one group so they inherit the panel's rotation for free.
+  const RESIZE_HANDLE_RADIUS_UNITS = 0.01;
+
   const edgeHandleGroup = new THREE.Group();
-  const edgeHandles = {};
-  ['left', 'right'].forEach((key) => {
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.05, 0.16),
-      new THREE.MeshBasicMaterial({ color: RESIZE_HANDLE_COLOR, depthTest: false })
-    );
-    mesh.renderOrder = 10;
-    edgeHandleGroup.add(mesh);
-    edgeHandles[key] = mesh;
-  });
-  ['top', 'bottom'].forEach((key) => {
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.16, 0.05),
-      new THREE.MeshBasicMaterial({ color: RESIZE_HANDLE_COLOR, depthTest: false })
-    );
-    mesh.renderOrder = 10;
-    edgeHandleGroup.add(mesh);
-    edgeHandles[key] = mesh;
-  });
   edgeHandleGroup.visible = false;
   scene.add(edgeHandleGroup);
+
+
+  // ---------------------------------------------------------------------------
+  // PANEL OUTLINE LAYER
+  // This is deliberately separate from the actual panel meshes:
+  //
+  //   panel mesh       -> normal rendering / raycasting
+  //   outline mesh     -> visual-only, never raycast
+  //
+  // The outline is rebuilt whenever the panel geometry changes and its
+  // transform is copied from the panel. This means live resize works without
+  // changing the actual scene/reconciler architecture.
+  // ---------------------------------------------------------------------------
+  const PANEL_OUTLINE_LAYER = 7;
+  camera.layers.enable(PANEL_OUTLINE_LAYER);
+  const panelOutlineGroup = new THREE.Group();
+  panelOutlineGroup.name = '2DPanelOutlines';
+  panelOutlineGroup.renderOrder = 20;
+  panelOutlineGroup.layers.set(PANEL_OUTLINE_LAYER);
+  scene.add(panelOutlineGroup);
+
+  const outlineEntries = new Map(); // mesh -> { line, hidden }
+  const outlineSolidMaterial = new THREE.LineBasicMaterial({
+    color: PANEL_OUTLINE_COLOR,
+    transparent: true,
+    opacity: PANEL_OUTLINE_OPACITY,
+    depthTest: false,
+    depthWrite: false,
+  });
+
+  const edgeHandleGeometry = new THREE.CircleGeometry(RESIZE_HANDLE_RADIUS_UNITS,16);
+  const edgeHandleMaterial = new THREE.MeshBasicMaterial({color: 0x454441, depthTest: false,});
+  const edgeHandles = {};
+
+  ['left', 'right', 'top', 'bottom'].forEach((key) => {const handle = new THREE.Mesh(edgeHandleGeometry,edgeHandleMaterial);
+
+    handle.renderOrder = 10;
+    handle.userData.edgeName = key;
+    edgeHandleGroup.add(handle);
+    edgeHandles[key] = handle;
+  });
+
+  function disposeOutlineEntry(mesh) {
+    const entry = outlineEntries.get(mesh);
+    if (!entry) return;
+    panelOutlineGroup.remove(entry.line);
+    entry.line.geometry.dispose();
+    outlineEntries.delete(mesh);
+  }
+
+  function createOutlineForMesh(mesh) {
+    if (!mesh?.geometry) return null;
+    const geometry = new THREE.EdgesGeometry(mesh.geometry, 15); // 1
+    const line = new THREE.LineSegments(geometry,outlineSolidMaterial);
+
+    line.name = '2DPanelOutline';
+    line.renderOrder = 20;
+
+    // Absolutely critical:
+    // the outline must never steal pointer events from the real panel
+    // or from the resize handles.
+    line.raycast = () => {};
+    panelOutlineGroup.add(line);
+    const entry = {line,hidden: false,};
+    outlineEntries.set(mesh, entry);
+    updateOutlineTransform(mesh);
+    return entry;
+  }
+
+  function updateOutlineTransform(mesh) {
+    const entry = outlineEntries.get(mesh);
+    if (!entry) return;
+
+    const line = entry.line;
+    // Copy the complete transform rather than only position/rotation.
+    // This is important during the live resize preview because mesh.scale
+    // is temporarily used by the resize interaction.
+    line.position.copy(mesh.position);
+    line.quaternion.copy(mesh.quaternion);
+    line.scale.copy(mesh.scale);
+  }
+
+  function ensureOutlineForMesh(mesh) {
+    if (!mesh?.geometry) return null;
+    const existing = outlineEntries.get(mesh);
+    if (!existing) {return createOutlineForMesh(mesh);}
+    return existing;
+  }
+
+  function updatePanelOutlines() {
+    const meshes = meshList();
+
+    // Keep the outline registry synchronized with the mesh registry.
+    const liveMeshes = new Set(meshes);
+    for (const mesh of outlineEntries.keys()) {
+      if (!liveMeshes.has(mesh)) {disposeOutlineEntry(mesh);}
+    }
+
+    // Make sure every current panel has an outline.
+    for (const mesh of meshes) {ensureOutlineForMesh(mesh);}
+
+    // Keep every outline exactly on its corresponding panel.
+    for (const mesh of meshes) {
+      mesh.updateMatrixWorld(true);
+      const entry = outlineEntries.get(mesh);
+      if (!entry) continue;
+      updateOutlineTransform(mesh);
+      // Selected panel gets a slightly higher render priority.
+      entry.line.renderOrder = mesh === currentMesh ? 22 : 21;
+    }
+  }
+
+  function setPanelOutlinesVisible(visible) {
+    panelOutlineGroup.visible = !!visible;
+  }
+
+  function getPanelOutlinesVisible() {
+    return panelOutlineGroup.visible;
+  }
 
   const EDGE_TO_FIELD = { left: 'width', right: 'width', top: 'height', bottom: 'height' };
 
@@ -136,30 +241,82 @@ export function create2DControls(
   }
 
   function positionHandle(mesh) {
-    const { halfW, halfH } = meshHalfExtents(mesh);
+    const params = mesh.geometry.parameters;
+    // IMPORTANT:
+    // These are LOCAL geometry dimensions only.
+    //
+    // Do NOT multiply by mesh.scale here.
+    // mesh.matrixWorld below already contains the current mesh scale.
+    //
+    // This is what makes the handle follow the live-resized edge
+    // exactly once instead of drifting to 2x the edge movement.
+    const halfW = params.width / 2;
+    const halfH = params.height / 2;
+
     const lockedFields = mesh.userData.lockedFields || {};
+    const lockedResizeAxes = mesh.userData.lockedResizeAxes || [];
+
     const xEditable = fieldAlignedToAxis(mesh, 'x') === 'width';
     const yEditable = fieldAlignedToAxis(mesh, 'y') === 'height';
 
-    edgeHandleGroup.position.set(mesh.position.x, mesh.position.y, mesh.position.z + 0.01);
-    edgeHandleGroup.rotation.z = mesh.rotation.z; // panels can still have a FIXED rotation set at creation
-    edgeHandles.left.position.set(-halfW, 0, 0);
-    edgeHandles.right.position.set(halfW, 0, 0);
-    edgeHandles.top.position.set(0, halfH, 0);
-    edgeHandles.bottom.position.set(0, -halfH, 0);
+    // Make sure matrixWorld contains the CURRENT live resize
+    // scale and position before calculating the handle locations.
+    mesh.updateMatrixWorld(true);
 
-    // Two gates on each handle: (1) hidden if its dimension is
-    // currently derived from a constraint — dragging it would mean
-    // nothing until that link is explicitly broken in the inspector;
-    // (2) hidden if that field doesn't currently line up with the
-    // axis this handle controls — e.g. left/right only make sense
-    // when width lines up with world X. A Parallel panel has both
-    // width->X and height->Y, so it gets all four; Vertical/
-    // Horizontal panels only ever get one axis's pair.
-    edgeHandles.left.visible = !lockedFields.width && xEditable;
-    edgeHandles.right.visible = !lockedFields.width && xEditable;
-    edgeHandles.top.visible = !lockedFields.height && yEditable;
-    edgeHandles.bottom.visible = !lockedFields.height && yEditable;
+    // The four edge centers in the panel's LOCAL coordinate system.
+    // matrixWorld applies:
+    //   - current scale
+    //   - current rotation
+    //   - current position
+    // exactly once.
+    const localPositions = {
+      left:   new THREE.Vector3(-halfW, 0, 0),
+      right:  new THREE.Vector3( halfW, 0, 0),
+      top:    new THREE.Vector3(0,  halfH, 0),
+      bottom: new THREE.Vector3(0, -halfH, 0),
+    };
+
+    for (const edgeName of Object.keys(localPositions)) {
+      const worldPosition = localPositions[edgeName]
+        .clone()
+        .applyMatrix4(mesh.matrixWorld);
+      edgeHandles[edgeName].position.copy(worldPosition);
+    }
+
+    // The handles themselves are already in WORLD SPACE.
+    // Therefore the parent group must not inherit the panel's
+    // transform.
+    edgeHandleGroup.position.set(0, 0, 0);
+    edgeHandleGroup.rotation.set(0, 0, 0);
+    edgeHandleGroup.scale.set(1, 1, 1);
+
+    // Two gates:
+    // 1. Hide a handle when its dimension is constraint-locked.
+    // 2. Hide it when that dimension does not correspond to the
+    //    visible X/Y axis in the front elevation.
+    edgeHandles.left.visible =!lockedFields.width &&
+      !lockedResizeAxes.includes('x') &&
+      xEditable;
+    edgeHandles.right.visible =
+      !lockedFields.width &&
+      !lockedResizeAxes.includes('x') &&
+      xEditable;
+    edgeHandles.top.visible =
+      !lockedFields.height &&
+      !lockedResizeAxes.includes('y') &&
+      yEditable;
+    edgeHandles.bottom.visible =
+      !lockedFields.height &&
+      !lockedResizeAxes.includes('y') &&
+      yEditable;
+    updateOutlineForSingleMesh(mesh);
+  }
+
+  function updateOutlineForSingleMesh(mesh) {
+    const entry = ensureOutlineForMesh(mesh);
+    if (!entry) return;
+    mesh.updateMatrixWorld(true);
+    updateOutlineTransform(mesh);
   }
 
   // ---- pointer / drag state ----
@@ -169,6 +326,7 @@ export function create2DControls(
   let dragStartMeshPos = null;
   let resizeEdgeKey = null;
   let resizeStartMm = null; // { width, height, thickness } at drag start
+  let resizeStartLocalParam = 0;
   let groupDragStart = null; // { nodeIds, startWorld, startPositions: Map<mesh, Vector3> } — set only during 'group-translate'
   const gestureState = { moved: false, downX: 0, downY: 0 };
 
@@ -236,6 +394,20 @@ export function create2DControls(
         };
         dragStartWorld = screenToWorld(e);
         dragStartMeshPos = draggedMesh.position.clone();
+
+        // Record where the mouse actually grabbed the edge in the panel's LOCAL coordinate system.
+        // Resize movement must be measured from the grabbed edge position, NOT from the panel center.
+        const startWorld = dragStartWorld;
+        const rot = draggedMesh.rotation.z;
+        const dx = startWorld.x - dragStartMeshPos.x;
+        const dy = startWorld.y - dragStartMeshPos.y;
+        const cosInv = Math.cos(-rot);
+        const sinInv = Math.sin(-rot);
+        const startLocalX = dx * cosInv - dy * sinInv;
+        const startLocalY = dx * sinInv + dy * cosInv;
+        const isWidthEdge = resizeEdgeKey === 'left' || resizeEdgeKey === 'right';
+        resizeStartLocalParam = isWidthEdge ? startLocalX : startLocalY;
+
         return;
       }
     }
@@ -277,14 +449,17 @@ export function create2DControls(
     const world = screenToWorld(e);
     const rot = draggedMesh.rotation.z;
     const cosInv = Math.cos(-rot), sinInv = Math.sin(-rot);
-    const dx0 = world.x - dragStartMeshPos.x, dy0 = world.y - dragStartMeshPos.y;
+    const dx0 = world.x - dragStartMeshPos.x;
+    const dy0 = world.y - dragStartMeshPos.y;
     const lx = dx0 * cosInv - dy0 * sinInv;
     const ly = dx0 * sinInv + dy0 * cosInv;
-
     const isWidthEdge = resizeEdgeKey === 'left' || resizeEdgeKey === 'right';
     const outwardSign = resizeEdgeKey === 'right' || resizeEdgeKey === 'top' ? 1 : -1;
+
+    // Measure movement from the position where the mouse actually grabbed the handle.
     const local = isWidthEdge ? lx : ly;
-    const scalarMm = (outwardSign * local) / MM_TO_UNIT;
+    const deltaLocal = local - resizeStartLocalParam;
+    const scalarMm = (outwardSign * deltaLocal) / MM_TO_UNIT;
 
     const field = EDGE_TO_FIELD[resizeEdgeKey];
     const startMm = resizeStartMm[field];
@@ -338,6 +513,7 @@ export function create2DControls(
       groupDragStart.startPositions.forEach((startPos, mesh) => {
         mesh.position.x = startPos.x + finalDeltaMm.x * MM_TO_UNIT;
         mesh.position.y = startPos.y + finalDeltaMm.y * MM_TO_UNIT;
+        updateOutlineForSingleMesh(mesh);
       });
     } else if (mode === 'resize' && draggedMesh) {
       const { isWidthEdge, startMm, newMm, worldShiftXmm, worldShiftYmm } = computeResizeResult(e);
@@ -478,8 +654,9 @@ export function create2DControls(
   function setSelectedMesh(mesh) {
     currentMesh = mesh;
     groupMembers = null;
-    edgeHandleGroup.visible = !!mesh; //
-    if (mesh) positionHandle(mesh);
+    edgeHandleGroup.visible = !!mesh;
+    if (mesh) {positionHandle(mesh);}
+    updatePanelOutlines();
   }
 
   // Called instead of setSelectedMesh when a GROUP is selected as a
@@ -491,6 +668,7 @@ export function create2DControls(
     groupMembers = memberMeshes && memberMeshes.length > 0 ? memberMeshes : null;
     currentMesh = null;
     edgeHandleGroup.visible = false;
+    updatePanelOutlines();
   }
 
   // Used by scene.js's reconcile() to skip forcibly repositioning a
@@ -506,13 +684,23 @@ export function create2DControls(
     canvas.removeEventListener('pointerdown', handlePanPointerDown);
     window.removeEventListener('pointermove', handlePanPointerMove);
     window.removeEventListener('pointerup', handlePanPointerUp);
+
     canvas.removeEventListener('wheel', handleWheel);
     scene.remove(edgeHandleGroup);
+
     Object.values(edgeHandles).forEach((m) => {
       m.geometry.dispose();
       m.material.dispose();
     });
+
+    // Dispose all generated panel outline geometries.
+    for (const mesh of outlineEntries.keys()) {
+      disposeOutlineEntry(mesh);
+    }
+
+    scene.remove(panelOutlineGroup);
+    outlineSolidMaterial.dispose();
   }
 
-  return { isDragging, setSelectedMesh, setSelectedGroup, isGroupMember, draggedMeshRef: () => draggedMesh, dispose };
+  return { isDragging, setSelectedMesh, setSelectedGroup, isGroupMember, draggedMeshRef: () => draggedMesh, setPanelOutlinesVisible, getPanelOutlinesVisible,dispose };
 }
