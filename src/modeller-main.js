@@ -230,7 +230,7 @@ function findDesignLimitViolation(rotation, positionMm, dims) {
 const canvas = document.getElementById('canvas');
 const main = document.getElementById('main');
 const panelListMountEl = document.getElementById('panel-list-mount');
-const relationsMountEl = document.getElementById('relations-mount');
+const relationsMountEl = document.getElementById('relations-container');
 const inspectorEl = document.getElementById('properties-container');
 const bomBodyEl = document.getElementById('bom-body');
 const stageLabelEl = document.getElementById('stage-label');
@@ -274,28 +274,27 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
       return;
     }
 
-    const offset = transform.offset
-    // const offset = {
-    //   x: transform.position.x / MM_TO_UNIT - node.basePosition.x,
-    //   y: transform.position.y / MM_TO_UNIT - node.basePosition.y,
-    //   z: transform.position.z / MM_TO_UNIT - node.basePosition.z,
-    // };
+    const { offset: clampedOffset, hitAxis } = clampOffsetToDesignLimits(node, transform.offset);
 
-    const { offset: clampedOffset, hitAxis } =
-      clampOffsetToDesignLimits(node, offset);
-
-    updateNode(nodeId, {
-      offset: clampedOffset,
-      rotation: transform.rotation,
-    });
-
-    if (nodeId === getSelectedId()) {
-      renderInspectorOnly();
+    if (isShelf(node)) {
+      const axis = rotationsMatch(node.rotation, HORIZONTAL_ROTATION) ? 'y' : 'x';
+      const spacing = checkMinGap(collectAxisSlabs(node.groupId, axis, {
+        [node.id]: { center: clampedOffset[axis], halfThickness: node.thickness / 2, label: node.name || 'Shelf' },
+      }));
+      if (!spacing.ok) {
+        showToast(`Can't fit — ${spacing.a} and ${spacing.b} would be closer than ${MIN_WALL_GAP_MM}mm`);
+        return {
+          x: (node.basePosition.x + node.offset.x) * MM_TO_UNIT,
+          y: (node.basePosition.y + node.offset.y) * MM_TO_UNIT,
+          z: (node.basePosition.z + node.offset.z) * MM_TO_UNIT,
+        }; // reject — snap the mesh back to its pre-drag offset
+      }
     }
 
+    updateNode(nodeId, { offset: clampedOffset, rotation: transform.rotation });
+    if (nodeId === getSelectedId()) { renderInspectorOnly(); }
     if (hitAxis) {
       showDesignLimitError(hitAxis);
-
       return {
         x: (node.basePosition.x + clampedOffset.x) * MM_TO_UNIT,
         y: (node.basePosition.y + clampedOffset.y) * MM_TO_UNIT,
@@ -491,8 +490,6 @@ function cancelCollinearMode() {
 // shelf isn't a box wall (isBoxWall is never set on it), so it goes
 // through the ordinary resolveConstraints() path exactly as before.
 // -------------------------------------------------------------
-let shelfMode = null; // 'horizontal' | 'vertical' | null
-let shelfPick1 = null; // the raw panel node (from `panels`, not resolved) of the first pick
 
 // A panel's ROTATION, not its name, is what makes it a valid boundary
 // — this is what lets an existing shelf stand in for Left/Right/Top/
@@ -508,10 +505,15 @@ function rotationsMatch(a, b) {
   return a.x === b.x && a.y === b.y && a.z === b.z;
 }
 
+let shelfMode = null;
+let shelfPick1 = null;
+let shelfPick1ClickMm = null; // desired position along the shelf's free axis, from where the first pick was clicked — null if unavailable (e.g. 2D view), in which case addShelf falls back to auto-placement
+
 function startShelfMode(mode) {
-  if (collinearActive) cancelCollinearMode(); // mutually exclusive — see collinear's own note above
+  if (collinearActive) cancelCollinearMode();
   shelfMode = mode;
   shelfPick1 = null;
+  shelfPick1ClickMm = null;
   setSelectedId(null);
   setSelectedGroupId(null);
   multiSelectedIds.clear();
@@ -525,6 +527,7 @@ function startShelfMode(mode) {
 function cancelShelfMode() {
   shelfMode = null;
   shelfPick1 = null;
+  shelfPick1ClickMm = null;
   setSelectedId(null);
   setFaceHighlight(null, null);
   setFacePickMode(false, null);
@@ -532,12 +535,7 @@ function cancelShelfMode() {
   renderAll();
 }
 
-// `faceName` is accepted (same callback shape setFacePickMode always
-// uses) but deliberately unused for anything functional beyond the
-// highlight — this tool only cares WHICH PANEL was picked, not which
-// specific face; the actual touching faces get computed dynamically
-// in addShelf below, from the two panels' real resolved positions.
-function handleShelfPick(nodeId, faceName) {
+function handleShelfPick(nodeId, faceName, worldPoint) {
   const node = panels.find((p) => p.id === nodeId);
   if (!node) return;
 
@@ -545,12 +543,13 @@ function handleShelfPick(nodeId, faceName) {
   const kindLabel = shelfMode === 'horizontal' ? 'a Left/Right panel or an existing vertical shelf' : 'a Top/Bottom panel or an existing horizontal shelf';
   if (!node.groupId || !rotationsMatch(node.rotation, wantRotation)) {
     showToast(`Pick ${kindLabel}`);
-    return; // stays armed — an invalid pick doesn't cancel the tool, just doesn't register
+    return;
   }
 
   if (!shelfPick1) {
     shelfPick1 = node;
-    // setFaceHighlight(nodeId, faceName);
+    const freeAxis = shelfMode === 'horizontal' ? 'y' : 'x';
+    shelfPick1ClickMm = worldPoint ? computeClickOffsetMm(node, worldPoint, freeAxis) : null;
     setPanelHighlight(nodeId, faceName);
     showToast(`Now pick the OTHER boundary of the SAME box (${kindLabel})`, false);
     renderAll();
@@ -597,11 +596,70 @@ function facingFace(resolved, axis, otherResolved) {
   return null; // defensive — every panel in this app is axis-aligned, so one of the two candidate faces always matches
 }
 
+
+// Converts a raycast hit point (world units) into an offset-space mm
+// value along one axis, relative to the box's shared basePosition —
+// same space every shelf/wall offset already lives in.
+function computeClickOffsetMm(node, worldPoint, axis) {
+  const worldMm = { x: worldPoint.x / MM_TO_UNIT, y: worldPoint.y / MM_TO_UNIT, z: worldPoint.z / MM_TO_UNIT };
+  return worldMm[axis] - node.basePosition[axis];
+}
+
+// Given same-axis slabs (sorted ascending by center) and a shelf of
+// `thickness` to place, finds the gap-clamped center closest to
+// `desiredMm` among ONLY the gaps big enough to actually fit the
+// shelf with MIN_WALL_GAP_MM clearance on both sides. A gap too
+// small to fit is skipped entirely rather than rejecting placement
+// outright — a nearby gap not being big enough shouldn't block a
+// perfectly good gap further away. Returns { fits:false } only if
+// NO gap anywhere on this axis can fit the shelf.
+function pickGapForPosition(sortedSlabs, desiredMm, thickness) {
+  const halfT = thickness / 2;
+  const requiredSpan = thickness + 2 * MIN_WALL_GAP_MM;
+  let best = null;
+
+  for (let i = 0; i < sortedSlabs.length - 1; i++) {
+    const prevOuter = sortedSlabs[i].center + sortedSlabs[i].halfThickness;
+    const nextOuter = sortedSlabs[i + 1].center - sortedSlabs[i + 1].halfThickness;
+    const clearSpan = nextOuter - prevOuter;
+    if (clearSpan < requiredSpan) continue; // this gap can't hold the shelf at all — try the next one
+
+    const minCenter = prevOuter + MIN_WALL_GAP_MM + halfT;
+    const maxCenter = nextOuter - MIN_WALL_GAP_MM - halfT;
+    const center = Math.min(maxCenter, Math.max(minCenter, desiredMm)); // exact click point if it already fits, else clamped to the nearest valid spot in THIS gap
+    const dist = Math.abs(desiredMm - center);
+
+    if (!best || dist < best.dist) best = { center, dist };
+  }
+
+  return best ? { fits: true, center: best.center } : { fits: false };
+}
+
+// Given same-axis slabs (already sorted ascending by center) and a
+// thickness to fit, finds the largest gap between consecutive slabs
+// and returns where a new slab's CENTER would sit if placed in the
+// middle of that gap, plus how much clear space that gap actually
+// has (so the caller can tell "fits" from "doesn't"). Used instead
+// of a fixed midpoint so a second/third shelf on the same pair of
+// boundaries doesn't always land on top of the first one.
+function findBestShelfSlot(sortedSlabs, thickness) {
+  let best = null;
+  for (let i = 0; i < sortedSlabs.length - 1; i++) {
+    const prevOuter = sortedSlabs[i].center + sortedSlabs[i].halfThickness;
+    const nextOuter = sortedSlabs[i + 1].center - sortedSlabs[i + 1].halfThickness;
+    const clearSpan = nextOuter - prevOuter;
+    if (!best || clearSpan > best.clearSpan) {
+      best = { center: (prevOuter + nextOuter) / 2, clearSpan };
+    }
+  }
+  return best;
+}
+
 function addShelf(pick1, pick2) {
   const groupId = pick1.groupId;
   const back = findBoxSibling(groupId, 'Back');
   const front = findBoxSibling(groupId, 'Front');
-  if (!back || !front) return; // defensive — shouldn't happen given handleShelfPick's own same-box validation
+  if (!back || !front) return;
 
   const resolved = resolveConstraints(panels);
   const r1 = resolved.find((r) => r.id === pick1.id);
@@ -609,32 +667,46 @@ function addShelf(pick1, pick2) {
   if (!r1 || !r2) return;
 
   const spanAxis = shelfMode === 'horizontal' ? 'x' : 'y';
-  const face1 = facingFace(r1, spanAxis, r2); // pick1's face pointing toward pick2
-  const face2 = facingFace(r2, spanAxis, r1); // pick2's face pointing toward pick1
+  const face1 = facingFace(r1, spanAxis, r2);
+  const face2 = facingFace(r2, spanAxis, r1);
   if (!face1 || !face2) return;
 
-  const spanFieldForBoundary = shelfMode === 'horizontal' ? 'width' : 'height'; // which field ON THE BOUNDARY PANELS this axis corresponds to — used only to size the shelf's OWN starting dims below, the live constraint itself just spans face-to-face
-  const startWidthOrHeight = Math.abs(r2.position[spanAxis] - r1.position[spanAxis]); // rough starting size, purely cosmetic — the spansBetween constraint below immediately recomputes the true value on first resolve regardless
+  const freeAxis = shelfMode === 'horizontal' ? 'y' : 'x';
+  const anchor = pick1.basePosition;
+  const thickness = pick1.thickness;
+  const existingSlabs = collectAxisSlabs(groupId, freeAxis).sort((a, b) => a.center - b.center);
 
+  let proposedFreeOffset;
+  if (shelfPick1ClickMm != null) {
+    const picked = pickGapForPosition(existingSlabs, shelfPick1ClickMm, thickness);
+    if (!picked.fits) {
+      showToast('Not enough space for a shelf there');
+      return;
+    }
+    proposedFreeOffset = picked.center;
+  } else {
+    const slot = findBestShelfSlot(existingSlabs, thickness);
+    const requiredSpan = thickness + 2 * MIN_WALL_GAP_MM;
+    if (!slot || slot.clearSpan < requiredSpan) {
+      showToast('Not enough space for another shelf here');
+      return;
+    }
+    proposedFreeOffset = slot.center;
+  }
+  const spanFieldForBoundary = shelfMode === 'horizontal' ? 'width' : 'height';
+  const startWidthOrHeight = Math.abs(r2.position[spanAxis] - r1.position[spanAxis]);
   const rotation = shelfMode === 'horizontal' ? HORIZONTAL_ROTATION : VERTICAL_ROTATION;
   const material = pick1.material;
-  const thickness = pick1.thickness;
 
   const spanToBoundaries = {
-    field: spanFieldForBoundary,
-    type: 'spansBetween', overridden: false,
+    field: spanFieldForBoundary, type: 'spansBetween', overridden: false,
     from: { node: pick1.id, face: face1, offset: 0 },
     to: { node: pick2.id, face: face2, offset: 0 },
     id: nextConstraintId(),
   };
   const spanToDepth = shelfMode === 'horizontal'
-    // Depth (this rotation's `height` field) spans directly to
-    // Back/Front's own INNER faces — reaches from the back panel to
-    // the front door automatically, and re-resolves live if either
-    // ever moves.
     ? { field: 'height', type: 'spansBetween', overridden: false,
         from: { node: back.id, face: 'front', offset: 0 }, to: { node: front.id, face: 'back', offset: 0 }, id: nextConstraintId() }
-    // Depth (this rotation's `width` field) — same idea, mirrored.
     : { field: 'width', type: 'spansBetween', overridden: false,
         from: { node: back.id, face: 'front', offset: 0 }, to: { node: front.id, face: 'back', offset: 0 }, id: nextConstraintId() };
 
@@ -644,33 +716,20 @@ function addShelf(pick1, pick2) {
     height: shelfMode === 'horizontal' ? DEFAULT_BOX_DEPTH_MM : startWidthOrHeight,
     thickness, material, rotation,
     groupId,
-    // Only the axis PERPENDICULAR to both constraints above (Y for a
-    // horizontal shelf, X for a vertical one) is left free — that's
-    // the whole point of this tool: where the shelf sits on that
-    // axis isn't otherwise determined by the pick, so it stays a
-    // literal, user-draggable field.
     lockedMoveAxes: shelfMode === 'horizontal' ? ['x', 'z'] : ['y', 'z'],
+    lockedResizeAxes: ['x', 'y', 'z'], // both dimension fields are constraint-derived (spanToBoundaries/spanToDepth) — same reasoning as box walls, dragging a dot wouldn't stick
     constraints: [spanToBoundaries, spanToDepth],
   });
 
-  // Default position on the free axis: the midpoint between the two
-  // picked boundaries' CURRENT positions — reasonable regardless of
-  // which two panels (box walls or existing shelves) were picked.
-  // The other two axes get auto-centered by the constraints above on
-  // the very first resolve regardless of what's set here.
-  const anchor = pick1.basePosition;
-  const freeAxis = shelfMode === 'horizontal' ? 'y' : 'x';
-  const midpointMm = (r1.position[freeAxis] + r2.position[freeAxis]) / 2;
   shelf.basePosition = anchor;
   shelf.offset = { x: 0, y: 0, z: 0 };
-  shelf.offset[freeAxis] = midpointMm - anchor[freeAxis];
+  shelf.offset[freeAxis] = proposedFreeOffset;
 
   panels = [...panels, shelf];
   setSelectedGroupId(groupId);
   setSelectedId(shelf.id);
   renderAll();
 }
-
 
 // other than the collinear tool itself — an explicit constraint on
 // that field, or a box panel's static structural lock? If so, MOVING
@@ -891,53 +950,111 @@ function updateNode(id, patch) {
 // true if applied, false if rejected (a toast has already been shown
 // either way).
 // -------------------------------------------------------------
+const MIN_WALL_GAP_MM = 15;
+
+// Checks a set of axis-aligned slabs (each { center, halfThickness,
+// label }, all offsets in the SAME axis) for at least MIN_WALL_GAP_MM
+// between every pair of neighbors once sorted along that axis. Walls
+// and shelves are indistinguishable here — a wall is just a slab that
+// happens to also be getting relaid-out this call.
+// Sorts a set of same-axis slabs and checks every neighbor pair keeps
+// at least MIN_WALL_GAP_MM of clear space between them.
+function checkMinGap(elements) {
+  const sorted = [...elements].sort((a, b) => a.center - b.center);
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const gap = (sorted[i + 1].center - sorted[i + 1].halfThickness) - (sorted[i].center + sorted[i].halfThickness);
+    if (gap < MIN_WALL_GAP_MM) {
+      return { ok: false, a: sorted[i].label, b: sorted[i + 1].label };
+    }
+  }
+  return { ok: true };
+}
+
+// Builds the full set of same-axis slabs for a box — the two bounding
+// walls (Bottom/Top for axis 'y', Left/Right for axis 'x') plus every
+// shelf sharing that axis (horizontal shelves live on 'y', vertical
+// on 'x') — with `overrides` swapping in a PROPOSED value for
+// whichever element is currently being dragged/resized/created.
+// `overrides` maps nodeId -> {center, halfThickness, label}; the
+// special key '__new__' holds a not-yet-created candidate (used by
+// addShelf's pre-creation check, where there's no id yet). This is
+// the one place that knows "what counts as a slab on this axis" —
+// wall drags, shelf drags, and shelf creation all go through it.
+function collectAxisSlabs(groupId, axis, overrides = {}) {
+  const relevantRotation = axis === 'y' ? HORIZONTAL_ROTATION : VERTICAL_ROTATION;
+  const wallRoleLow = axis === 'y' ? 'Bottom' : 'Left';
+  const wallRoleHigh = axis === 'y' ? 'Top' : 'Right';
+
+  const slabs = [];
+  panels.forEach((p) => {
+    if (p.groupId !== groupId) return;
+    if (p.hidden) return; // a hidden (removed-but-restorable) panel no longer occupies space — see removeSelected()
+    const isRelevantWall = p.isBoxWall && (p.name === wallRoleLow || p.name === wallRoleHigh);
+    const isRelevantShelf = !p.isBoxWall && rotationsMatch(p.rotation, relevantRotation);
+    if (!isRelevantWall && !isRelevantShelf) return;
+    const o = overrides[p.id];
+    slabs.push(
+      o
+        ? { center: o.center, halfThickness: o.halfThickness, label: o.label || p.name || 'Shelf' }
+        : { center: p.offset[axis], halfThickness: p.thickness / 2, label: p.name || 'Shelf' }
+    );
+  });
+  if (overrides.__new__) slabs.push(overrides.__new__);
+  return slabs;
+}
+
+function isShelf(node) {
+  return !!node.groupId && !node.isBoxWall &&
+    (rotationsMatch(node.rotation, HORIZONTAL_ROTATION) || rotationsMatch(node.rotation, VERTICAL_ROTATION));
+}
+
 function relayoutBox(groupId) {
   const roles = {
-    left: findBoxSibling(groupId, 'Left'),
-    right: findBoxSibling(groupId, 'Right'),
-    top: findBoxSibling(groupId, 'Top'),
-    bottom: findBoxSibling(groupId, 'Bottom'),
-    back: findBoxSibling(groupId, 'Back'),
-    front: findBoxSibling(groupId, 'Front'),
+    left: findBoxSibling(groupId, 'Left'), right: findBoxSibling(groupId, 'Right'),
+    top: findBoxSibling(groupId, 'Top'), bottom: findBoxSibling(groupId, 'Bottom'),
+    back: findBoxSibling(groupId, 'Back'), front: findBoxSibling(groupId, 'Front'),
   };
-  if (Object.values(roles).some((n) => !n)) return true; // not a full box (e.g. mid-ungroup) — nothing to relayout, not an error
+  if (Object.values(roles).some((n) => !n)) return true;
 
   const layout = computeBoxLayout(roles);
 
-  // Validate every wall BEFORE touching any of them.
   for (const [role, node] of Object.entries(roles)) {
     const dims = { width: layout[role].width, height: layout[role].height, thickness: node.thickness };
-
     if (dims.width < MIN_PANEL_DIM_MM || dims.height < MIN_PANEL_DIM_MM) {
       showToast("Can't shrink the box that far — walls would overlap");
       return false;
     }
-
     const sizeViolation = findPanelSizeViolation(dims);
-    if (sizeViolation) {
-      showPanelSizeLimitError(sizeViolation);
-      return false;
-    }
-
+    if (sizeViolation) { showPanelSizeLimitError(sizeViolation); return false; }
     const positionMm = {
       x: node.basePosition.x + layout[role].offset.x,
       y: node.basePosition.y + layout[role].offset.y,
       z: node.basePosition.z + layout[role].offset.z,
     };
     const hitAxis = findDesignLimitViolation(node.rotation, positionMm, dims);
-    if (hitAxis) {
-      showDesignLimitError(hitAxis);
-      return false;
-    }
+    if (hitAxis) { showDesignLimitError(hitAxis); return false; }
   }
 
-  // All clear — commit all six at once.
+  const yCheck = checkMinGap(collectAxisSlabs(groupId, 'y', {
+    [roles.bottom.id]: { center: layout.bottom.offset.y, halfThickness: roles.bottom.thickness / 2, label: 'Bottom' },
+    [roles.top.id]:    { center: layout.top.offset.y,    halfThickness: roles.top.thickness / 2,    label: 'Top' },
+  }));
+  if (!yCheck.ok) {
+    showToast(`Can't fit — ${yCheck.a} and ${yCheck.b} would be closer than ${MIN_WALL_GAP_MM}mm`);
+    return false;
+  }
+
+  const xCheck = checkMinGap(collectAxisSlabs(groupId, 'x', {
+    [roles.left.id]:  { center: layout.left.offset.x,  halfThickness: roles.left.thickness / 2,  label: 'Left' },
+    [roles.right.id]: { center: layout.right.offset.x, halfThickness: roles.right.thickness / 2, label: 'Right' },
+  }));
+  if (!xCheck.ok) {
+    showToast(`Can't fit — ${xCheck.a} and ${xCheck.b} would be closer than ${MIN_WALL_GAP_MM}mm`);
+    return false;
+  }
+
   for (const [role, node] of Object.entries(roles)) {
-    updateNode(node.id, {
-      width: layout[role].width,
-      height: layout[role].height,
-      offset: layout[role].offset,
-    });
+    updateNode(node.id, { width: layout[role].width, height: layout[role].height, offset: layout[role].offset });
   }
   return true;
 }
@@ -1057,9 +1174,9 @@ function ungroupSelected() {
 function renderAll() {
   const selectedId = getSelectedId();
   const selectedGroupId = getSelectedGroupId();
+  const selectedBoxWallId = selectedId && panels.find(p => p.id === selectedId)?.isBoxWall ? selectedId : null;
   const resolved = resolveConstraints(panels); // unfiltered — a hidden panel still needs to resolve correctly so any sibling constraint referencing it stays accurate, and so it's instantly right again the moment it's restored
   const visiblePanels = resolved.filter((p) => !p.hidden);
-
   // Authoritative "is this a box wall" id set, sourced directly from
   // the raw graph (`panels`), NOT from the resolved output. Every box
   // wall is stamped isBoxWall:true exactly once, in addBox(), and
@@ -1072,7 +1189,7 @@ function renderAll() {
   // e.g. Front) while others happened to still come through correctly.
   const boxWallIds = new Set(panels.filter((p) => p.isBoxWall).map((p) => p.id));
 
-  reconcile(visiblePanels, selectedId, selectedGroupId, multiSelectedIds, boxWallIds);
+  reconcile(visiblePanels, selectedId, selectedGroupId, multiSelectedIds, boxWallIds, selectedBoxWallId);
 
   renderPanelList(panelListMountEl, {
     panels: visiblePanels,
@@ -1115,46 +1232,108 @@ function renderAll() {
 function renderInspectorOnly() {
   const selectedId = getSelectedId();
   const selectedGroupId = getSelectedGroupId();
-  const selectedPanel = panels.find((p) => p.id === selectedId) || null;
+
+  const selectedPanel =
+    panels.find((p) => p.id === selectedId) || null;
+
   // Recomputed here too (not threaded from renderAll) so the
-  // high-frequency onTransformChange path above always reflects the
-  // current state of every field, not a stale snapshot.
-  const resolved = resolveConstraints(panels);
-  const resolvedPanel = resolved.find((r) => r.id === selectedId) || null;
-  const groupMembers = selectedGroupId ? panels.filter((p) => p.groupId === selectedGroupId) : [];
-  const visibleGroupMembers = groupMembers.filter((p) => !p.hidden);
-  const hiddenGroupMembers = groupMembers.filter((p) => p.hidden);
-  const groupMemberCount = visibleGroupMembers.length;
-  // null (shown as "Mixed materials") if members currently disagree —
-  // e.g. a group ungrouped-and-regrouped from panels that never had
-  // their material unified. Never silently pick one to display.
+  // high-frequency onTransformChange path always reflects
+  // the current state of every field, not a stale snapshot.
+  const resolved =
+    resolveConstraints(panels);
+
+  const resolvedPanel =
+    resolved.find((r) => r.id === selectedId) || null;
+
+  const groupMembers =
+    selectedGroupId
+      ? panels.filter(
+          (p) => p.groupId === selectedGroupId
+        )
+      : [];
+
+  const visibleGroupMembers =
+    groupMembers.filter(
+      (p) => !p.hidden
+    );
+
+  const hiddenGroupMembers =
+    groupMembers.filter(
+      (p) => p.hidden
+    );
+
+  const groupMemberCount =
+    visibleGroupMembers.length;
+
+  // null means "Mixed materials".
   const groupMaterial =
-    groupMembers.length > 0 && groupMembers.every((p) => p.material === groupMembers[0].material)
+    groupMembers.length > 0 &&
+    groupMembers.every(
+      (p) =>
+        p.material === groupMembers[0].material
+    )
       ? groupMembers[0].material
       : null;
 
-  renderProperties(inspectorEl, {
-    selectedPanel,
-    resolvedPanel,
-    selectedGroupId,
-    groupMemberCount,
-    groupMaterial,
-    hiddenGroupMembers,
-    onFieldChange: updateSelectedField,
-    onTransformFieldChange: updateSelectedTransformField,
-    onUnlinkConstraint: unlinkOrRemoveConstraint,
-    onRename: renameSelected,
-    onRemove: removeSelected,
-    onUngroup: ungroupSelected,
-    onRestoreFace: restoreFace,
-    onGroupMaterialChange: updateGroupMaterial,
-  });
 
-  renderRelations(relationsMountEl, {
-    selectedPanel,
-    allPanels: panels,
-    onUnlinkConstraint: unlinkOrRemoveConstraint,
-  });
+  /* =========================================================
+     PROPERTIES
+     ========================================================= */
+
+  if (inspectorEl) {
+    renderProperties(
+      inspectorEl,
+      {
+        selectedPanel,
+        resolvedPanel,
+        selectedGroupId,
+        groupMemberCount,
+        groupMaterial,
+        hiddenGroupMembers,
+
+        onFieldChange:
+          updateSelectedField,
+
+        onTransformFieldChange:
+          updateSelectedTransformField,
+
+        onUnlinkConstraint:
+          unlinkOrRemoveConstraint,
+
+        onRename:
+          renameSelected,
+
+        onRemove:
+          removeSelected,
+
+        onUngroup:
+          ungroupSelected,
+
+        onRestoreFace:
+          restoreFace,
+
+        onGroupMaterialChange:
+          updateGroupMaterial,
+      }
+    );
+  }
+
+
+  /* =========================================================
+     RELATIONS
+     ========================================================= */
+
+  if (relationsMountEl) {
+    renderRelations(
+      relationsMountEl,
+      {
+        selectedPanel,
+        allPanels: panels,
+        onUnlinkConstraint:
+          unlinkOrRemoveConstraint,
+      }
+    );
+  }
 }
 
 function renameSelected(newName) {
@@ -1379,9 +1558,8 @@ function removeSelected() {
   const selectedId = getSelectedId();
 
   if (groupId && !selectedId) {
-    // group-level selection (nothing drilled into) — this IS a real,
-    // permanent delete of the whole group, unlike the single-face
-    // case below.
+    // group-level selection (nothing drilled into) — permanent delete
+    // of the whole group, unchanged.
     panels = panels.filter((p) => p.groupId !== groupId);
     setSelectedGroupId(null);
     setSelectedId(panels.length > 0 ? panels[0].id : null);
@@ -1392,17 +1570,23 @@ function removeSelected() {
   const node = panels.find((p) => p.id === selectedId);
   if (!node) return;
 
+  if (node.groupId && isShelf(node)) {
+    // Shelves have no "restore" concept — a shelf's position is a
+    // user choice, not part of the box's structure, so removing one
+    // erases it from the graph completely and immediately frees the
+    // space it occupied (collectAxisSlabs never has to know about a
+    // gone-but-still-blocking shelf, because there's no such state).
+    panels = panels.filter((p) => p.id !== selectedId);
+    setSelectedGroupId(node.groupId);
+    setSelectedId(null);
+    renderAll();
+    return;
+  }
+
   if (node.groupId) {
-    // panel-level selection WITHIN a group — HIDE it rather than
-    // removing it from the graph. It stays fully present (constraints
-    // involving it keep resolving normally, and — for a box wall —
-    // relayoutBox still reads its position/thickness normally too)
-    // but is excluded from rendering, the panel list, and the BOM —
-    // see renderAll's `!p.hidden` filters. Restorable via a button in
-    // the group-level inspector view (see properties.js's Group view
-    // + restoreFace below). Step back up to group-level selection
-    // either way, since there's nothing left to show for the now-
-    // hidden panel.
+    // panel-level selection WITHIN a group — a box WALL face. HIDE it
+    // rather than removing it from the graph (restorable via the
+    // group inspector) — unchanged from before.
     panels = panels.map((p) => (p.id === selectedId ? { ...p, hidden: true } : p));
     setSelectedGroupId(node.groupId);
     setSelectedId(null);
@@ -1410,8 +1594,7 @@ function removeSelected() {
     return;
   }
 
-  // plain standalone panel — a real, permanent removal (no group to
-  // restore it through later)
+  // plain standalone panel — permanent removal, unchanged.
   panels = panels.filter((p) => p.id !== selectedId);
   setSelectedId(panels.length > 0 ? panels[0].id : null);
   renderAll();
@@ -1421,6 +1604,7 @@ function restoreFace(nodeId) {
   panels = panels.map((p) => (p.id === nodeId ? { ...p, hidden: false } : p));
   renderAll();
 }
+
 
 // -------------------------------------------------------------
 // Relation (constraint) CRUD — manual spansBetween/attachedTo

@@ -334,7 +334,7 @@ export function computeBoxLayout({ left, right, top, bottom, back, front }) {
   const xInnerMin = lx + left.thickness / 2, xInnerMax = rx - right.thickness / 2;
   const yOuterMin = by - bottom.thickness / 2, yOuterMax = ty + top.thickness / 2;
   const yInnerMin = by + bottom.thickness / 2, yInnerMax = ty - top.thickness / 2;
-  const zInnerMin = bz + back.thickness / 2, zInnerMax = fz - front.thickness / 2;
+  const zInnerMin = bz - back.thickness / 2, zInnerMax = fz + front.thickness / 2;
 
   const outerWidth = xOuterMax - xOuterMin;
   const innerWidth = xInnerMax - xInnerMin;
@@ -353,7 +353,7 @@ export function computeBoxLayout({ left, right, top, bottom, back, front }) {
     right:  { width: innerDepth, height: innerHeight, offset: { x: rx, y: innerHeightCenterY, z: innerDepthCenterZ } },
     top:    { width: outerWidth, height: innerDepth,  offset: { x: outerWidthCenterX, y: ty, z: innerDepthCenterZ } },
     bottom: { width: outerWidth, height: innerDepth,  offset: { x: outerWidthCenterX, y: by, z: innerDepthCenterZ } },
-    back:   { width: innerWidth, height: outerHeight, offset: { x: innerWidthCenterX, y: outerHeightCenterY, z: bz } },
+    back:   { width: innerWidth, height: innerHeight, offset: { x: innerWidthCenterX, y: outerHeightCenterY, z: bz } },
     front:  { width: innerWidth, height: innerHeight, offset: { x: innerWidthCenterX, y: innerHeightCenterY, z: fz } },
   };
 }

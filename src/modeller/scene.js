@@ -489,7 +489,7 @@ export function createModellerScene(
     reconcile(lastResolvedPanels, lastSelectedId, lastSelectedGroupId, lastMultiSelectedIds, lastBoxWallIds); // re-apply immediately, don't wait for the next external render
   }
 
-  function reconcile(resolvedPanels, selectedId, selectedGroupId, multiSelectedIds, boxWallIds) {
+  function reconcile(resolvedPanels, selectedId, selectedGroupId, multiSelectedIds, boxWallIds, selectedBoxWallId) {
     lastResolvedPanels = resolvedPanels;
     lastSelectedId = selectedId;
     lastSelectedGroupId = selectedGroupId;
@@ -524,6 +524,13 @@ export function createModellerScene(
       let entry = meshRegistry.get(node.id);
       const isSelected = node.id === selectedId || (selectedGroupId != null && node.groupId === selectedGroupId);
       const isMultiSelected = !isSelected && multiSelectedIds && multiSelectedIds.has(node.id);
+      // A selected BOX WALL reuses the shelf-tool's own highlight color
+      // (CONST_Face_Panel_Color_Highlight) instead of the ordinary
+      // selection orange — same visual language as "this panel is the
+      // one currently being pointed at", whether that's via shelf-pick
+      // or via plain selection. boxWallIds is the same authoritative
+      // set already used elsewhere in this function.
+      const isSelectedSpecialPanel = node.id === selectedBoxWallId || node.id === selectedId;
 
       if (!entry) {
         const material = new THREE.MeshStandardMaterial({
@@ -605,8 +612,16 @@ export function createModellerScene(
         entry.mesh.scale.set(1, 1, 1); // scale is only ever transient (see view2d.js's resize drag)
       }
 
-      entry.mesh.material.color.set(isSelected ? 0xe0904a : isMultiSelected ? 0x4f8cff : 0xdcbd8c);
-      entry.edges.material.color.set(isSelected ? 0x8a4a1a : isMultiSelected ? 0x2a5cc9 : 0x8b6540);
+      if (isSelectedSpecialPanel) {
+        entry.mesh.material.color.set(0xedca05);//CONST_Face_Panel_Color_Highlight);
+        entry.mesh.material.opacity = 0.5;// CONST_Face_Panel_Color_Highlight_Opacity;
+      } else {
+        entry.mesh.material.color.set(isSelected? 0xe0904a: isMultiSelected? 0x4f8cff: 0xdcbd8c);
+        entry.mesh.material.opacity = 1;
+      }
+      const material = new THREE.MeshStandardMaterial({color: 0xdcbd8c,roughness: 0.75,metalness: 0.04,transparent: true,});
+      entry.mesh.material.needsUpdate = true;
+      entry.edges.material.color.set(isSelected? 0x8a4a1a: isMultiSelected? 0x2a5cc9: 0x8b6540);
     });
 
     const selectedEntry = meshRegistry.get(selectedId);

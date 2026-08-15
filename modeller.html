@@ -1,763 +1,2351 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
   <title>3D Modeller — Furniture Modeller</title>
+
+
   <style>
+
+    /* =========================================================
+       GLOBAL
+       ========================================================= */
+
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
 
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+
       background: #faf3ea;
       color: #3a3126;
+
       height: 100vh;
+
       overflow: hidden;
+
       display: flex;
       flex-direction: column;
     }
 
-    /* Digit-only number fields — no increment/decrement arrows */
+
     input[type=number]::-webkit-inner-spin-button,
     input[type=number]::-webkit-outer-spin-button {
       -webkit-appearance: none;
       margin: 0;
     }
+
+
     input[type=number] {
       -moz-appearance: textfield;
       appearance: textfield;
     }
 
-    /* ── Topbar ── */
+
+    /* =========================================================
+       TOP BAR
+       ========================================================= */
+
     #topbar {
       height: 48px;
+
       background: #f3e8d8;
-      border-bottom: 1px solid #e3d3ba;
+
+      border-bottom:
+        1px solid #e3d3ba;
+
       display: flex;
       align-items: center;
+
       padding: 0 16px;
+
       gap: 16px;
+
       flex-shrink: 0;
+
       z-index: 10;
     }
+
 
     .back-btn {
       display: flex;
       align-items: center;
+
       gap: 6px;
+
       color: #8a7d68;
+
       text-decoration: none;
+
       font-size: 13px;
+
       padding: 5px 10px;
+
       border-radius: 5px;
-      transition: background .15s, color .15s;
+
+      transition:
+        background .15s,
+        color .15s;
     }
+
 
     .back-btn:hover {
       background: #e9dcc5;
       color: #3a3126;
     }
 
+
     .sep {
       width: 1px;
       height: 20px;
+
       background: #e3d3ba;
     }
 
-    .icon-btn {
-      display: none; /* replaced by .collapse-tab, attached to the sidebars themselves */
-    }
 
     .app-name {
       font-size: 13px;
+
       font-weight: 600;
+
       color: #3a3126;
+
       letter-spacing: .04em;
     }
+
 
     #stage-label {
       font-size: 11px;
       color: #a4977f;
     }
 
-    .spacer { flex: 1; }
+
+    .spacer {
+      flex: 1;
+    }
+
 
     .hint-bar {
       font-size: 11px;
       color: #a4977f;
     }
 
+
+    /* =========================================================
+       MODE TOGGLE
+       ========================================================= */
+
     .mode-toggle {
       display: flex;
+
       gap: 4px;
+
       background: #ece0cc;
+
       border-radius: 6px;
+
       padding: 3px;
     }
+
+
     .mode-btn {
       font-size: 12px;
+
       padding: 5px 12px;
+
       border: none;
+
       border-radius: 4px;
+
       background: transparent;
+
       color: #7a6d58;
+
       cursor: pointer;
-      transition: background .15s, color .15s;
+
+      transition:
+        background .15s,
+        color .15s;
     }
+
+
     .mode-btn.active {
       background: #fff;
+
       color: #b5601f;
+
       font-weight: 600;
-      box-shadow: 0 1px 2px rgba(0,0,0,.08);
+
+      box-shadow:
+        0 1px 2px rgba(0,0,0,.08);
     }
+
+
     .mode-btn:hover:not(.active) {
       color: #3a3126;
     }
 
-    /* ── Main layout: sidebar / viewport / sidebar ── */
+
+    /* =========================================================
+       MAIN
+       ========================================================= */
+
     #main {
       flex: 1;
+
       display: flex;
+
       overflow: hidden;
+
+      min-width: 0;
+      min-height: 0;
     }
 
-    #list-panel, #inspector {
-      width: 220px;
+
+    /* =========================================================
+       LEFT / RIGHT TOOLBARS
+       ========================================================= */
+
+    #list-panel,
+    #inspector {
+
+      width: 260px;
+
       background: #fffaf3;
-      border-right: 1px solid #e6dcc9;
+
+      border-right:
+        1px solid #e6dcc9;
+
       padding: 14px;
-      overflow-y: auto;
+
+      overflow: hidden;
+
       flex-shrink: 0;
+
+      min-width: 0;
+
+      transition:
+        width .15s ease;
     }
+
 
     #inspector {
       border-right: none;
-      border-left: 1px solid #e6dcc9;
+
+      border-left:
+        1px solid #e6dcc9;
     }
 
-    #list-panel.collapsed, #inspector.collapsed {
-      width: 0 !important;
-      padding: 0;
+
+    /*
+     * Collapsed toolbars remain as a 32px rail.
+     *
+     * They NEVER become width: 0.
+     */
+
+    #list-panel.collapsed,
+    #inspector.collapsed {
+
+      width: 32px !important;
+
+      min-width: 32px !important;
+
+      padding: 0 !important;
+
       overflow: hidden;
-      border: none;
+
+      border-right:
+        1px solid #e6dcc9;
     }
+
+
+    #inspector.collapsed {
+      border-left:
+        1px solid #e6dcc9;
+    }
+
+
+    #list-panel.collapsed > *,
+    #inspector.collapsed > * {
+      visibility: hidden;
+    }
+
+
+    #list-panel.collapsed .collapse-tab,
+    #inspector.collapsed .collapse-tab {
+      visibility: visible;
+    }
+
+
+    /* =========================================================
+       SIDE RESIZERS
+       ========================================================= */
 
     .resizer {
+
       width: 5px;
+
       flex-shrink: 0;
+
       cursor: col-resize;
+
       background: transparent;
+
       position: relative;
+
+      touch-action: none;
+
+      user-select: none;
+
+      z-index: 50;
     }
-    .resizer:hover, .resizer.dragging {
+
+
+    .resizer:hover,
+    .resizer.dragging {
       background: #e0b98a;
     }
 
+
     .collapse-tab {
+
       position: absolute;
+
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%);
-      width: 16px;
+
+      transform:
+        translate(-50%, -50%);
+
+      width: 24px;
       height: 44px;
+
       display: flex;
+
       align-items: center;
       justify-content: center;
-      border: 1px solid #e3d3ba;
+
+      border:
+        1px solid #e3d3ba;
+
       border-radius: 6px;
+
       background: #fffaf3;
+
       color: #a4977f;
-      font-size: 10px;
+
+      font-size: 11px;
+
+      font-weight: 600;
+
       cursor: pointer;
-      z-index: 5;
-      box-shadow: 0 1px 3px rgba(0,0,0,.08);
-      transition: background .15s, color .15s;
+
+      z-index: 100;
+
+      box-shadow:
+        0 1px 3px rgba(0,0,0,.08);
+
+      transition:
+        background .15s,
+        color .15s;
     }
+
+
     .collapse-tab:hover {
       background: #ece0cc;
       color: #3a3126;
     }
 
+
+    /* =========================================================
+       VIEWPORT
+       ========================================================= */
+
     #viewport-wrap {
+
       flex: 1;
+
       position: relative;
+
+      overflow: hidden;
+
+      min-width: 0;
+      min-height: 0;
+    }
+
+
+    #canvas {
+
+      display: block;
+
+      width: 100%;
+      height: 100%;
+
+      touch-action: none;
+    }
+
+
+    /* =========================================================
+       TOOLBAR ROOT
+       ========================================================= */
+
+    #panel-list-mount {
+
+      width: 100%;
+      height: 100%;
+
+      min-height: 0;
+
       overflow: hidden;
     }
 
-    /* ── Canvas ── */
-    #canvas {
-      display: block;
+
+    .toolbar-root {
+
       width: 100%;
       height: 100%;
-      touch-action: none; /* let pointer events (incl. touch/trackpad) drive orbit + gizmo */
+
+      display: flex;
+
+      flex-direction: column;
+
+      min-height: 0;
+
+      overflow: hidden;
     }
 
-    /* ── Overlay info ── */
-    #info {
+
+    /* =========================================================
+       TOOLBAR SECTIONS
+       ========================================================= */
+
+    .toolbar-section {
+
+      position: relative;
+
+      display: flex;
+
+      flex-direction: column;
+
+      min-height: 58px;
+
+      overflow: hidden;
+
+      flex-shrink: 0;
+
+      background: #fffaf3;
+    }
+
+
+    /*
+     * Elements receives the initial flexible space.
+     */
+    .toolbar-section[data-section="elements"] {
+
+      flex: 1 1 42%;
+
+      min-height: 110px;
+    }
+
+
+    /*
+     * Relations is protected.
+     *
+     * It cannot collapse below this size.
+     */
+    .toolbar-section[data-section="relations"] {
+
+      min-height: 76px;
+
+      margin-bottom: 12px;
+    }
+
+
+    .toolbar-section-header {
+
+      flex: 0 0 34px;
+
+      min-height: 34px;
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: space-between;
+
+      padding: 7px 4px;
+
+      background: #fffaf3;
+
+      z-index: 2;
+    }
+
+
+    .toolbar-section-header .section-title {
+      margin-bottom: 0;
+    }
+
+
+    .toolbar-section-content {
+
+      flex: 1;
+
+      min-height: 0;
+
+      overflow-y: auto;
+
+      overflow-x: hidden;
+
+      padding:
+        0 2px 6px;
+    }
+
+
+    .toolbar-section-content > * {
+      max-width: 100%;
+    }
+
+
+    /* =========================================================
+       SECTION SEPARATORS
+       ========================================================= */
+
+    .toolbar-section-resizer {
+
+      height: 8px;
+
+      flex:
+        0 0 8px;
+
+      cursor: row-resize;
+
+      position: relative;
+
+      background: transparent;
+
+      touch-action: none;
+
+      user-select: none;
+
+      z-index: 10;
+    }
+
+
+    .toolbar-section-resizer::after {
+
+      content: "";
+
       position: absolute;
-      bottom: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255,255,255,.7);
-      backdrop-filter: blur(6px);
-      border: 1px solid rgba(0,0,0,.06);
-      border-radius: 20px;
-      padding: 6px 16px;
-      font-size: 12px;
-      color: #8a7d68;
-      pointer-events: none;
+
+      left: 8px;
+      right: 8px;
+
+      top: 3px;
+
+      height: 1px;
+
+      background: #e6dcc9;
+
+      transition:
+        background .12s ease,
+        height .12s ease;
+    }
+
+
+    .toolbar-section-resizer:hover::after,
+    .toolbar-section-resizer.dragging::after {
+
+      background: #d97742;
+
+      height: 2px;
+    }
+
+
+    .toolbar-resizing,
+    .toolbar-resizing * {
+
+      user-select: none !important;
+
+      cursor: row-resize !important;
+    }
+
+
+    .toolbar-section.resizing {
+      overflow: hidden;
+    }
+
+
+    /* =========================================================
+       ELEMENTS
+       ========================================================= */
+
+    .elements-section-content {
+      padding-right: 3px;
+    }
+
+
+    .list-item {
+
+      display: flex;
+
+      width: 100%;
+
+      text-align: left;
+
+      padding: 7px 8px;
+
+      margin-bottom: 6px;
+
+      font-size: 11px;
+
+      background: #fbf3e6;
+
+      border:
+        1px solid #e6dcc9;
+
+      color: #3a3126;
+
+      border-radius: 4px;
+
+      cursor: pointer;
+
+      min-height: 30px;
+
+      align-items: center;
+    }
+
+
+    .list-item:hover {
+
+      border-color:
+        #d5c5a8;
+    }
+
+
+    .list-item.selected {
+
+      border-color:
+        #d97742;
+
+      background:
+        #fce6d2;
+    }
+
+
+    .list-item .id {
+
+      font-weight: 600;
+
+      overflow: hidden;
+
+      text-overflow: ellipsis;
+
       white-space: nowrap;
     }
 
-    /* ── Axes label ── */
-    #axes {
+
+    .list-item.multi-selected {
+
+      border-color:
+        #4f8cff;
+
+      background:
+        #e6edfc;
+    }
+
+
+    /* =========================================================
+       GROUPS
+       ========================================================= */
+
+    .group-dropdown {
+
+      width: 100%;
+
+      margin-bottom: 6px;
+    }
+
+
+    .group-header-row {
+
+      display: flex;
+
+      width: 100%;
+
+      min-height: 34px;
+
+      margin-bottom: 0;
+    }
+
+
+    .group-header-row.selected
+    .group-header-select {
+
+      border-color:
+        #d97742;
+
+      background:
+        #fce6d2;
+    }
+
+
+    .group-header-select {
+
+      flex: 1;
+
+      margin: 0;
+
+      border-radius:
+        4px 0 0 4px;
+
+      background:
+        #f0e4d0;
+
+      border-color:
+        #e6dcc9;
+    }
+
+
+    .group-dropdown-toggle {
+
+      width: 30px;
+
+      flex:
+        0 0 30px;
+
+      border:
+        1px solid #e6dcc9;
+
+      border-left: none;
+
+      border-radius:
+        0 4px 4px 0;
+
+      background:
+        #f0e4d0;
+
+      color:
+        #7a6d58;
+
+      cursor: pointer;
+
+      font-size: 12px;
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+    }
+
+
+    .group-dropdown-toggle:hover {
+
+      background:
+        #e9dcc5;
+
+      color:
+        #3a3126;
+    }
+
+
+    .group-members {
+
+      padding-top: 5px;
+    }
+
+
+    .list-item.group-member {
+
+      margin-left: 16px;
+
+      width:
+        calc(100% - 16px);
+
+      background:
+        #fbf3e6;
+    }
+
+
+    .group-member::before {
+      color: #a4977f;
+    }
+
+
+    /* =========================================================
+       ADD BUTTONS
+       ========================================================= */
+
+    .add-btn {
+
+      width: 100%;
+
+      padding: 7px 8px;
+
+      font-size: 12px;
+
+      border:
+        1px dashed #d5c5a8;
+
+      border-radius: 4px;
+
+      background: transparent;
+
+      color: #8a7d68;
+
+      cursor: pointer;
+
+      margin-top: 4px;
+
+      min-height: 30px;
+    }
+
+
+    .add-btn:hover {
+
+      border-color:
+        #b5a68d;
+
+      color:
+        #3a3126;
+
+      background:
+        #fbf3e6;
+    }
+
+
+    .remove-btn {
+
+      border-color:
+        #e0b6a0;
+
+      color:
+        #b5502f;
+
+      background:
+        #fffaf3;
+    }
+
+
+    .remove-btn:hover {
+
+      background:
+        #fbe9e0;
+    }
+
+
+    /* =========================================================
+       COLLINEAR
+       ========================================================= */
+
+    .collinear-gap-row {
+
+      display: flex;
+
+      align-items: center;
+
+      gap: 6px;
+
+      padding:
+        4px 2px 2px;
+
+      margin-bottom: 2px;
+    }
+
+
+    .collinear-gap-row label {
+
+      font-size: 11px;
+
+      color:
+        #7a6d58;
+
+      white-space: nowrap;
+
+      flex: 1;
+    }
+
+
+    .collinear-gap-row input {
+
+      width: 70px;
+
+      padding: 5px 6px;
+
+      border:
+        1px solid #ddd0ba;
+
+      border-radius: 4px;
+
+      background: #fff;
+
+      color:
+        #3a3126;
+
+      outline: none;
+
+      font-size: 11px;
+    }
+
+
+    .collinear-gap-row input:focus {
+
+      border-color:
+        #d97742;
+    }
+
+
+    /* =========================================================
+       RELATIONS
+       ========================================================= */
+
+    .relations-section-content {
+
+      padding-bottom: 6px;
+    }
+
+
+    .constraint-list {
+      margin-bottom: 10px;
+    }
+
+
+    .constraint-item {
+
+      display: flex;
+
+      align-items: flex-start;
+
+      gap: 6px;
+
+      padding: 6px 8px;
+
+      margin-bottom: 6px;
+
+      background:
+        #fbf3e6;
+
+      border:
+        1px solid #e6dcc9;
+
+      border-radius: 5px;
+
+      font-size: 10.5px;
+    }
+
+
+    .constraint-item.overridden {
+      opacity: .55;
+    }
+
+
+    .constraint-desc {
+
+      flex: 1;
+
+      line-height: 1.4;
+
+      color:
+        #55503f;
+
+      min-width: 0;
+    }
+
+
+    .constraint-remove-btn {
+
+      border: none;
+
+      background: transparent;
+
+      color:
+        #b5502f;
+
+      font-size: 14px;
+
+      line-height: 1;
+
+      cursor: pointer;
+
+      padding: 0 2px;
+
+      flex-shrink: 0;
+    }
+
+
+    .constraint-remove-btn:hover {
+
+      color:
+        #8f321d;
+    }
+
+
+    /* =========================================================
+       SHARED SECTION TITLE
+       ========================================================= */
+
+    .section-title {
+
+      font-size: 11px;
+
+      font-weight: 600;
+
+      text-transform: uppercase;
+
+      letter-spacing: .06em;
+
+      color:
+        #a4977f;
+
+      margin-bottom: 10px;
+    }
+
+
+    .empty-state {
+
+      font-size: 12px;
+
+      color:
+        #a4977f;
+
+      padding:
+        4px 2px;
+    }
+
+
+    /* =========================================================
+       VIEWPORT OVERLAYS
+       ========================================================= */
+
+    #info {
+
       position: absolute;
+
+      bottom: 16px;
+
+      left: 50%;
+
+      transform:
+        translateX(-50%);
+
+      background:
+        rgba(255,255,255,.7);
+
+      backdrop-filter:
+        blur(6px);
+
+      border:
+        1px solid rgba(0,0,0,.06);
+
+      border-radius: 20px;
+
+      padding:
+        6px 16px;
+
+      font-size: 12px;
+
+      color:
+        #8a7d68;
+
+      pointer-events: none;
+
+      white-space: nowrap;
+    }
+
+
+    #axes {
+
+      position: absolute;
+
       top: 16px;
       right: 16px;
+
       font-size: 11px;
-      color: #b5a68d;
+
+      color:
+        #b5a68d;
+
       text-align: right;
+
       pointer-events: none;
+
       line-height: 1.8;
     }
 
-    #axes span { font-weight: 600; }
-    #axes .x { color: #c0392b; }
-    #axes .y { color: #2f8a4f; }
-    #axes .z { color: #2f5fa8; }
 
-    /* ── Rotating 3D axes gizmo, bottom-left ── */
+    #axes span {
+      font-weight: 600;
+    }
+
+
+    #axes .x {
+      color: #c0392b;
+    }
+
+
+    #axes .y {
+      color: #2f8a4f;
+    }
+
+
+    #axes .z {
+      color: #2f5fa8;
+    }
+
+
+    /* =========================================================
+       AXES GIZMO
+       ========================================================= */
+
     #axes-gizmo-canvas {
+
       position: absolute;
+
       bottom: 16px;
       left: 16px;
+
       width: 110px;
       height: 110px;
     }
 
-    /* ── Picture-in-picture preview, bottom-right: shows the OTHER
-       view (3D when main is 2D, 2D when main is 3D). Click to swap. ── */
-    /* ── Design-limit violation toast: dead-center of the whole
-       screen, not just the viewport — a design limit is a hard rule,
-       not a viewport-local hint. Hidden by default (opacity/scale),
-       shown by adding .visible (see modeller-main.js). ── */
-    #design-limit-toast {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) scale(0.96);
-      z-index: 1000;
-      background: #3a1414;
-      color: #ffd7d1;
-      border: 1px solid #a83a2c;
-      box-shadow: 0 8px 28px rgba(0,0,0,.4);
-      border-radius: 10px;
-      padding: 14px 22px;
-      font-size: 14px;
-      font-weight: 600;
-      text-align: center;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.15s ease, transform 0.15s ease;
-    }
-    #design-limit-toast.visible {
-      opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
-    }
+
+    /* =========================================================
+       PIP
+       ========================================================= */
 
     #pip-window {
+
       position: absolute;
+
       bottom: 16px;
       right: 16px;
+
       width: 200px;
       height: 140px;
+
       border-radius: 10px;
-      border: 1px solid rgba(0,0,0,.12);
-      box-shadow: 0 4px 14px rgba(0,0,0,.18);
+
+      border:
+        1px solid rgba(0,0,0,.12);
+
+      box-shadow:
+        0 4px 14px rgba(0,0,0,.18);
+
       overflow: hidden;
+
       cursor: pointer;
-      background: #f6ede0;
-      transition: transform .12s ease, box-shadow .12s ease;
+
+      background:
+        #f6ede0;
+
+      transition:
+        transform .12s ease,
+        box-shadow .12s ease;
     }
+
+
     #pip-window:hover {
-      transform: scale(1.03);
-      box-shadow: 0 6px 20px rgba(0,0,0,.26);
+
+      transform:
+        scale(1.03);
+
+      box-shadow:
+        0 6px 20px rgba(0,0,0,.26);
     }
+
+
     #pip-window canvas {
+
       display: block;
+
       width: 100%;
       height: 100%;
-      pointer-events: none; /* the wrapper div owns the click, not the canvas */
-    }
-    #pip-window .pip-label {
-      position: absolute;
-      top: 6px;
-      left: 8px;
-      font-size: 10px;
-      font-weight: 600;
-      color: #8a7d68;
-      background: rgba(255,255,255,.78);
-      padding: 2px 7px;
-      border-radius: 10px;
+
       pointer-events: none;
     }
 
-    /* ── Sidebar shared styles ── */
-    .section-title {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      color: #a4977f;
-      margin-bottom: 10px;
-    }
 
-    .list-item {
-      display: flex;
-      flex-direction: column;
-      width: 100%;
-      text-align: left;
-      padding: 6px 8px;
-      margin-bottom: 6px;
-      font-size: 11px;
-      background: #fbf3e6;
-      border: 1px solid #e6dcc9;
-      color: #3a3126;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .list-item.selected {
-      border-color: #d97742;
-      background: #fce6d2;
-    }
-    .list-item .id { font-weight: 600; }
-    .list-item .dims { color: #a4977f; }
+    #pip-window .pip-label {
 
-    .list-item.group-header {
-      background: #f0e4d0;
-      border-style: solid;
-      border-width: 1px;
-    }
-    .list-item.group-header.selected {
-      border-color: #d97742;
-      background: #fce6d2;
-    }
-    .list-item.group-member {
-      margin-left: 16px;
-      width: calc(100% - 16px);
-    }
-    .list-item.multi-selected {
-      border-color: #4f8cff;
-      background: #e6edfc;
-    }
+      position: absolute;
 
-    .group-member-note {
+      top: 6px;
+      left: 8px;
+
       font-size: 10px;
-      color: #a4977f;
-      margin-bottom: 8px;
+
+      font-weight: 600;
+
+      color:
+        #8a7d68;
+
+      background:
+        rgba(255,255,255,.78);
+
+      padding:
+        2px 7px;
+
+      border-radius: 10px;
+
+      pointer-events: none;
     }
 
-    .add-btn {
-      width: 100%;
-      padding: 6px 8px;
-      font-size: 12px;
-      border: 1px dashed #d5c5a8;
-      border-radius: 4px;
-      background: transparent;
-      color: #8a7d68;
-      cursor: pointer;
-      margin-top: 4px;
-    }
-    .add-btn:hover { border-color: #b5a68d; color: #3a3126; }
 
-    .restore-face-list {
-      margin-bottom: 10px;
-    }
-    .restore-face-btn {
-      border-style: solid;
-      border-color: #4f8cff;
-      color: #2a5cc9;
-      margin-top: 6px;
-    }
-    .restore-face-btn:hover {
-      background: #e6edfc;
-      border-color: #2a5cc9;
+    /* =========================================================
+       DESIGN LIMIT TOAST
+       ========================================================= */
+
+    #design-limit-toast {
+
+      position: fixed;
+
+      top: 50%;
+      left: 50%;
+
+      transform:
+        translate(-50%, -50%)
+        scale(.96);
+
+      z-index: 1000;
+
+      background:
+        #3a1414;
+
+      color:
+        #ffd7d1;
+
+      border:
+        1px solid #a83a2c;
+
+      box-shadow:
+        0 8px 28px rgba(0,0,0,.4);
+
+      border-radius: 10px;
+
+      padding:
+        14px 22px;
+
+      font-size: 14px;
+
+      font-weight: 600;
+
+      text-align: center;
+
+      pointer-events: none;
+
+      opacity: 0;
+
+      transition:
+        opacity .15s ease,
+        transform .15s ease;
     }
 
-    .remove-btn {
-      width: 100%;
-      padding: 6px 8px;
-      font-size: 12px;
-      border: 1px solid #e0b6a0;
-      border-radius: 4px;
-      background: transparent;
-      color: #b5502f;
-      cursor: pointer;
-      margin: 4px 0;
+
+    #design-limit-toast.visible {
+
+      opacity: 1;
+
+      transform:
+        translate(-50%, -50%)
+        scale(1);
     }
-    .remove-btn:hover { background: #fbe9e0; }
+
+
+    /* =========================================================
+       INSPECTOR
+       ========================================================= */
+
+    #properties-container {
+      min-height: 0;
+    }
+
 
     .field-row {
+
       display: flex;
+
       flex-direction: column;
+
       gap: 4px;
+
       margin-bottom: 12px;
     }
-    .field-row label { font-size: 12px; color: #7a6d58; }
+
+
+    .field-row label {
+
+      font-size: 12px;
+
+      color:
+        #7a6d58;
+    }
+
 
     .dims-row {
+
       display: flex;
+
       gap: 8px;
+
       margin-bottom: 12px;
     }
+
+
     .dims-row .field-row {
+
       flex: 1;
+
       min-width: 0;
+
       margin-bottom: 0;
     }
-    .dims-row .field-input-wrap { gap: 3px; }
-    .dims-row .field-input { padding: 6px 4px; font-size: 12px; }
-    .dims-row .field-unit { width: auto; }
 
-    .edge-banding-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4px 12px;
-    }
-    .edge-banding-checkbox {
+
+    .field-input-wrap {
+
       display: flex;
+
       align-items: center;
+
       gap: 6px;
-      font-size: 13px;
-      color: #4a4030;
-      cursor: pointer;
     }
 
-    .field-input-wrap { display: flex; align-items: center; gap: 6px; }
+
     .field-input {
+
       flex: 1;
+
       width: 100%;
+
       box-sizing: border-box;
-      padding: 6px 8px;
+
+      padding:
+        6px 8px;
+
       font-size: 13px;
+
       background: #fff;
-      border: 1px solid #ddd0ba;
-      color: #3a3126;
+
+      border:
+        1px solid #ddd0ba;
+
+      color:
+        #3a3126;
+
       border-radius: 4px;
+
       outline: none;
     }
-    .field-input:focus { border-color: #d97742; }
-    .field-unit { font-size: 11px; color: #a4977f; width: 20px; }
 
-    .divider { height: 1px; background: #e6dcc9; margin: 8px 0 14px; }
-    .empty-state { font-size: 12px; color: #a4977f; }
 
-    .type-toggle {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 14px;
+    .field-input:focus {
+
+      border-color:
+        #d97742;
     }
-    .type-btn {
-      flex: 1;
-      padding: 8px 4px;
+
+
+    .field-unit {
+
       font-size: 11px;
-      text-align: center;
-      border: 1px solid #ddd0ba;
-      border-radius: 5px;
-      background: #fff;
-      color: #7a6d58;
-      cursor: pointer;
-      transition: background .15s, color .15s, border-color .15s;
-    }
-    .type-btn.active {
-      border-color: #d97742;
-      background: #fce6d2;
-      color: #b5601f;
-      font-weight: 600;
-    }
-    .type-btn:hover:not(.active) {
-      border-color: #b5a68d;
-      color: #3a3126;
+
+      color:
+        #a4977f;
+
+      width: 20px;
     }
 
-    .box-preset-btn {
+
+    .field-input-wrap.locked {
+      opacity: .75;
+    }
+
+
+    .field-input:disabled {
+
+      background:
+        #f3ede0;
+
+      color:
+        #7a6d58;
+
+      cursor:
+        not-allowed;
+    }
+
+
+    .unlink-btn {
+
       width: 100%;
-      padding: 8px;
-      font-size: 12px;
-      border: 1px dashed #d5c5a8;
-      border-radius: 5px;
-      background: transparent;
-      color: #7a6d58;
-      cursor: pointer;
-      margin-bottom: 14px;
-    }
-    .box-preset-btn:hover {
-      border-color: #b5a68d;
-      color: #3a3126;
-      background: #fbf3e6;
-    }
 
-    .transform-grid {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 4px;
-    }
-    .transform-field-wrap {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      background: #fff;
-      border: 1px solid #ddd0ba;
+      margin-top: 4px;
+
+      padding:
+        4px 6px;
+
+      font-size: 10.5px;
+
+      border:
+        1px dashed #d5c5a8;
+
       border-radius: 4px;
-      padding: 0 6px;
-    }
-    .transform-field-wrap .field-input {
-      border: none;
-      padding: 6px 2px;
-      text-align: right;
-    }
-    .transform-field-wrap .field-input:focus { border: none; outline: none; }
-    .axis-label { font-size: 10px; font-weight: 700; width: 10px; }
-    .axis-label.axis-x { color: #c0392b; }
-    .axis-label.axis-y { color: #2f8a4f; }
-    .axis-label.axis-z { color: #2f5fa8; }
-    .transform-label {
-      font-size: 10px;
-      color: #a4977f;
-      margin-bottom: 12px;
+
+      background: transparent;
+
+      color:
+        #8a7d68;
+
+      cursor: pointer;
     }
 
-    /* ---- rename (pencil icon) ---- */
+
+    .unlink-btn:hover {
+
+      border-color:
+        #b5a68d;
+
+      color:
+        #3a3126;
+    }
+
+
+    .divider {
+
+      height: 1px;
+
+      background:
+        #e6dcc9;
+
+      margin:
+        8px 0 14px;
+    }
+
+
     .node-header-row {
+
       display: flex;
+
       align-items: center;
+
       justify-content: space-between;
+
       gap: 6px;
+
       margin-bottom: 10px;
     }
-    .node-header-row .section-title { margin-bottom: 0; }
-    .rename-btn {
-      border: none;
-      background: transparent;
-      font-size: 12px;
-      cursor: pointer;
-      opacity: 0.6;
-      padding: 2px 4px;
-      flex-shrink: 0;
-    }
-    .rename-btn:hover { opacity: 1; }
-    .rename-input { font-size: 12px; padding: 3px 6px; }
 
-    /* ---- Stage 2: relations UI ---- */
-    .warning-banner {
-      background: #fdf0e2;
-      border: 1px solid #e8c496;
-      color: #96551f;
-      font-size: 11px;
-      padding: 8px 10px;
-      border-radius: 5px;
-      margin-bottom: 12px;
-      line-height: 1.5;
-    }
 
-    .field-input-wrap.locked { opacity: 0.75; }
-    .field-input:disabled { background: #f3ede0; color: #7a6d58; cursor: not-allowed; }
-    .unlink-btn {
-      width: 100%;
-      margin-top: 4px;
-      padding: 4px 6px;
-      font-size: 10.5px;
-      border: 1px dashed #d5c5a8;
-      border-radius: 4px;
-      background: transparent;
-      color: #8a7d68;
-      cursor: pointer;
-    }
-    .unlink-btn:hover { border-color: #b5a68d; color: #3a3126; }
-
-    .constraint-list { margin-bottom: 10px; }
-    .constraint-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 6px;
-      padding: 6px 8px;
-      margin-bottom: 6px;
-      background: #fbf3e6;
-      border: 1px solid #e6dcc9;
-      border-radius: 5px;
-      font-size: 10.5px;
-    }
-    .constraint-item.overridden { opacity: 0.55; }
-    .constraint-item { cursor: pointer; }
-    .constraint-item:hover { border-color: #d5c5a8; }
-    .constraint-item.editing {
-      border-color: #d97742;
-      background: #fce6d2;
-    }
-    .editing-hint {
-      font-size: 10px;
-      color: #a4977f;
-      font-style: italic;
-      margin-bottom: 8px;
-    }
-    .constraint-form-actions {
-      display: flex;
-      gap: 6px;
-    }
-    .constraint-form-actions .box-preset-btn,
-    .constraint-form-actions .remove-btn {
-      flex: 1;
-      margin: 0;
-    }
-    .constraint-form-error {
-      font-size: 10.5px;
-      color: #96551f;
-      background: #fdf0e2;
-      border: 1px solid #e8c496;
-      border-radius: 4px;
-      padding: 0;
-      line-height: 1.5;
+    .node-header-row .section-title {
       margin-bottom: 0;
     }
-    .constraint-form-error:not(:empty) {
-      padding: 6px 8px;
+
+
+    .rename-btn {
+
+      border: none;
+
+      background: transparent;
+
+      font-size: 12px;
+
+      cursor: pointer;
+
+      opacity: .6;
+
+      padding:
+        2px 4px;
+
+      flex-shrink: 0;
+    }
+
+
+    .rename-btn:hover {
+      opacity: 1;
+    }
+
+
+    .group-member-note {
+
+      font-size: 10px;
+
+      color:
+        #a4977f;
+
       margin-bottom: 8px;
     }
-    .constraint-desc { flex: 1; line-height: 1.4; color: #55503f; }
-    .constraint-remove-btn {
-      border: none;
-      background: transparent;
-      color: #b5502f;
-      font-size: 14px;
-      line-height: 1;
-      cursor: pointer;
-      padding: 0 2px;
-    }
 
-    .add-constraint-form {
-      background: #fffdf8;
-      border: 1px dashed #d5c5a8;
-      border-radius: 6px;
-      padding: 10px;
-    }
-    .relation-ref-pair {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-    .relation-ref {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      background: #fbf3e6;
-      border: 1px solid #e6dcc9;
-      border-radius: 5px;
-      padding: 6px;
-    }
-    .relation-ref-label {
-      font-size: 9.5px;
-      text-transform: uppercase;
-      letter-spacing: .05em;
-      color: #a4977f;
-      font-weight: 600;
-    }
-    .relation-ref select, .relation-ref input {
-      width: 100%;
+
+    .warning-banner {
+
+      background:
+        #fdf0e2;
+
+      border:
+        1px solid #e8c496;
+
+      color:
+        #96551f;
+
       font-size: 11px;
-      padding: 4px 6px;
-    }
-    select.field-input {
-      background: #fff;
-      border: 1px solid #ddd0ba;
-      border-radius: 4px;
-      color: #3a3126;
+
+      padding:
+        8px 10px;
+
+      border-radius: 5px;
+
+      margin-bottom: 12px;
+
+      line-height: 1.5;
     }
 
-    table.bom { width: 100%; border-collapse: collapse; font-size: 12px; }
-    table.bom th {
-      text-align: left;
-      color: #a4977f;
-      font-weight: 500;
-      padding-bottom: 6px;
-      border-bottom: 1px solid #e6dcc9;
+
+    /* =========================================================
+       TRANSFORM
+       ========================================================= */
+
+    .transform-grid {
+
+      display: flex;
+
+      gap: 6px;
+
+      margin-bottom: 4px;
     }
-    table.bom th.right, table.bom td.right { text-align: right; }
-    table.bom td { padding: 6px 0; vertical-align: top; color: #3a3126; }
+
+
+    .transform-field-wrap {
+
+      flex: 1;
+
+      display: flex;
+
+      align-items: center;
+
+      gap: 4px;
+
+      background: #fff;
+
+      border:
+        1px solid #ddd0ba;
+
+      border-radius: 4px;
+
+      padding:
+        0 6px;
+    }
+
+
+    .transform-field-wrap .field-input {
+
+      border: none;
+
+      padding:
+        6px 2px;
+
+      text-align: right;
+    }
+
+
+    .axis-label {
+
+      font-size: 10px;
+
+      font-weight: 700;
+
+      width: 10px;
+    }
+
+
+    .axis-label.axis-x {
+      color: #c0392b;
+    }
+
+
+    .axis-label.axis-y {
+      color: #2f8a4f;
+    }
+
+
+    .axis-label.axis-z {
+      color: #2f5fa8;
+    }
+
+
+    .transform-label {
+
+      font-size: 10px;
+
+      color:
+        #a4977f;
+
+      margin-bottom: 12px;
+    }
+
+
+    /* =========================================================
+       BOM
+       ========================================================= */
+
+    table.bom {
+
+      width: 100%;
+
+      border-collapse: collapse;
+
+      font-size: 12px;
+    }
+
+
+    table.bom th {
+
+      text-align: left;
+
+      color:
+        #a4977f;
+
+      font-weight: 500;
+
+      padding-bottom: 6px;
+
+      border-bottom:
+        1px solid #e6dcc9;
+    }
+
+
+    table.bom th.right,
+    table.bom td.right {
+      text-align: right;
+    }
+
+
+    table.bom td {
+
+      padding:
+        6px 0;
+
+      vertical-align: top;
+
+      color:
+        #3a3126;
+    }
 
   </style>
+
 </head>
+
+
 <body>
 
-  <!-- Top bar -->
+
+  <!-- =======================================================
+       TOP BAR
+       ======================================================= -->
+
   <div id="topbar">
-    <a href="index.html" class="back-btn">← Back</a>
+
+    <a
+      href="index.html"
+      class="back-btn"
+    >
+      ← Back
+    </a>
+
+
     <div class="sep"></div>
-    <div class="app-name">3D Modeller</div>
-    <div id="stage-label"></div>
-    <div class="mode-toggle" id="view-mode-toggle">
-      <button class="mode-btn active" id="view-3d-btn">3D</button>
-      <button class="mode-btn" id="view-2d-btn">2D</button>
+
+
+    <div class="app-name">
+      3D Modeller
     </div>
+
+
+    <div id="stage-label"></div>
+
+
+    <div
+      class="mode-toggle"
+      id="view-mode-toggle"
+    >
+
+      <button
+        type="button"
+        class="mode-btn active"
+        id="view-3d-btn"
+      >
+        3D
+      </button>
+
+
+      <button
+        type="button"
+        class="mode-btn"
+        id="view-2d-btn"
+      >
+        2D
+      </button>
+
+    </div>
+
+
     <div class="spacer"></div>
-    <div class="hint-bar" id="hint-bar-3d">Drag empty space: orbit &nbsp;·&nbsp; Right-drag: pan &nbsp;·&nbsp; Scroll: zoom &nbsp;·&nbsp; Click panel: select &nbsp;·&nbsp; Ctrl/Cmd-click: multi-select &nbsp;·&nbsp; Click empty space: deselect &nbsp;·&nbsp; Arrow: move &nbsp;·&nbsp; Drag a face dot: resize &nbsp;·&nbsp; Click cube face: snap view</div>
-    <div class="hint-bar" id="hint-bar-2d" style="display:none;">Drag a panel: move &nbsp;·&nbsp; Ctrl/Cmd-click: multi-select &nbsp;·&nbsp; Drag an edge handle: resize &nbsp;·&nbsp; Drag empty space: pan &nbsp;·&nbsp; Scroll: zoom &nbsp;·&nbsp; Click empty space: deselect</div>
+
+
+    <div
+      class="hint-bar"
+      id="hint-bar-3d"
+    >
+      Drag empty space: orbit
+      &nbsp;·&nbsp;
+      Right-drag: pan
+      &nbsp;·&nbsp;
+      Scroll: zoom
+      &nbsp;·&nbsp;
+      Click panel: select
+      &nbsp;·&nbsp;
+      Ctrl/Cmd-click: multi-select
+      &nbsp;·&nbsp;
+      Click empty space: deselect
+      &nbsp;·&nbsp;
+      Arrow: move
+      &nbsp;·&nbsp;
+      Drag a face dot: resize
+      &nbsp;·&nbsp;
+      Click cube face: snap view
+    </div>
+
+
+    <div
+      class="hint-bar"
+      id="hint-bar-2d"
+      style="display:none;"
+    >
+      Drag a panel: move
+      &nbsp;·&nbsp;
+      Ctrl/Cmd-click: multi-select
+      &nbsp;·&nbsp;
+      Drag an edge handle: resize
+      &nbsp;·&nbsp;
+      Drag empty space: pan
+      &nbsp;·&nbsp;
+      Scroll: zoom
+      &nbsp;·&nbsp;
+      Click empty space: deselect
+    </div>
+
   </div>
 
-  <!-- Main layout: panel list / 3D viewport / inspector -->
+
+  <!-- =======================================================
+       MAIN
+       ======================================================= -->
+
   <div id="main">
+
+
+    <!-- =====================================================
+         LEFT TOOLBAR
+         ===================================================== -->
+
     <div id="list-panel">
-      <div id="panel-list-mount"></div>
-      <div class="divider"></div>
-      <div id="relations-mount"></div>
+
+      <div
+        id="panel-list-mount"
+      ></div>
+
     </div>
-    <div class="resizer" id="resizer-left">
-      <button class="collapse-tab" id="toggle-list-btn" title="Toggle panel list">⟨⟩</button>
+
+
+    <!-- =====================================================
+         LEFT TOOLBAR RESIZER
+         ===================================================== -->
+
+    <div
+      class="resizer"
+      id="resizer-left"
+    >
+
+      <button
+        type="button"
+        class="collapse-tab"
+        id="toggle-list-btn"
+        title="Collapse / expand Elements toolbar"
+        aria-label="Collapse / expand Elements toolbar"
+      >
+        &lt;&gt;
+      </button>
+
     </div>
+
+
+    <!-- =====================================================
+         VIEWPORT
+         ===================================================== -->
 
     <div id="viewport-wrap">
-      <canvas id="canvas"></canvas>
 
-      <div id="info">Panel Modeller — Stage 0</div>
+      <canvas
+        id="canvas"
+      ></canvas>
+
+
+      <div id="info">
+        Panel Modeller — Stage 0
+      </div>
+
 
       <div id="axes">
-        <span class="x">X</span> width<br>
-        <span class="y">Y</span> height<br>
-        <span class="z">Z</span> depth
+
+        <span class="x">X</span>
+        width
+        <br>
+
+        <span class="y">Y</span>
+        height
+        <br>
+
+        <span class="z">Z</span>
+        depth
+
       </div>
 
-      <canvas id="axes-gizmo-canvas"></canvas>
 
-      <div id="pip-window" title="Click to switch view">
-        <canvas id="pip-canvas"></canvas>
-        <span class="pip-label" id="pip-label">3D</span>
+      <canvas
+        id="axes-gizmo-canvas"
+      ></canvas>
+
+
+      <div
+        id="pip-window"
+        title="Click to switch view"
+      >
+
+        <canvas
+          id="pip-canvas"
+        ></canvas>
+
+
+        <span
+          class="pip-label"
+          id="pip-label"
+        >
+          3D
+        </span>
+
       </div>
+
     </div>
 
-    <div class="resizer" id="resizer-right">
-      <button class="collapse-tab" id="toggle-inspector-btn" title="Toggle inspector">⟨⟩</button>
+
+    <!-- =====================================================
+         RIGHT TOOLBAR RESIZER
+         ===================================================== -->
+
+    <div
+      class="resizer"
+      id="resizer-right"
+    >
+
+      <button
+        type="button"
+        class="collapse-tab"
+        id="toggle-inspector-btn"
+        title="Collapse / expand inspector"
+        aria-label="Collapse / expand inspector"
+      >
+        &lt;&gt;
+      </button>
+
     </div>
+
+
+    <!-- =====================================================
+         RIGHT INSPECTOR
+         ===================================================== -->
+
     <div id="inspector">
-      <div id="properties-container"></div>
+
+      <div
+        id="properties-container"
+      ></div>
+
+
       <div class="divider"></div>
-      <div class="section-title">Cut List (derived, per piece)</div>
-      <table class="bom">
-        <thead>
-          <tr><th>Piece</th><th class="right">W × H (mm)</th><th>Material</th><th class="right">Thk</th><th>Grain</th><th>Edges</th><th class="right">Qty</th><th class="right">m²</th></tr>
-        </thead>
-        <tbody id="bom-body"></tbody>
-      </table>
+
+
+      <div class="section-title">
+        Cut List (derived, per piece)
+      </div>
+
+
+      <div
+        style="
+          overflow:auto;
+          max-width:100%;
+        "
+      >
+
+        <table class="bom">
+
+          <thead>
+
+            <tr>
+
+              <th>
+                Piece
+              </th>
+
+              <th class="right">
+                W × H (mm)
+              </th>
+
+              <th>
+                Material
+              </th>
+
+              <th class="right">
+                Thk
+              </th>
+
+              <th>
+                Grain
+              </th>
+
+              <th>
+                Edges
+              </th>
+
+              <th class="right">
+                Qty
+              </th>
+
+              <th class="right">
+                m²
+              </th>
+
+            </tr>
+
+          </thead>
+
+
+          <tbody
+            id="bom-body"
+          ></tbody>
+
+        </table>
+
+      </div>
+
     </div>
+
   </div>
 
-  <div id="design-limit-toast"></div>
 
-  <script type="module" src="/src/modeller-main.js"></script>
+  <!-- =======================================================
+       DESIGN LIMIT TOAST
+       ======================================================= -->
+
+  <div
+    id="design-limit-toast"
+  ></div>
+
+
+  <!-- =======================================================
+       MAIN APPLICATION
+       ======================================================= -->
+
+  <script
+    type="module"
+    src="/src/modeller-main.js"
+  ></script>
+
+
+  <!-- =======================================================
+       TOOLBAR SIDE CONTROLS
+       ======================================================= -->
+
+  <script type="module">
+
+    /* =========================================================
+       COLLAPSE / EXPAND
+       ========================================================= */
+
+    function setupCollapseButton(
+      buttonId,
+      panelId,
+      expandedTitle,
+      collapsedTitle
+    ) {
+
+      const button =
+        document.getElementById(
+          buttonId
+        );
+
+
+      const panel =
+        document.getElementById(
+          panelId
+        );
+
+
+      if (
+        !button ||
+        !panel
+      ) {
+        return;
+      }
+
+
+      /*
+       * Avoid installing the handler more than once.
+       */
+      if (
+        button.dataset.collapseInstalled ===
+        'true'
+      ) {
+        return;
+      }
+
+
+      button.dataset.collapseInstalled =
+        'true';
+
+
+      button.addEventListener(
+        'click',
+        (event) => {
+
+          event.preventDefault();
+          event.stopPropagation();
+
+
+          const collapsed =
+            panel.classList.toggle(
+              'collapsed'
+            );
+
+
+          /*
+           * IMPORTANT:
+           *
+           * Use textContent, not innerHTML.
+           *
+           * This keeps the visible symbol as "<>" while
+           * avoiding the invalid HTML sequence "<>".
+           */
+          button.textContent =
+            '<>';
+
+
+          button.title =
+            collapsed
+              ? collapsedTitle
+              : expandedTitle;
+
+
+          button.setAttribute(
+            'aria-label',
+            button.title
+          );
+        }
+      );
+    }
+
+
+    setupCollapseButton(
+      'toggle-list-btn',
+      'list-panel',
+      'Collapse Elements toolbar',
+      'Expand Elements toolbar'
+    );
+
+
+    setupCollapseButton(
+      'toggle-inspector-btn',
+      'inspector',
+      'Collapse inspector',
+      'Expand inspector'
+    );
+
+
+    /* =========================================================
+       SIDE WIDTH RESIZERS
+       ========================================================= */
+
+    function installSideResizer(
+      resizerId,
+      panelId,
+      direction
+    ) {
+
+      const resizer =
+        document.getElementById(
+          resizerId
+        );
+
+
+      const panel =
+        document.getElementById(
+          panelId
+        );
+
+
+      if (
+        !resizer ||
+        !panel
+      ) {
+        return;
+      }
+
+
+      if (
+        resizer.dataset.sideResizeInstalled ===
+        'true'
+      ) {
+        return;
+      }
+
+
+      resizer.dataset.sideResizeInstalled =
+        'true';
+
+
+      let dragging = false;
+
+      let startX = 0;
+      let startWidth = 0;
+
+
+      const MIN_WIDTH = 220;
+      const MAX_WIDTH = 460;
+
+
+      function start(
+        event
+      ) {
+
+        if (
+          event.pointerType === 'mouse' &&
+          event.button !== 0
+        ) {
+          return;
+        }
+
+
+        if (
+          event.target.closest(
+            '.collapse-tab'
+          )
+        ) {
+          return;
+        }
+
+
+        if (
+          panel.classList.contains(
+            'collapsed'
+          )
+        ) {
+          return;
+        }
+
+
+        dragging = true;
+
+
+        startX =
+          event.clientX;
+
+
+        startWidth =
+          panel
+            .getBoundingClientRect()
+            .width;
+
+
+        resizer.classList.add(
+          'dragging'
+        );
+
+
+        document.body.style.userSelect =
+          'none';
+
+
+        try {
+
+          resizer.setPointerCapture(
+            event.pointerId
+          );
+
+        } catch (_) {}
+
+
+        event.preventDefault();
+        event.stopPropagation();
+      }
+
+
+      function move(
+        event
+      ) {
+
+        if (!dragging) {
+          return;
+        }
+
+
+        let delta =
+          event.clientX -
+          startX;
+
+
+        if (
+          direction === 'right'
+        ) {
+          delta = -delta;
+        }
+
+
+        const width =
+          Math.max(
+            MIN_WIDTH,
+            Math.min(
+              MAX_WIDTH,
+              startWidth + delta
+            )
+          );
+
+
+        panel.style.width =
+          `${width}px`;
+
+
+        event.preventDefault();
+      }
+
+
+      function stop(
+        event
+      ) {
+
+        if (!dragging) {
+          return;
+        }
+
+
+        dragging = false;
+
+
+        resizer.classList.remove(
+          'dragging'
+        );
+
+
+        document.body.style.userSelect =
+          '';
+
+
+        try {
+
+          if (
+            resizer.hasPointerCapture &&
+            resizer.hasPointerCapture(
+              event.pointerId
+            )
+          ) {
+
+            resizer.releasePointerCapture(
+              event.pointerId
+            );
+          }
+
+        } catch (_) {}
+      }
+
+
+      resizer.addEventListener(
+        'pointerdown',
+        start
+      );
+
+
+      resizer.addEventListener(
+        'pointermove',
+        move
+      );
+
+
+      resizer.addEventListener(
+        'pointerup',
+        stop
+      );
+
+
+      resizer.addEventListener(
+        'pointercancel',
+        stop
+      );
+
+
+      window.addEventListener(
+        'pointerup',
+        (event) => {
+
+          if (dragging) {
+            stop(event);
+          }
+
+        },
+        true
+      );
+
+
+      window.addEventListener(
+        'pointercancel',
+        (event) => {
+
+          if (dragging) {
+            stop(event);
+          }
+
+        },
+        true
+      );
+    }
+
+
+    installSideResizer(
+      'resizer-left',
+      'list-panel',
+      'left'
+    );
+
+
+    installSideResizer(
+      'resizer-right',
+      'inspector',
+      'right'
+    );
+
+  </script>
 
 </body>
+
 </html>
