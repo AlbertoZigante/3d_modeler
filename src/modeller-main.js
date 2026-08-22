@@ -36,6 +36,7 @@ import {
   DESIGN_LIMITS_MM,
   PANEL_SIZE_LIMITS_MM,
   MATERIAL_CATALOG,
+  loadMaterialCatalog,
   nextConstraintId,
   FACE_TO_DIM_FIELD,
   getAlignedAxis,
@@ -45,11 +46,18 @@ import { resolveConstraints } from './modeller/snap.js';
 import { createModellerScene } from './modeller/scene.js';
 import { getSelectedId, setSelectedId, getSelectedGroupId, setSelectedGroupId } from './modeller/selection.js';
 import { computeBom } from './engine/bom.js';
+import { exportCutListPdf, exportNestingPdf } from './engine/pdfExport.js';
+import { nestCutList, summarizeNestingResult } from './engine/nesting.js';
 import { renderProperties } from './ui/properties.js';
 import { renderPanelList } from './ui/toolbar.js';
 import { renderRelations } from './ui/relations.js';
 import { initResizableLayout } from './ui/layout.js';
-
+import {
+  history,createStateCommand,MovePanelCommand,MoveGroupCommand,ResizePanelCommand,ChangeMaterialCommand,
+  ChangeGroupMaterialCommand,RenamePanelCommand,AddPanelCommand,DeletePanelCommand,AddBoxCommand,
+  DeleteBoxCommand,GroupPanelsCommand,UngroupPanelsCommand,AddShelfCommand,DeleteShelfCommand,
+  AddConstraintCommand,RemoveConstraintCommand,UnlinkConstraintCommand,HideBoxWallCommand,RestoreBoxWallCommand,
+} from './modeller/history.js';
 initResizableLayout();
 
 // ---- THE GRAPH ----
@@ -59,7 +67,95 @@ initResizableLayout();
 // defined; addBox() itself calls renderAll(), so nothing else is
 // needed here).
 let panels = [];
+let lastBomRows = []; // cached from the most recent renderAll(), so the export button reflects exactly what's on screen without recomputing
+function capturePanelsState() {
+  return panels;
+}
 
+function restorePanelsState(nextPanels) {
+  panels = nextPanels;
+  renderAll();
+}
+
+function recordHistoryCommand(CommandClass, before, after) {
+  const command = createStateCommand({
+    CommandClass,
+    before,
+    after,
+    applyState: restorePanelsState,
+  });
+  history.record(command);
+}
+// Cached from the most recent "Nest Cut List" run — kept around so
+// the inline summary/warning banner survives ordinary re-renders
+// without recomputing nesting on every renderAll() (real packing
+// work, not a cheap aggregation like computeBom). `signature` is a
+// lightweight fingerprint of the BOM rows nesting was actually run
+// against, so a later design change can be flagged as "stale"
+// without needing to re-nest just to notice.
+let lastNestingResult = null; // { nestResults, summary, signature } | null
+
+function bomRowsSignature(rows) {
+  return rows.map((r) => `${r.label}|${r.material}|${r.thicknessMm}|${r.widthMm}|${r.heightMm}|${r.quantity}`).join(';');
+}
+
+function escapeHtmlLocal(value) {
+  const div = document.createElement('div');
+  div.textContent = String(value ?? '');
+  return div.innerHTML;
+}
+function openCutListWindow() {
+  if (lastBomRows.length === 0) return;
+  exportCutListPdf(lastBomRows, { projectName: 'Cut List', mode: 'open' });
+}
+
+function openNestingPlan() {
+  if (lastBomRows.length === 0) return;
+  const nestResults = nestCutList(lastBomRows, MATERIAL_CATALOG, {});
+  const summary = summarizeNestingResult(nestResults, MATERIAL_CATALOG);
+  lastNestingResult = { nestResults, summary, signature: bomRowsSignature(lastBomRows) }; // <-- missing
+  renderNestingSummary(); // <-- missing
+  exportNestingPdf(nestResults, summary, { projectName: 'Nesting Plan', mode: 'open' });
+}
+
+function renderNestingSummary() {
+  if (!nestingSummaryEl) return;
+
+  if (!lastNestingResult) {
+    nestingSummaryEl.innerHTML = '';
+    return;
+  }
+
+  const { summary, signature } = lastNestingResult;
+  const stale = signature !== bomRowsSignature(lastBomRows);
+  const unplacedMaterials = summary.perMaterial.filter((m) => m.unplacedCount > 0);
+
+  nestingSummaryEl.innerHTML = `
+    <div class="section-title">Nesting Plan</div>
+
+    ${stale ? `
+      <div class="warning-banner">
+        Design changed since this was last nested — numbers below may be out of date. Re-run "Nest Cut List" to refresh.
+      </div>
+    ` : ''}
+
+    <div style="font-size:12px; color:#3a3126; margin-bottom:12px; line-height:1.6;">
+      ${summary.totals.sheetsUsed} sheet(s) &middot;
+      ${(summary.totals.utilization * 100).toFixed(1)}% utilization
+      ${summary.totals.totalCost > 0 ? ` &middot; ${summary.totals.totalCost.toFixed(2)} total` : ''}
+    </div>
+
+    ${unplacedMaterials.length > 0 ? `
+      <div class="warning-banner">
+        <strong>${summary.totals.unplacedCount} piece(s) don't fit any configured stock sheet:</strong>
+        <br>
+        ${unplacedMaterials
+          .map((m) => `${escapeHtmlLocal(m.material)}: ${m.unplacedLabels.map(escapeHtmlLocal).join(', ')} (${m.unplacedCount} pc, ${m.unplacedAreaM2.toFixed(2)}m²)`)
+          .join('<br>')}
+      </div>
+    ` : ''}
+  `;
+}
 // Ctrl/Cmd-click — in the panel list OR either 2D/3D view — toggles
 // membership here; "Group selected" (see groupSelectedPanels below)
 // turns the current set into a real group and clears it. Only ever
@@ -75,7 +171,8 @@ const multiSelectedIds = new Set();
 // (snapshot + delta), never just add the delta onto whatever offset
 // is already stored, or it would compound every single frame.
 let groupDragStartOffsets = null; // Map<nodeId, {x,y,z}> | null
-
+let moveDragBefore = null;
+let moveDragIsGroup = false;
 // -------------------------------------------------------------
 // Design limits (DESIGN_LIMITS_MM, in modules.js): the overall space
 // a design may occupy, checked at every edit entry point below — not
@@ -85,7 +182,6 @@ let groupDragStartOffsets = null; // Map<nodeId, {x,y,z}> | null
 // clearer than silently shrinking a typed value to whatever fits).
 // -------------------------------------------------------------
 const AXIS_LABEL = { x: 'width (X)', y: 'height (Y)', z: 'depth (Z)' };
-const designLimitToastEl = document.getElementById('design-limit-toast');
 let designLimitHideTimer = null;
 
 // Shared toast plumbing for every short-lived status/error message in
@@ -95,17 +191,41 @@ let designLimitHideTimer = null;
 // flash from a STATUS message that should stay up until the caller
 // explicitly changes or clears it (e.g. while a multi-step pick is
 // still in progress).
+
 function showToast(text, autoHide = true) {
-  designLimitToastEl.textContent = text;
-  designLimitToastEl.classList.add('visible');
+  const toastEl =
+    document.getElementById('toolbar-properties-toast');
+
+  if (!toastEl) {
+    return;
+  }
+
+  toastEl.innerHTML = `
+    <div class="properties-hint">
+      ${escapeHtmlLocal(text)}
+    </div>
+  `;
+
   clearTimeout(designLimitHideTimer);
+
   if (autoHide) {
-    designLimitHideTimer = setTimeout(() => designLimitToastEl.classList.remove('visible'), 2200);
+    designLimitHideTimer = setTimeout(() => {
+      hideToast();
+    }, 2200);
   }
 }
+
 function hideToast() {
   clearTimeout(designLimitHideTimer);
-  designLimitToastEl.classList.remove('visible');
+
+  const toastEl =
+    document.getElementById('toolbar-properties-toast');
+
+  if (!toastEl) {
+    return;
+  }
+
+  toastEl.innerHTML = '';
 }
 
 function showDesignLimitError(axis) {
@@ -236,6 +356,23 @@ const bomBodyEl = document.getElementById('bom-body');
 const stageLabelEl = document.getElementById('stage-label');
 const axesCanvas = document.getElementById('axes-gizmo-canvas');
 const pipCanvas = document.getElementById('pip-canvas');
+const nestingSummaryEl = document.getElementById('nesting-summary');
+const undoBtn = document.getElementById('undo-btn');
+const redoBtn = document.getElementById('redo-btn');
+
+function syncHistoryButtons() {
+  if (undoBtn) undoBtn.disabled = !history.canUndo();
+  if (redoBtn) redoBtn.disabled = !history.canRedo();
+}
+history.setOnChange(syncHistoryButtons);
+undoBtn?.addEventListener('click', () => history.undo());
+redoBtn?.addEventListener('click', () => history.redo());
+syncHistoryButtons();
+
+document.getElementById('export-bom-pdf-btn')?.addEventListener('click', () => {
+  if (lastBomRows.length === 0) return;
+  exportCutListPdf(lastBomRows, { projectName: 'Cut List' });
+});
 
 // ---- Scene (view layer). Consumes RESOLVED panels only. ----
 const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight } = createModellerScene(canvas, main, {
@@ -244,6 +381,11 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
   onPipModeClick: (mode) => switchView(mode),
   onSelect: handleCanvasSelectClick,
   onTransformChange: (nodeId, transform) => {
+    if (moveDragBefore === null) {
+      moveDragBefore = panels;
+      moveDragIsGroup = false;
+    }
+
     const node = panels.find((p) => p.id === nodeId);
     if (!node) return;
 
@@ -309,6 +451,8 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
         return [id, p ? { ...p.offset } : { x: 0, y: 0, z: 0 }];
       })
     );
+    moveDragBefore = panels;
+    moveDragIsGroup = true;
   },
   onGroupTransformChange: (nodeIds, deltaMm) => {
     // High-frequency during drag, same lightweight-patch approach as
@@ -344,8 +488,19 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
     }
   },
   onDimensionChange: (nodeId, dims, offsetDeltaMm) => applyDimensionChange(nodeId, dims, offsetDeltaMm),
+
 });
 
+window.addEventListener('pointerup', () => {
+  if (moveDragBefore === null) return;
+  const before = moveDragBefore;
+  const isGroup = moveDragIsGroup;
+  moveDragBefore = null;
+  moveDragIsGroup = false;
+  const after = panels;
+  if (before === after) return;
+  recordHistoryCommand(isGroup ? MoveGroupCommand : MovePanelCommand, before, after);
+});
 // Shared by the gizmo/edge-drag onDimensionChange callback above AND
 // the collinear tool below (applyCollinear) — validates a proposed
 // width/height/thickness + offset delta against both per-panel size
@@ -383,7 +538,10 @@ function applyDimensionChange(nodeId, dims, offsetDeltaMm) {
     showDesignLimitError(hitAxis);
     return false;
   }
+  const before = panels;
   updateNode(nodeId, { width: dims.width, height: dims.height, thickness: dims.thickness, offset: proposedOffset });
+  const after = panels;
+  recordHistoryCommand(ResizePanelCommand,before,after);
   renderAll();
   return true;
 }
@@ -725,7 +883,10 @@ function addShelf(pick1, pick2) {
   shelf.offset = { x: 0, y: 0, z: 0 };
   shelf.offset[freeAxis] = proposedFreeOffset;
 
+  const before = panels;
   panels = [...panels, shelf];
+  const after = panels;
+  recordHistoryCommand(AddShelfCommand,before,after);
   setSelectedGroupId(groupId);
   setSelectedId(shelf.id);
   renderAll();
@@ -781,11 +942,141 @@ function handleFacePick(nodeId, faceName) {
   if (applied) cancelCollinearMode(); // one-shot PICKING tool — done after a single successful pair; a rejection (see applyCollinear) leaves pick1 as-is so they can retry with a different second pick
 }
 
+// -------------------------------------------------------------
+// COLLINEAR BOX TRANSLATION
+//
+// Box walls are structural members of a single rigid assembly.
+// When a box wall is the FIRST collinear pick, the wall itself must
+// never move/resize independently. Instead, translate every member
+// of the box by the same delta along the collinear axis.
+//
+// The target is calculated from the currently resolved position of
+// pick1's selected face and pick2's selected face. The gap value is
+// applied in the same direction as the existing attachedTo logic.
+//
+// Returns true when the whole box was translated successfully.
+// -------------------------------------------------------------
+function applyCollinearBoxTranslation(pick1, pick2) {
+  const node1 = panels.find((p) => p.id === pick1.nodeId);
+  const node2 = panels.find((p) => p.id === pick2.nodeId);
+
+  if (!node1 || !node2 || !node1.groupId) return false;
+
+  const groupId = node1.groupId;
+
+  // IMPORTANT:
+  // Hidden members must still be part of the box transformation.
+  // `hidden` should only control rendering, not whether the model
+  // position is updated.
+  const members = panels.filter(
+    (p) => p.groupId === groupId
+  );
+
+  if (members.length === 0) return false;
+
+  const resolved = resolveConstraints(panels);
+  const resolved1 = resolved.find((p) => p.id === pick1.nodeId);
+  const resolved2 = resolved.find((p) => p.id === pick2.nodeId);
+
+  if (!resolved1 || !resolved2) return false;
+
+  const axis = pick1.axis;
+
+  const face1Mm =
+    resolved1.position[axis] +
+    pick1.sign * (resolved1[pick1.dimField] / 2);
+
+  const face2Mm =
+    resolved2.position[axis] +
+    pick2.sign * (resolved2[pick2.dimField] / 2);
+
+  const targetMm =
+    face2Mm + pick2.sign * collinearGapMm;
+
+  const deltaMm = targetMm - face1Mm;
+
+  if (Math.abs(deltaMm) < 0.0001) {
+    return true;
+  }
+
+  // Test the COMPLETE group, including hidden members.
+  const testPanels = panels.map((p) => {
+    if (p.groupId !== groupId) return p;
+
+    return {
+      ...p,
+      offset: {
+        ...p.offset,
+        [axis]: p.offset[axis] + deltaMm,
+      },
+    };
+  });
+
+  const testResolved = resolveConstraints(testPanels);
+
+  for (const member of members) {
+    const testNode = testResolved.find((p) => p.id === member.id);
+    if (!testNode) return false;
+
+    const dims = {
+      width: testNode.width,
+      height: testNode.height,
+      thickness: testNode.thickness,
+    };
+
+    const hitAxis = findDesignLimitViolation(
+      testNode.rotation,
+      testNode.position,
+      dims
+    );
+
+    if (hitAxis) {
+      showDesignLimitError(hitAxis);
+      return false;
+    }
+  }
+
+  const before = panels;
+
+  // IMPORTANT:
+  // Apply the translation to ALL group members, hidden or visible.
+  panels = panels.map((p) => {
+    if (p.groupId !== groupId) return p;
+
+    return {
+      ...p,
+      offset: {
+        ...p.offset,
+        [axis]: p.offset[axis] + deltaMm,
+      },
+    };
+  });
+
+  const after = panels;
+
+  recordHistoryCommand(MoveGroupCommand, before, after);
+
+  renderAll();
+
+  return true;
+}
+
 function applyCollinear(pick1, pick2) {
   const node1 = panels.find((p) => p.id === pick1.nodeId);
   if (!node1) return false;
 
   const axis = pick1.axis;
+
+  // -----------------------------------------------------------
+  // BOX MEMBER
+  //
+  // A box wall is part of a rigid six-panel assembly. It must
+  // never be independently moved or resized by collinear.
+  // Translate the entire box instead.
+  // -----------------------------------------------------------
+  if (node1.groupId) {
+    return applyCollinearBoxTranslation(pick1, pick2);
+  }
 
   if (!isAxisPositionLocked(node1, axis)) {
     // MOVE — live attachedTo constraint on the position field. `myFace`
@@ -807,8 +1098,11 @@ function applyCollinear(pick1, pick2) {
     // here, so in practice this filter is a no-op today, but it keeps
     // this function correct if that check's rules ever change).
     const otherConstraints = (node1.constraints || []).filter((c) => c.field !== newConstraint.field);
+    const before = panels;
     updateNode(pick1.nodeId, { constraints: [...otherConstraints, newConstraint] });
-    renderAll(); // resolveConstraints picks up the new constraint immediately — if it happens to create a dependency cycle, the resolver already handles that gracefully (a warning on the affected node, not a crash) rather than needing special-cased detection here
+    const after = panels;
+    recordHistoryCommand(AddConstraintCommand,before,after); // resolveConstraints picks up the new constraint immediately — if it happens to create a dependency cycle, the resolver already handles that gracefully (a warning on the affected node, not a crash) rather than needing special-cased detection here
+    renderAll();
     return true;
   }
 
@@ -870,7 +1164,10 @@ function applyCollinear(pick1, pick2) {
     return false;
   }
 
+  const before = panels;
   updateNode(pick1.nodeId, { constraints: [...otherConstraints, newConstraint] });
+  const after = panels;
+  recordHistoryCommand(AddConstraintCommand,before,after);
   renderAll();
   showToast('Movement was blocked — resized instead. This will keep re-adjusting automatically if the other panel changes.', false);
   return true;
@@ -880,8 +1177,22 @@ function applyCollinear(pick1, pick2) {
 // does for nothing else in this app (no other modal/multi-step tool
 // exists yet) — scoped narrowly so it can't interfere with anything.
 window.addEventListener('keydown', (e) => {
+  const modifier = e.ctrlKey || e.metaKey;
+  if (!modifier) return;
+
   if (e.key === 'Escape' && collinearActive) cancelCollinearMode();
   if (e.key === 'Escape' && shelfMode) cancelShelfMode();
+  
+  if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    history.undo();
+    return;
+  }
+
+  if (e.key.toLowerCase() === 'z' && e.shiftKey ||e.key.toLowerCase() === 'y'){
+    e.preventDefault();
+    history.redo();
+  }
 });
 
 // -------------------------------------------------------------
@@ -1150,7 +1461,10 @@ function groupSelectedPanels() {
   if (multiSelectedIds.size < 2) return;
   const ids = [...multiSelectedIds];
   const newGroupId = ids[0]; // reuse one member's own id as the group's identifier — no separate id generator needed, same trick addBox already uses
+  const before = panels;
   panels = panels.map((p) => (ids.includes(p.id) ? { ...p, groupId: newGroupId } : p));
+  const after = panels;
+  recordHistoryCommand(GroupPanelsCommand,before,after);
   multiSelectedIds.clear();
   setSelectedGroupId(newGroupId);
   setSelectedId(null);
@@ -1165,7 +1479,10 @@ function ungroupSelected() {
   // group-selected view (the only place a restore button exists)
   // won't be reachable for this panel anymore, so a still-hidden
   // member would become a permanently invisible orphan otherwise.
+  const before = panels;
   panels = panels.map((p) => (p.groupId === groupId ? { ...p, groupId: null, hidden: false } : p));
+  const after = panels;
+  recordHistoryCommand(UngroupPanelsCommand,before,after);
   setSelectedGroupId(null);
   setSelectedId(formerMembers[0] || null); // land somewhere sensible rather than deselecting entirely
   renderAll();
@@ -1176,7 +1493,19 @@ function renderAll() {
   const selectedGroupId = getSelectedGroupId();
   const selectedBoxWallId = selectedId && panels.find(p => p.id === selectedId)?.isBoxWall ? selectedId : null;
   const resolved = resolveConstraints(panels); // unfiltered — a hidden panel still needs to resolve correctly so any sibling constraint referencing it stays accurate, and so it's instantly right again the moment it's restored
-  const visiblePanels = resolved.filter((p) => !p.hidden);
+
+  // pieceCode is assigned once, at creation, on the RAW node — same
+  // reasoning as boxWallIds just below: resolveConstraints rebuilds
+  // each node's fields and isn't guaranteed to carry an arbitrary
+  // custom field through untouched, so this reads it back from
+  // `panels` (authoritative) rather than trusting the resolved copy.
+  const pieceCodeById = new Map(panels.map((p) => [p.id, p.pieceCode]));
+  const resolvedWithCodes = resolved.map((r) => ({
+    ...r,
+    pieceCode: r.pieceCode ?? pieceCodeById.get(r.id),
+  }));
+
+  const visiblePanels = resolvedWithCodes.filter((p) => !p.hidden);
   // Authoritative "is this a box wall" id set, sourced directly from
   // the raw graph (`panels`), NOT from the resolved output. Every box
   // wall is stamped isBoxWall:true exactly once, in addBox(), and
@@ -1210,22 +1539,15 @@ function renderAll() {
     onShelfHorizontal: () => (shelfMode === 'horizontal' ? cancelShelfMode() : startShelfMode('horizontal')),
     onShelfVertical: () => (shelfMode === 'vertical' ? cancelShelfMode() : startShelfMode('vertical')),
     shelfMode,
+    onOpenCutList: openCutListWindow,
+    onNestCutList: openNestingPlan,
   });
 
   renderInspectorOnly();
 
   const rows = computeBom(visiblePanels);
-  bomBodyEl.innerHTML = rows
-    .map(
-      (row) => `
-      <tr>
-        <td>${row.material} (${row.thickness}mm)</td>
-        <td class="right">${row.quantity}</td>
-        <td class="right">${row.areaM2.toFixed(3)}</td>
-      </tr>`
-    )
-    .join('');
-
+  lastBomRows = rows;
+  renderNestingSummary(); // re-check staleness against the freshly recomputed BOM rows, without re-nesting
   stageLabelEl.textContent = `${visiblePanels.length} node(s) · constraints active`;
 }
 
@@ -1337,8 +1659,18 @@ function renderInspectorOnly() {
 }
 
 function renameSelected(newName) {
+  const selectedId = getSelectedId();
+  const node = panels.find((p) => p.id === selectedId);
+  if (!node) return;
+
   const trimmed = newName.trim();
-  updateNode(getSelectedId(), { name: trimmed === '' ? null : trimmed });
+  const nextName = trimmed === '' ? null : trimmed;
+  if (node.name === nextName) return;
+
+  const before = panels;
+  updateNode(selectedId, {name: nextName,});
+  const after = panels;
+  recordHistoryCommand(RenamePanelCommand,before,after);
   renderAll();
 }
 
@@ -1369,15 +1701,19 @@ function updateSelectedField(field, value) {
       // material swap here has to go through the same whole-box
       // validate-then-commit path as a drag, not the single-node
       // design-limit check below.
-      const priorMaterial = node.material;
-      const priorThickness = node.thickness;
-      updateNode(selectedId, { material: catalogEntry.name, thickness: catalogEntry.thicknessMm });
+      const before = panels;
+      updateNode(selectedId, {material: catalogEntry.name,thickness: catalogEntry.thicknessMm});
       const applied = relayoutBox(node.groupId);
+
       if (!applied) {
-        updateNode(selectedId, { material: priorMaterial, thickness: priorThickness });
+        panels = before;
+        renderAll();
+        return;
       }
+      const after = panels;
+      recordHistoryCommand(ChangeMaterialCommand,before,after);
       renderAll();
-      return;
+    return;
     }
 
     const proposedDims = { width: node.width, height: node.height, thickness: catalogEntry.thicknessMm };
@@ -1392,7 +1728,10 @@ function updateSelectedField(field, value) {
       renderAll(); // revert the dropdown back to the stored (unchanged) material
       return;
     }
+    const before = panels;
     updateNode(selectedId, { material: catalogEntry.name, thickness: catalogEntry.thicknessMm });
+    const after = panels;
+    recordHistoryCommand(ChangeMaterialCommand,before,after);
     renderAll();
     return;
   }
@@ -1436,10 +1775,12 @@ function updateGroupMaterial(materialName) {
 
   // Box groups: every member's thickness feeds computeBoxLayout(), so
   // a whole-group material swap has to be validated as ONE relayout,
+
   // not per-member — a change that's fine for Left in isolation could
   // still push Top/Bottom/Back/Front out of bounds once every wall's
   // thickness moves together.
   if (members.some((p) => p.isBoxWall)) {
+    const before = panels;
     const priorMaterials = new Map(members.map((p) => [p.id, { material: p.material, thickness: p.thickness }]));
     panels = panels.map((p) =>
       p.groupId === groupId ? { ...p, material: catalogEntry.name, thickness: catalogEntry.thicknessMm } : p
@@ -1450,8 +1791,11 @@ function updateGroupMaterial(materialName) {
         const prior = priorMaterials.get(p.id);
         return prior ? { ...p, material: prior.material, thickness: prior.thickness } : p;
       });
-    }
     renderAll();
+    return;
+    }
+    const after = panels;
+    recordHistoryCommand(ChangeGroupMaterialCommand,before,after);
     return;
   }
 
@@ -1476,9 +1820,12 @@ function updateGroupMaterial(materialName) {
     }
   }
 
+  const before = panels;
   panels = panels.map((p) =>
     p.groupId === groupId ? { ...p, material: catalogEntry.name, thickness: catalogEntry.thicknessMm } : p
   );
+  const after = panels;
+  recordHistoryCommand(ChangeGroupMaterialCommand,before,after)
   renderAll();
 }
 
@@ -1493,12 +1840,18 @@ function updateSelectedTransformField(group, axis, value) {
   // inspector) — route it through relayoutBox rather than the plain
   // single-node clamp below, so the rest of the box re-fits too.
   if (node.isBoxWall && group === 'offset') {
-    const priorOffset = node.offset;
-    updateNode(selectedId, { offset: { ...node.offset, [axis]: value } });
+    const before = panels;
+    updateNode(selectedId, {offset: {...node.offset,[axis]: value,},});
     const applied = relayoutBox(node.groupId);
+
     if (!applied) {
-      updateNode(selectedId, { offset: priorOffset });
+      panels = before;
+      renderAll();
+      return;
     }
+
+    const after = panels;
+    recordHistoryCommand(MovePanelCommand,before,after);
     renderAll();
     return;
   }
@@ -1512,8 +1865,10 @@ function updateSelectedTransformField(group, axis, value) {
       return;
     }
   }
-
+  const before = panels;
   updateNode(selectedId, { [group]: { ...node[group], [axis]: value } });
+  const after = panels;
+  recordHistoryCommand(MovePanelCommand,before,after);
   renderAll();
 }
 
@@ -1534,9 +1889,14 @@ const HORIZONTAL_ROTATION = { x: 90, y: 0, z: 0 };
 const PARALLEL_ROTATION = { x: 0, y: 0, z: 0 };
 
 function createAndSelectPanel(rotation) {
+  const before = capturePanelsState(); // to aliment history (undo/redo) before the new panel is added
+
   const node = createPanelNode({ rotation });
   node.basePosition = computeNextBasePosition(resolveConstraints(panels), node);
   panels = [...panels, node];
+
+  const after = capturePanelsState(); // to aliment history (undo/redo) after the new panel is added
+  recordHistoryCommand(AddPanelCommand,before,after);
   setSelectedId(node.id);
   renderAll();
 }
@@ -1560,9 +1920,12 @@ function removeSelected() {
   if (groupId && !selectedId) {
     // group-level selection (nothing drilled into) — permanent delete
     // of the whole group, unchanged.
+    const before = panels;
     panels = panels.filter((p) => p.groupId !== groupId);
+    const after = panels;
     setSelectedGroupId(null);
     setSelectedId(panels.length > 0 ? panels[0].id : null);
+    recordHistoryCommand(DeleteBoxCommand,before,after);
     renderAll();
     return;
   }
@@ -1576,9 +1939,12 @@ function removeSelected() {
     // erases it from the graph completely and immediately frees the
     // space it occupied (collectAxisSlabs never has to know about a
     // gone-but-still-blocking shelf, because there's no such state).
+    const before = panels;
     panels = panels.filter((p) => p.id !== selectedId);
+    const after = panels;
     setSelectedGroupId(node.groupId);
     setSelectedId(null);
+    recordHistoryCommand(DeleteShelfCommand,before,after);
     renderAll();
     return;
   }
@@ -1587,21 +1953,33 @@ function removeSelected() {
     // panel-level selection WITHIN a group — a box WALL face. HIDE it
     // rather than removing it from the graph (restorable via the
     // group inspector) — unchanged from before.
+    const before = panels;
     panels = panels.map((p) => (p.id === selectedId ? { ...p, hidden: true } : p));
+    const after = panels;
     setSelectedGroupId(node.groupId);
     setSelectedId(null);
+    recordHistoryCommand(HideBoxWallCommand,before,after);
     renderAll();
     return;
   }
 
   // plain standalone panel — permanent removal, unchanged.
+  const before = panels;
   panels = panels.filter((p) => p.id !== selectedId);
+  const after = panels;
   setSelectedId(panels.length > 0 ? panels[0].id : null);
+  recordHistoryCommand(DeletePanelCommand,before,after);
   renderAll();
 }
 
 function restoreFace(nodeId) {
+  const node = panels.find((p) => p.id === nodeId);
+  if (!node || !node.hidden) return;
+
+  const before = panels;
   panels = panels.map((p) => (p.id === nodeId ? { ...p, hidden: false } : p));
+  const after = panels;
+  recordHistoryCommand(RestoreBoxWallCommand,before,after);
   renderAll();
 }
 
@@ -1631,8 +2009,11 @@ function unlinkOrRemoveConstraint(identifier, opts = {}) {
   if (!node) return;
 
   if (opts.remove) {
+    const before = panels;
     const nextConstraints = (node.constraints || []).filter((c) => c.id !== identifier);
     updateNode(selectedId, { constraints: nextConstraints });
+    const after = panels;
+    recordHistoryCommand(RemoveConstraintCommand, before, after);
     renderAll();
     return;
   }
@@ -1658,7 +2039,10 @@ function unlinkOrRemoveConstraint(identifier, opts = {}) {
     const currentMm = resolvedNode ? resolvedNode.position[axis] : baseMm;
     patch.offset = { ...node.offset, [axis]: currentMm - baseMm };
   }
+  const before = panels;
   updateNode(selectedId, patch);
+  const after = panels;
+  recordHistoryCommand(UnlinkConstraintCommand,before,after);
   renderAll();
 }
 
@@ -1813,17 +2197,27 @@ function addBox() {
   back.offset = { x: 0, y: 0, z: -D / 2 - T / 2 };
   front.offset = { x: 0, y: 0, z: +D / 2 + T / 2 };
 
-  panels = [...panels, ...boxPanels]; // always appended — never replaces an existing panel
-  relayoutBox(left.id); // normalizes every non-driving width/height/offset through the exact same math a later drag will use
-
-  updateNode(front.id, { hidden: true }); // open-front box by default — restorable via the group inspector's "restore" button
+  const before = panels;
+  panels = [...panels, ...boxPanels];
+  relayoutBox(left.id);
+  updateNode(front.id, { hidden: true });
+  const after = panels;
+  recordHistoryCommand(AddBoxCommand, before, after);
 
   setSelectedGroupId(left.id);
   setSelectedId(null);
   renderAll();
 }
 
-// Initial state: a full box (addBox() calls renderAll() itself at
-// its end, so this alone replaces the old seed1/seed2 + renderAll()
-// startup).
-addBox();
+// Initial state: a full box. addBox() reads MATERIAL_CATALOG[0]
+// (see its own comment), which is only populated once
+// loadMaterialCatalog() resolves — everything ABOVE this point (DOM
+// refs, scene/gizmo wiring, every function declaration) has no
+// dependency on the catalog and already ran synchronously at module
+// load; only this first box needs to wait.
+async function bootstrap() {
+  await loadMaterialCatalog();
+  addBox();
+  history.clear();
+}
+bootstrap();

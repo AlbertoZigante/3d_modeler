@@ -836,14 +836,21 @@ export function create2DControls(
   function handlePointerUp(e) {
     if (isFacePickMode?.()) {
       if (!gestureState.moved) {
+        const worldPoint = screenToWorld(e);
         const hits = hitTest(e, meshList());
+
         if (hits.length > 0) {
           const mesh = hits[0].object;
-          const faceName = nearestEdgeFaceName(mesh, screenToWorld(e));
-          onFacePick?.(mesh.userData.nodeId, faceName);
+          const faceName = nearestEdgeFaceName(mesh, worldPoint);
+
+          onFacePick?.(
+            mesh.userData.nodeId,
+            faceName,
+            worldPoint.clone()
+          );
         }
       }
-      return; // pick mode suspends select/resize/translate entirely
+      return;
     }
 
     if (!gestureState.moved && mode !== 'resize') {

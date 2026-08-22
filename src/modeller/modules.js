@@ -148,24 +148,157 @@ export function nextConstraintId() {
   return `c${constraintIdCounter++}`;
 }
 
-/**
- * PLACEHOLDER catalog — replace with the real curated SKU list (per
- * the project's own plan: hand-curated TOSIZE/Panobois materials,
- * eventually a YAML file per category). Each entry's thicknessMm is
- * the single source of truth for what a panel's thickness becomes
- * when that material is selected — see modeller-main.js's
- * updateSelectedField('material', ...), the ONLY place thickness is
- * ever allowed to change after a panel is created.
- */
-export const MATERIAL_CATALOG = [
-  { name: 'Melamine White 18mm', thicknessMm: 18 },
-  { name: 'Melamine Oak 18mm', thicknessMm: 18 },
-  { name: 'MDF Raw 18mm', thicknessMm: 18 },
-  { name: 'MDF Raw 25mm', thicknessMm: 25 },
-  { name: 'Plywood Birch 12mm', thicknessMm: 12 },
-  { name: 'Plywood Birch 18mm', thicknessMm: 18 },
-  { name: 'Hardboard Back Panel 6mm', thicknessMm: 6 },
+// ---- PIECE CODES ----
+// A stable "LE0001"-style identifier assigned to every panel at
+// creation time — used for assembly instructions and the cut list
+// (see engine/bom.js, engine/pdfExport.js). Assigned ONCE and never
+// regenerated: renaming a panel later, or reordering `panels` (a box
+// relayout, an ungroup), must never change a code someone may already
+// have written on a physical cut piece. This is exactly why it's
+// computed from the node's INITIAL name at creation, not read live
+// off node.name on every render the way getDisplayName() is.
+// ---- PIECE CODES ----
+// A stable "LE0001"-style identifier assigned to every panel at
+// creation time — used for assembly instructions and the cut list
+// (see engine/bom.js, engine/pdfExport.js). Assigned ONCE and never
+// regenerated.
+const PIECE_CODE_PREFIXES = {
+  left: 'LE', right: 'RI', top: 'TO', bottom: 'BO', back: 'BA', front: 'FR',
+};
+
+const pieceCodeCounters = {};
+
+function prefixForPieceName(name) {
+  if (!name) return 'PA';
+  const n = name.toLowerCase();
+  if (n.includes('shelf')) {
+    return n.includes('(v)') || n.includes('vertical') ? 'SV' : 'SH';
+  }
+  for (const key of Object.keys(PIECE_CODE_PREFIXES)) {
+    if (n.includes(key)) return PIECE_CODE_PREFIXES[key];
+  }
+  return 'PA';
+}
+
+function nextPieceCode(name) {
+  const prefix = prefixForPieceName(name);
+  const next = (pieceCodeCounters[prefix] || 0) + 1;
+  pieceCodeCounters[prefix] = next;
+  return `${prefix}${String(next).padStart(4, '0')}`;
+}
+
+// ---- MATERIAL CATALOG ----
+// Loaded from a CSV file at startup (see loadMaterialCatalog below)
+// instead of hardcoded here — this simulates the eventual real
+// database read (roadmap step 4's "stock sheet size per material"
+// and price will land as extra CSV columns later, same loader).
+//
+// `export let`, not `const`: ES module bindings are LIVE, so every
+// other file's `import { MATERIAL_CATALOG } from './modules.js'`
+// automatically sees the populated array the moment
+// loadMaterialCatalog() finishes reassigning it — no need to pass
+// the catalog around explicitly, and no risk of a stale snapshot.
+// Starts empty; anything that reads it before the app's bootstrap
+// (see modeller-main.js) has awaited loadMaterialCatalog() would see
+// an empty array, so nothing may read it at module-evaluation time —
+// only from inside functions that run after user interaction or
+// after the initial render, both of which happen after bootstrap.
+export let MATERIAL_CATALOG = [];
+
+const FALLBACK_MATERIAL_CATALOG = [
+  { name: 'Melamine White 18mm', thicknessMm: 18, grainInterchangeable: true, sheetWidthMm: 2440, sheetHeightMm: 1220, pricePerSheet: 0, edgeBandingPricePerM: 0 },
 ];
+
+// Minimal CSV line splitter — handles simple double-quoted fields (so
+// a material name COULD contain a comma if ever needed) without
+// pulling in a full CSV parsing dependency for a 3-column file.
+function splitCsvLine(line) {
+  const cells = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { current += ch; }
+    } else {
+      if (ch === '"') inQuotes = true;
+      else if (ch === ',') { cells.push(current); current = ''; }
+      else current += ch;
+    }
+  }
+  cells.push(current);
+  return cells;
+}
+
+// Row-level validation: a malformed row is skipped (with a console
+// warning naming the bad line) rather than silently poisoning the
+// catalog with a NaN thickness or an unnamed material — the same
+// "reject outright, don't guess" convention this file already uses
+// for design-limit violations elsewhere.
+function parseMaterialsCsv(text) {
+  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  if (lines.length === 0) return [];
+  const header = splitCsvLine(lines[0]).map((h) => h.trim());
+  const rows = [];
+  lines.slice(1).forEach((line, i) => {
+    const cells = splitCsvLine(line);
+    const raw = {};
+    header.forEach((key, idx) => { raw[key] = (cells[idx] ?? '').trim(); });
+
+    const thicknessMm = Number(raw.thicknessMm);
+    const sheetWidthMm = Number(raw.sheetWidthMm);
+    const sheetHeightMm = Number(raw.sheetHeightMm);
+
+    if (!raw.name || !Number.isFinite(thicknessMm) || !Number.isFinite(sheetWidthMm) || !Number.isFinite(sheetHeightMm)) {
+      console.warn(`Skipping invalid material catalog row ${i + 2} (name/thickness/sheet size required): "${line}"`);
+      return;
+    }
+
+    const pricePerSheet = Number(raw.pricePerSheet);
+    const edgeBandingPricePerM = Number(raw.edgeBandingPricePerM);
+    const kerfMm = Number(raw.kerfMm);
+
+    rows.push({
+      name: raw.name,
+      thicknessMm,
+      grainInterchangeable: /^(true|1|yes)$/i.test(raw.grainInterchangeable || ''),
+      sheetWidthMm,
+      sheetHeightMm,
+      pricePerSheet: Number.isFinite(pricePerSheet) ? pricePerSheet : 0,
+      edgeBandingPricePerM: Number.isFinite(edgeBandingPricePerM) ? edgeBandingPricePerM : 0,
+      ...(Number.isFinite(kerfMm) && kerfMm >= 0 ? { kerfMm } : {}), // omitted entirely if absent/invalid — nestCutList's own fallback-to-default logic (see nesting.js) only triggers off catalogEntry.kerfMm being undefined, so leaving it out here is what makes "no column value" and "explicitly no override" behave identically
+    });
+  });
+  return rows;
+}
+
+// Awaited once, at app startup, before the initial addBox() runs —
+// see modeller-main.js's bootstrap(). On any failure (network, empty
+// file, every row invalid) falls back to a minimal built-in catalog
+// rather than leaving MATERIAL_CATALOG empty, which would crash
+// addBox()'s MATERIAL_CATALOG[0] lookup outright. The fallback is
+// deliberately impoverished (one material) so it's immediately
+// obvious in the UI that something's wrong, rather than silently
+// degrading.
+export async function loadMaterialCatalog(url = `${import.meta.env.BASE_URL}data/materials.csv`) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = await response.text();
+    const rows = parseMaterialsCsv(text);
+    if (rows.length === 0) throw new Error('Catalog CSV parsed to zero valid rows');
+    MATERIAL_CATALOG = rows;
+  } catch (err) {
+    console.error(
+      `Could not load material catalog from "${url}" — falling back to a minimal built-in default. The app will run, but only one material will be available until this is fixed.`,
+      err
+    );
+    MATERIAL_CATALOG = FALLBACK_MATERIAL_CATALOG;
+  }
+  return MATERIAL_CATALOG;
+}
 
 export function createPanelNode(overrides = {}) {
   const rotation = overrides.rotation || { x: 0, y: 90, z: 0 };
@@ -185,13 +318,35 @@ export function createPanelNode(overrides = {}) {
     groupId: null,
     isBoxWall: false,
     hidden: false,
+    // Subset of bandableEdgeFaces(node) — which edges actually get
+    // banding tape. Empty by default (no UI exists yet to toggle
+    // this per-panel; see the roadmap note below), NOT auto-derived
+    // from anything, since whether an edge is banded is a real
+    // fabrication decision, not something inferable from geometry.
+    bandedEdges: [],
     ...overrides,
   };
 
   node.thicknessAxis =
     getAlignedAxis(node.rotation, 'front')?.axis || 'z';
 
+  // Assigned from node.name AFTER overrides are merged in (box walls
+  // and shelves set name directly via overrides) — see the file-
+  // header comment above for why this never gets recomputed later.
+  node.pieceCode = nextPieceCode(node.name);
+
   return node;
+}
+
+// Which of a node's LOCAL faces are physically edge-bandable — reuses
+// classifyFacesByThickness's own edgeFaces (the 4 faces where
+// THICKNESS is one of the two edge dimensions, as opposed to the 2
+// flat "show" faces) rather than inventing a second face vocabulary.
+// Same reasoning as why constraints and the collinear tool share
+// LOCAL_FACES: 'right'/'left'/'top'/'bottom' here mean the same thing
+// they always do, regardless of the panel's actual 3D rotation.
+export function bandableEdgeFaces(node) {
+  return classifyFacesByThickness(node).edgeFaces;
 }
 
 // Used anywhere a panel needs to be shown to a person (list, inspector,

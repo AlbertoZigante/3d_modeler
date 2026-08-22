@@ -372,23 +372,42 @@ export function createModellerScene(
 
   function handleClickSelect3D(e) {
     const rect = canvas.getBoundingClientRect();
+
     const ndc = new THREE.Vector2(
       ((e.clientX - rect.left) / rect.width) * 2 - 1,
       -((e.clientY - rect.top) / rect.height) * 2 + 1
     );
+
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(ndc, camera3d);
+
     const hits = raycaster.intersectObjects(meshList(), false);
 
     if (facePickMode) {
       if (hits.length > 0 && hits[0].face) {
-        const faceName = faceNameFromLocalNormal(hits[0].face.normal);
-        onFacePickCallback?.(hits[0].object.userData.nodeId, faceName);
+        const hit = hits[0];
+
+        const faceName = faceNameFromLocalNormal(hit.face.normal);
+
+        // IMPORTANT:
+        // hit.point is the actual 3D world-space position where
+        // the mouse ray intersected the panel.
+        const worldPoint = hit.point.clone();
+
+        onFacePickCallback?.(
+          hit.object.userData.nodeId,
+          faceName,
+          worldPoint
+        );
       }
+
       return; // ordinary selection is suspended entirely while picking
     }
 
-    onSelect?.(hits.length > 0 ? hits[0].object.userData.nodeId : null, e.ctrlKey || e.metaKey);
+    onSelect?.(
+      hits.length > 0 ? hits[0].object.userData.nodeId : null,
+      e.ctrlKey || e.metaKey
+    );
   }
 
   let orbit = null;
@@ -421,7 +440,10 @@ export function createModellerScene(
       onGroupDragStart,
       onGroupTransformChange,
       isFacePickMode: () => facePickMode,
-      onFacePick: (nodeId, faceName) => onFacePickCallback?.(nodeId, faceName),
+
+      // 2D now returns the actual world-space click position too.
+      onFacePick: (nodeId, faceName, worldPoint) =>
+        onFacePickCallback?.(nodeId, faceName, worldPoint),
     });
   }
 

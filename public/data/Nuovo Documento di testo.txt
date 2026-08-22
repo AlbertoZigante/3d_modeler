@@ -1,0 +1,8 @@
+name,thicknessMm,grainInterchangeable,sheetWidthMm,sheetHeightMm,pricePerSheet,edgeBandingPricePerM,kerfMm
+Melamine White 18mm,18,true,2440,1220,45.00,1.20,3
+Melamine Oak 18mm,18,false,2440,1220,52.00,1.80,3
+MDF Raw 18mm,18,true,2440,1220,32.00,0.90,3.2
+MDF Raw 25mm,25,true,2440,1220,42.00,1.10,3.2
+Plywood Birch 12mm,12,false,2440,1220,58.00,2.20,2.5
+Plywood Birch 18mm,18,false,2440,1220,68.00,2.20,2.5
+Hardboard Back Panel 6mm,6,true,2440,1220,18.00,0,2

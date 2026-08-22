@@ -7,6 +7,13 @@
  *   Elements
  *      Groups
  *      Panels
+ *      "Open Cut List (PDF)" — always the last item in this section,
+ *      after every panel/group row, however many there are. Moved
+ *      here (from a fixed footer) so it's discoverable right where
+ *      the element list ends, at the cost of no longer being
+ *      permanently visible — a long panel list now means scrolling
+ *      the Elements section to reach it, since that section already
+ *      scrolls independently (overflow-y: auto).
  *
  *   Building Components
  *      + Vertical panel
@@ -51,6 +58,11 @@ import { getDisplayName } from '../modeller/modules.js';
    ============================================================ */
 
 const SECTION_MIN_HEIGHT = 58;
+
+const COMPONENTS_HEIGHT = 160;
+const TOOLS_HEIGHT = 100;
+const PROPERTIES_HEIGHT = 160;
+
 const PROPERTIES_MIN_HEIGHT = 76;
 const PROPERTIES_BOTTOM_MARGIN = 12;
 
@@ -114,6 +126,28 @@ const COMPONENT_ICONS = {
       <line x1="9.5" y1="12" x2="14.5" y2="12" />
       <path d="M11 9.2 L8.8 12 L11 14.8" />
       <path d="M13 9.2 L15.2 12 L13 14.8" />
+    </svg>
+  `,
+  // A sheet with a corner folded/cut and a printer-style horizontal
+  // line — reads as "printable list", distinct from the more
+  // geometric building-tool icons above.
+  cutlist: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 3 H14 L18 7 V21 H6 Z" />
+      <path d="M14 3 V7 H18" />
+      <line x1="9" y1="12" x2="15" y2="12" />
+      <line x1="9" y1="16" x2="15" y2="16" />
+    </svg>
+  `,
+  // A sheet with smaller rectangles packed inside it — distinct from
+  // the plain "cutlist" sheet icon, reads as "layout/packing" rather
+  // than "list".
+  nestingPlan: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" />
+      <rect x="3" y="3" width="10" height="8" />
+      <rect x="13" y="3" width="8" height="5" />
+      <rect x="3" y="11" width="6" height="10" />
     </svg>
   `,
 };
@@ -180,6 +214,19 @@ function ensureComponentIconStyles() {
       opacity: 0.75;
       line-height: 1.4;
     }
+
+    /* Toast messages displayed inside the Properties panel */
+    #toolbar-properties-toast {
+      margin-top: 8px;
+    }
+
+    #toolbar-properties-toast .properties-hint {
+      padding: 7px 8px;
+      border-radius: 5px;
+      background: #f3ede0;
+      border: 1px solid #d8d0c4;
+    }
+
     .properties-gap-row {
       display: flex;
       align-items: center;
@@ -191,6 +238,31 @@ function ensureComponentIconStyles() {
     }
     .properties-gap-row input {
       width: 72px;
+    }
+    .cutlist-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 9px 8px;
+      margin-top: 10px;
+      font-size: 12.5px;
+      font-weight: 600;
+      border: 1px solid #c97b38;
+      border-radius: 6px;
+      background: #e0904a;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.12s ease, border-color 0.12s ease;
+    }
+    .cutlist-btn:hover {
+      background: #c97b38;
+    }
+    .cutlist-btn svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
     }
   `;
   document.head.appendChild(style);
@@ -227,6 +299,9 @@ export function renderPanelList(
     onShelfHorizontal,
     onShelfVertical,
     shelfMode,
+
+    onOpenCutList,
+    onNestCutList,
   }
 ) {
 
@@ -261,42 +336,45 @@ export function renderPanelList(
   const anyToolActive =
     !!(collinearActive || shelfMode);
 
-  const propertiesSectionMarkup =
-    anyToolActive
-      ? `
-        <div
-          class="toolbar-section-resizer"
-          data-resizer-after="tools"
-          title="Drag to resize Building Tools"
-        ></div>
+  const propertiesSectionMarkup = `
+    <div
+      class="toolbar-section-resizer"
+      data-resizer-after="tools"
+      title="Drag to resize Building Tools"
+    ></div>
 
-        <section
-          class="toolbar-section"
-          data-section="properties"
-        >
+    <section
+      class="toolbar-section"
+      data-section="properties"
+    >
 
-          <div class="toolbar-section-header">
+      <div class="toolbar-section-header">
 
-            <div class="section-title">
-              Properties
-            </div>
+        <div class="section-title">
+          Properties
+        </div>
 
-          </div>
+      </div>
 
+      <div
+        class="toolbar-section-content"
+        id="toolbar-properties-content"
+      >
 
-          <div class="toolbar-section-content">
+        <div id="toolbar-properties-body">
+          ${renderPropertiesContent({
+            collinearActive,
+            collinearGapMm,
+            shelfMode,
+          })}
+        </div>
 
-            ${renderPropertiesContent({
-              collinearActive,
-              collinearGapMm,
-              shelfMode,
-            })}
+        <div id="toolbar-properties-toast"></div>
 
-          </div>
+      </div>
 
-        </section>
-      `
-      : '';
+    </section>
+  `;
 
 
   container.innerHTML = `
@@ -337,6 +415,29 @@ export function renderPanelList(
             id="group-selected-btn"
             style="display:none;"
           ></button>
+
+
+          <!-- Always the last items in Elements, after every
+               panel/group row however many there are. -->
+          <button
+            type="button"
+            class="cutlist-btn"
+            id="open-cutlist-btn"
+            title="Open the current cut list as a PDF in a new tab"
+          >
+            ${COMPONENT_ICONS.cutlist}
+            <span>Open Cut List (PDF)</span>
+          </button>
+
+          <button
+            type="button"
+            class="cutlist-btn"
+            id="nest-cutlist-btn"
+            title="Pack the current cut list onto stock sheets and open the layout as a PDF"
+          >
+            ${COMPONENT_ICONS.nestingPlan}
+            <span>Nest Cut List (PDF)</span>
+          </button>
 
         </div>
 
@@ -629,6 +730,27 @@ export function renderPanelList(
       }
     );
   }
+
+
+  /* ==========================================================
+     CUT LIST (PDF) — always last in Elements
+     ========================================================== */
+
+  container
+    .querySelector('#open-cutlist-btn')
+    ?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onOpenCutList?.();
+    });
+
+  container
+    .querySelector('#nest-cutlist-btn')
+    ?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onNestCutList?.();
+    });
 
 
   /* ==========================================================
@@ -1313,18 +1435,60 @@ function restoreSectionHeights(
   heights
 ) {
 
-  if (
-    !root ||
-    !heights
-  ) {
+  if (!root) {
     return;
   }
 
+  const defaultHeights = {
+    components: `${COMPONENTS_HEIGHT}px`,
+    tools: `${TOOLS_HEIGHT}px`,
+    properties: `${PROPERTIES_HEIGHT}px`,
+  };
 
+
+  Object.entries(
+    defaultHeights
+  ).forEach(
+    ([name, height]) => {
+
+      const section =
+        root.querySelector(
+          `.toolbar-section[data-section="${CSS.escape(name)}"]`
+        );
+
+
+      if (!section) {
+        return;
+      }
+
+
+      /*
+       * Use the user's previously resized height if one exists.
+       * Otherwise use the configured default height.
+       */
+      section.style.height =
+        heights[name] ?? height;
+
+      section.style.flex =
+        '0 0 auto';
+    }
+  );
+
+
+  /*
+   * Restore any other section heights that may exist.
+   */
   Object.entries(
     heights
   ).forEach(
     ([name, height]) => {
+
+      if (
+        defaultHeights[name]
+      ) {
+        return;
+      }
+
 
       const section =
         root.querySelector(
@@ -1340,13 +1504,8 @@ function restoreSectionHeights(
       section.style.height =
         height;
 
-
       section.style.flex =
         '0 0 auto';
-
-
-      section.dataset.userResized =
-        'true';
     }
   );
 }
@@ -1420,9 +1579,9 @@ export function installToolbarSectionResizers(
 
 
         /*
-         * Properties (the last section, when present) gets extra
-         * protected height — same role the old Relations section
-         * used to play.
+         * Properties (the last resizable section, when present)
+         * gets extra protected height — same role the old
+         * Relations section used to play.
          */
         if (
           section.dataset.section ===

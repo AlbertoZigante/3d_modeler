@@ -135,12 +135,6 @@ export function renderProperties(
       ${axisFieldHTML('offset', 'z', selectedPanel.offset.z)}
     </div>
     <div class="transform-label">Position offset (mm)</div>
-    <div class="transform-grid">
-      ${axisFieldHTML('rotation', 'x', selectedPanel.rotation.x)}
-      ${axisFieldHTML('rotation', 'y', selectedPanel.rotation.y)}
-      ${axisFieldHTML('rotation', 'z', selectedPanel.rotation.z)}
-    </div>
-    <div class="transform-label">Rotation (degrees)</div>
   `;
 
   // ---- rename (pencil icon) ----

@@ -201,6 +201,83 @@
       color: #3a3126;
     }
 
+    /* =========================================================
+      UNDO / REDO
+      ========================================================= */
+
+    .history-controls {
+
+      display: flex;
+
+      gap: 3px;
+
+      margin-left: 4px;
+    }
+
+
+    .history-btn {
+
+      width: 30px;
+      height: 28px;
+
+      display: flex;
+
+      align-items: center;
+      justify-content: center;
+
+      padding: 0;
+
+      border:
+        1px solid #e3d3ba;
+
+      border-radius: 5px;
+
+      background: #f8efe2;
+
+      color: #7a6d58;
+
+      cursor: pointer;
+
+      font-size: 17px;
+
+      line-height: 1;
+
+      transition:
+        background .15s,
+        color .15s,
+        border-color .15s,
+        opacity .15s;
+    }
+
+
+    .history-btn:hover:not(:disabled) {
+
+      background: #fff;
+
+      color: #b5601f;
+
+      border-color: #d5c5a8;
+    }
+
+
+    .history-btn:active:not(:disabled) {
+
+      background: #ece0cc;
+
+      transform: translateY(1px);
+    }
+
+
+    .history-btn:disabled {
+
+      opacity: .35;
+
+      cursor: default;
+
+      color: #a4977f;
+
+      background: #f3e8d8;
+    }
 
     /* =========================================================
        MAIN
@@ -262,9 +339,9 @@
     #list-panel.collapsed,
     #inspector.collapsed {
 
-      width: 32px !important;
+      width: 2px !important;
 
-      min-width: 32px !important;
+      min-width: 2px !important;
 
       padding: 0 !important;
 
@@ -330,16 +407,17 @@
       top: 50%;
       left: 50%;
 
-      transform:
-        translate(-50%, -50%);
+      transform: translate(-50%, -50%);
 
-      width: 24px;
-      height: 44px;
+      width: 28px;
+      height: 48px;
 
       display: flex;
 
       align-items: center;
       justify-content: center;
+
+      padding: 0;
 
       border:
         1px solid #e3d3ba;
@@ -356,7 +434,9 @@
 
       cursor: pointer;
 
-      z-index: 100;
+      pointer-events: auto;
+
+      z-index: 1000;
 
       box-shadow:
         0 1px 3px rgba(0,0,0,.08);
@@ -364,6 +444,17 @@
       transition:
         background .15s,
         color .15s;
+    }
+
+    .resizer {
+      position: relative;
+      flex: 0 0 6px;
+      min-width: 6px;
+      pointer-events: auto;
+    }
+
+    .resizer .collapse-tab {
+      pointer-events: auto;
     }
 
 
@@ -1703,6 +1794,37 @@
     </div>
 
 
+    <div
+      class="history-controls"
+      id="history-controls"
+    >
+
+      <button
+        type="button"
+        class="history-btn"
+        id="undo-btn"
+        title="Undo"
+        aria-label="Undo"
+        disabled
+      >
+        ↶
+      </button>
+
+
+      <button
+        type="button"
+        class="history-btn"
+        id="redo-btn"
+        title="Redo"
+        aria-label="Redo"
+        disabled
+      >
+        ↷
+      </button>
+
+    </div>
+
+
     <div class="spacer"></div>
 
 
@@ -1885,69 +2007,10 @@
       ></div>
 
 
-      <div class="divider"></div>
+       <div class="divider"></div>
 
 
-      <div class="section-title">
-        Cut List (derived, per piece)
-      </div>
-
-
-      <div
-        style="
-          overflow:auto;
-          max-width:100%;
-        "
-      >
-
-        <table class="bom">
-
-          <thead>
-
-            <tr>
-
-              <th>
-                Piece
-              </th>
-
-              <th class="right">
-                W × H (mm)
-              </th>
-
-              <th>
-                Material
-              </th>
-
-              <th class="right">
-                Thk
-              </th>
-
-              <th>
-                Grain
-              </th>
-
-              <th>
-                Edges
-              </th>
-
-              <th class="right">
-                Qty
-              </th>
-
-              <th class="right">
-                m²
-              </th>
-
-            </tr>
-
-          </thead>
-
-
-          <tbody
-            id="bom-body"
-          ></tbody>
-
-        </table>
+      <div id="nesting-summary"></div>
 
       </div>
 
@@ -1980,166 +2043,246 @@
        ======================================================= -->
 
   <script type="module">
+  /* ============================================================
+    LEFT / RIGHT TOOLBAR CONTROLS
+    ============================================================ */
 
-    /* =========================================================
-       COLLAPSE / EXPAND
-       ========================================================= */
+  (() => {
+    'use strict';
 
-    function setupCollapseButton(
+    const MIN_WIDTH = 220;
+    const MAX_WIDTH = 460;
+    const COLLAPSED_WIDTH = 32;
+
+    /*
+    * Keep the last expanded width for each toolbar.
+    */
+    const savedWidths = {
+      left: 260,
+      right: 260
+    };
+
+
+    /* ==========================================================
+      UTILS
+      ========================================================== */
+
+    function getPanel(panelId) {
+      return document.getElementById(panelId);
+    }
+
+    function getButton(buttonId) {
+      return document.getElementById(buttonId);
+    }
+
+    function getResizer(resizerId) {
+      return document.getElementById(resizerId);
+    }
+
+
+    function getCurrentWidth(panel) {
+      if (!panel) {
+        return 260;
+      }
+
+      const width = panel.getBoundingClientRect().width;
+
+      return Number.isFinite(width) && width > 0
+        ? width
+        : 260;
+    }
+
+
+    function clampWidth(width) {
+      return Math.max(
+        MIN_WIDTH,
+        Math.min(MAX_WIDTH, width)
+      );
+    }
+
+
+    /* ==========================================================
+      COLLAPSE / EXPAND
+      ========================================================== */
+
+    function setupCollapseButton({
       buttonId,
       panelId,
-      expandedTitle,
-      collapsedTitle
-    ) {
+      side
+    }) {
+      const button = getButton(buttonId);
+      const panel = getPanel(panelId);
 
-      const button =
-        document.getElementById(
-          buttonId
+      if (!button || !panel) {
+        console.warn(
+          `[Toolbar] Cannot initialise collapse button: ${buttonId}`
         );
-
-
-      const panel =
-        document.getElementById(
-          panelId
-        );
-
-
-      if (
-        !button ||
-        !panel
-      ) {
         return;
       }
-
 
       /*
-       * Avoid installing the handler more than once.
-       */
-      if (
-        button.dataset.collapseInstalled ===
-        'true'
-      ) {
+      * Prevent duplicate installation if this script is evaluated
+      * more than once.
+      */
+      if (button.dataset.toolbarCollapseInstalled === 'true') {
         return;
       }
 
+      button.dataset.toolbarCollapseInstalled = 'true';
 
-      button.dataset.collapseInstalled =
-        'true';
+
+      function updateButton() {
+        const collapsed =
+          panel.classList.contains('collapsed');
+
+        button.textContent = '<>';
+
+        button.title = collapsed
+          ? `Expand ${side === 'left' ? 'Elements toolbar' : 'inspector'}`
+          : `Collapse ${side === 'left' ? 'Elements toolbar' : 'inspector'}`;
+
+        button.setAttribute(
+          'aria-label',
+          button.title
+        );
+
+        button.setAttribute(
+          'aria-expanded',
+          String(!collapsed)
+        );
+      }
 
 
       button.addEventListener(
         'click',
         (event) => {
-
           event.preventDefault();
           event.stopPropagation();
 
+          /*
+          * If the toolbar is being resized, never interpret the
+          * release as a collapse click.
+          */
+          if (document.body.classList.contains('toolbar-side-resizing')) {
+            return;
+          }
 
-          const collapsed =
-            panel.classList.toggle(
-              'collapsed'
-            );
 
+          const isCollapsed =
+            panel.classList.contains('collapsed');
+
+
+          if (isCollapsed) {
+
+            /*
+            * EXPAND
+            *
+            * Restore the width that existed before collapsing.
+            */
+            const width =
+              clampWidth(
+                savedWidths[side] || 260
+              );
+
+            panel.classList.remove('collapsed');
+
+            panel.style.width =
+              `${width}px`;
+
+            panel.style.minWidth =
+              `${width}px`;
+
+          } else {
+
+            /*
+            * COLLAPSE
+            *
+            * Save the current expanded width first.
+            */
+            const currentWidth =
+              getCurrentWidth(panel);
+
+            if (
+              currentWidth > COLLAPSED_WIDTH + 1
+            ) {
+              savedWidths[side] =
+                clampWidth(currentWidth);
+            }
+
+            panel.classList.add('collapsed');
+
+            /*
+            * CSS already forces the collapsed width to 32px.
+            * Do NOT put an inline width of 32px here because that
+            * would make restoring the previous width harder.
+            */
+            panel.style.minWidth = '';
+          }
+
+
+          updateButton();
 
           /*
-           * IMPORTANT:
-           *
-           * Use textContent, not innerHTML.
-           *
-           * This keeps the visible symbol as "<>" while
-           * avoiding the invalid HTML sequence "<>".
-           */
-          button.textContent =
-            '<>';
-
-
-          button.title =
-            collapsed
-              ? collapsedTitle
-              : expandedTitle;
-
-
-          button.setAttribute(
-            'aria-label',
-            button.title
-          );
-        }
+          * Make sure the click never reaches the resizer.
+          */
+          event.stopImmediatePropagation();
+        },
+        true
       );
+
+
+      /*
+      * Initialise the button state.
+      */
+      updateButton();
     }
 
 
-    setupCollapseButton(
-      'toggle-list-btn',
-      'list-panel',
-      'Collapse Elements toolbar',
-      'Expand Elements toolbar'
-    );
+    /* ==========================================================
+      SIDE TOOLBAR RESIZER
+      ========================================================== */
 
-
-    setupCollapseButton(
-      'toggle-inspector-btn',
-      'inspector',
-      'Collapse inspector',
-      'Expand inspector'
-    );
-
-
-    /* =========================================================
-       SIDE WIDTH RESIZERS
-       ========================================================= */
-
-    function installSideResizer(
+    function installSideResizer({
       resizerId,
       panelId,
-      direction
-    ) {
+      side
+    }) {
+      const resizer = getResizer(resizerId);
+      const panel = getPanel(panelId);
 
-      const resizer =
-        document.getElementById(
-          resizerId
+      if (!resizer || !panel) {
+        console.warn(
+          `[Toolbar] Cannot initialise resizer: ${resizerId}`
         );
-
-
-      const panel =
-        document.getElementById(
-          panelId
-        );
-
-
-      if (
-        !resizer ||
-        !panel
-      ) {
         return;
       }
 
 
       if (
-        resizer.dataset.sideResizeInstalled ===
-        'true'
+        resizer.dataset.toolbarSideResizeInstalled === 'true'
       ) {
         return;
       }
 
-
-      resizer.dataset.sideResizeInstalled =
-        'true';
+      resizer.dataset.toolbarSideResizeInstalled = 'true';
 
 
       let dragging = false;
-
+      let pointerId = null;
       let startX = 0;
       let startWidth = 0;
 
 
-      const MIN_WIDTH = 220;
-      const MAX_WIDTH = 460;
+      /* ----------------------------------------------------------
+        START
+        ---------------------------------------------------------- */
 
+      function startResize(event) {
 
-      function start(
-        event
-      ) {
-
+        /*
+        * Mouse:
+        * only the primary button starts resizing.
+        */
         if (
           event.pointerType === 'mouse' &&
           event.button !== 0
@@ -2148,53 +2291,69 @@
         }
 
 
+        /*
+        * IMPORTANT:
+        *
+        * The collapse button lives INSIDE the resizer.
+        *
+        * Never start a width drag from the collapse button.
+        */
         if (
-          event.target.closest(
-            '.collapse-tab'
-          )
+          event.target instanceof Element &&
+          event.target.closest('.collapse-tab')
         ) {
           return;
         }
 
 
+        /*
+        * Don't resize a collapsed toolbar.
+        */
         if (
-          panel.classList.contains(
-            'collapsed'
-          )
+          panel.classList.contains('collapsed')
         ) {
           return;
         }
 
 
         dragging = true;
+        pointerId = event.pointerId;
 
-
-        startX =
-          event.clientX;
-
+        startX = event.clientX;
 
         startWidth =
-          panel
-            .getBoundingClientRect()
-            .width;
+          getCurrentWidth(panel);
 
 
-        resizer.classList.add(
-          'dragging'
+        /*
+        * Store the expanded width continuously.
+        * This guarantees that expanding after a drag restores
+        * exactly what the user selected.
+        */
+        savedWidths[side] =
+          clampWidth(startWidth);
+
+
+        resizer.classList.add('dragging');
+
+        document.body.classList.add(
+          'toolbar-side-resizing'
         );
-
 
         document.body.style.userSelect =
           'none';
 
+        document.body.style.cursor =
+          'col-resize';
+
 
         try {
-
           resizer.setPointerCapture(
             event.pointerId
           );
-
-        } catch (_) {}
+        } catch (_) {
+          // Pointer capture isn't supported everywhere.
+        }
 
 
         event.preventDefault();
@@ -2202,50 +2361,88 @@
       }
 
 
-      function move(
-        event
-      ) {
+      /* ----------------------------------------------------------
+        MOVE
+        ---------------------------------------------------------- */
+
+      function resize(event) {
 
         if (!dragging) {
           return;
         }
 
+        /*
+        * Only react to the pointer that started the drag.
+        */
+        if (
+          pointerId !== null &&
+          event.pointerId !== pointerId
+        ) {
+          return;
+        }
+
 
         let delta =
-          event.clientX -
-          startX;
+          event.clientX - startX;
 
 
-        if (
-          direction === 'right'
-        ) {
+        /*
+        * Left toolbar:
+        *
+        *     dragging right  => wider
+        *     dragging left   => narrower
+        *
+        * Right toolbar:
+        *
+        *     dragging left   => wider
+        *     dragging right  => narrower
+        */
+        if (side === 'right') {
           delta = -delta;
         }
 
 
-        const width =
-          Math.max(
-            MIN_WIDTH,
-            Math.min(
-              MAX_WIDTH,
-              startWidth + delta
-            )
+        const newWidth =
+          clampWidth(
+            startWidth + delta
           );
 
 
         panel.style.width =
-          `${width}px`;
+          `${newWidth}px`;
+
+        panel.style.minWidth =
+          `${newWidth}px`;
+
+        panel.style.maxWidth =
+          `${newWidth}px`;
+
+
+        savedWidths[side] =
+          newWidth;
 
 
         event.preventDefault();
       }
 
 
-      function stop(
-        event
-      ) {
+      /* ----------------------------------------------------------
+        STOP
+        ---------------------------------------------------------- */
+
+      function stopResize(event) {
 
         if (!dragging) {
+          return;
+        }
+
+
+        if (
+          event &&
+          pointerId !== null &&
+          event.pointerId !== undefined &&
+          event.pointerId !== pointerId
+        ) {
           return;
         }
 
@@ -2257,61 +2454,70 @@
           'dragging'
         );
 
+        document.body.classList.remove(
+          'toolbar-side-resizing'
+        );
 
         document.body.style.userSelect =
           '';
 
+        document.body.style.cursor =
+          '';
+
 
         try {
-
           if (
+            pointerId !== null &&
             resizer.hasPointerCapture &&
-            resizer.hasPointerCapture(
-              event.pointerId
-            )
+            resizer.hasPointerCapture(pointerId)
           ) {
-
             resizer.releasePointerCapture(
-              event.pointerId
+              pointerId
             );
           }
-
         } catch (_) {}
+
+
+        pointerId = null;
       }
 
 
+      /* ----------------------------------------------------------
+        POINTER EVENTS
+        ---------------------------------------------------------- */
+
       resizer.addEventListener(
         'pointerdown',
-        start
+        startResize
       );
-
 
       resizer.addEventListener(
         'pointermove',
-        move
+        resize
       );
-
 
       resizer.addEventListener(
         'pointerup',
-        stop
+        stopResize
       );
-
 
       resizer.addEventListener(
         'pointercancel',
-        stop
+        stopResize
       );
 
 
+      /*
+      * Safety net:
+      * if the pointer leaves the resizer or pointer capture is lost,
+      * still terminate the drag.
+      */
       window.addEventListener(
         'pointerup',
         (event) => {
-
           if (dragging) {
-            stop(event);
+            stopResize(event);
           }
-
         },
         true
       );
@@ -2320,30 +2526,88 @@
       window.addEventListener(
         'pointercancel',
         (event) => {
-
           if (dragging) {
-            stop(event);
+            stopResize(event);
           }
-
         },
         true
+      );
+
+
+      /*
+      * Prevent text/image dragging while resizing.
+      */
+      resizer.addEventListener(
+        'dragstart',
+        (event) => {
+          if (dragging) {
+            event.preventDefault();
+          }
+        }
       );
     }
 
 
-    installSideResizer(
-      'resizer-left',
-      'list-panel',
-      'left'
-    );
+    /* ==========================================================
+      INITIALISE
+      ========================================================== */
+
+    function initialiseSideToolbars() {
+
+      /*
+      * LEFT
+      */
+      setupCollapseButton({
+        buttonId: 'toggle-list-btn',
+        panelId: 'list-panel',
+        side: 'left'
+      });
 
 
-    installSideResizer(
-      'resizer-right',
-      'inspector',
-      'right'
-    );
+      installSideResizer({
+        resizerId: 'resizer-left',
+        panelId: 'list-panel',
+        side: 'left'
+      });
 
+
+      /*
+      * RIGHT
+      */
+      setupCollapseButton({
+        buttonId: 'toggle-inspector-btn',
+        panelId: 'inspector',
+        side: 'right'
+      });
+
+
+      installSideResizer({
+        resizerId: 'resizer-right',
+        panelId: 'inspector',
+        side: 'right'
+      });
+    }
+
+
+    /*
+    * The script is currently at the end of <body>, but using
+    * DOMContentLoaded as well makes this safe if it is moved later.
+    */
+    if (
+      document.readyState === 'loading'
+    ) {
+      document.addEventListener(
+        'DOMContentLoaded',
+        initialiseSideToolbars,
+        {
+          once: true
+        }
+      );
+    } else {
+      initialiseSideToolbars();
+    }
+
+  })();
   </script>
 
 </body>
