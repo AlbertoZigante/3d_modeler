@@ -29,7 +29,6 @@ import {
   createPanelNode,
   computeNextBasePosition,
   computeWorldHalfExtents,
-  computeBoxLayout,
   MM_TO_UNIT,
   MIN_PANEL_DIM_MM,
   FLOOR_MM,
@@ -52,12 +51,27 @@ import { renderProperties } from './ui/properties.js';
 import { renderPanelList } from './ui/toolbar.js';
 import { renderRelations } from './ui/relations.js';
 import { initResizableLayout } from './ui/layout.js';
+import { addBox, relayoutBox} from './features/box.js';
+
+// TO ADD THE FOLLOWING IMPORTS
+import {isShelf} from './features/shelf.js'
+import {startShelfMode, cancelShelfMode} from './tools/shelfTool.js'
+import {startCollinearMode, cancelCollinearMode} from './tools/collinearTool.js'
+import {clampOffsetToDesignLimits,
+  clampGroupOffsetToDesignLimits,
+  findPanelSizeViolation,
+  findDesignLimitViolation,
+  collectAxisSlabs} from './shared/geometry.js'
+import {showToast, hideToast, showDesignLimitError, showPanelSizeLimitError} from './ui/toast.js'
+import {openCutListWindow, openNestingPlan, renderNestingSummary, setBomRows} from './ui/cutlist.js'
+import {openCutListWindow, openNestingPlan, renderNestingSummary} from './ui/cutlist.js'
+
 import {
   history,createStateCommand,MovePanelCommand,MoveGroupCommand,ResizePanelCommand,ChangeMaterialCommand,
   ChangeGroupMaterialCommand,RenamePanelCommand,AddPanelCommand,DeletePanelCommand,AddBoxCommand,
   DeleteBoxCommand,GroupPanelsCommand,UngroupPanelsCommand,AddShelfCommand,DeleteShelfCommand,
   AddConstraintCommand,RemoveConstraintCommand,UnlinkConstraintCommand,HideBoxWallCommand,RestoreBoxWallCommand,
-} from './modeller/history.js';
+} from './history/history.js';
 initResizableLayout();
 
 // ---- THE GRAPH ----
@@ -77,7 +91,7 @@ function restorePanelsState(nextPanels) {
   renderAll();
 }
 
-function recordHistoryCommand(CommandClass, before, after) {
+export function recordHistoryCommand(CommandClass, before, after) {
   const command = createStateCommand({
     CommandClass,
     before,
@@ -95,67 +109,14 @@ function recordHistoryCommand(CommandClass, before, after) {
 // without needing to re-nest just to notice.
 let lastNestingResult = null; // { nestResults, summary, signature } | null
 
-function bomRowsSignature(rows) {
-  return rows.map((r) => `${r.label}|${r.material}|${r.thicknessMm}|${r.widthMm}|${r.heightMm}|${r.quantity}`).join(';');
-}
 
-function escapeHtmlLocal(value) {
-  const div = document.createElement('div');
-  div.textContent = String(value ?? '');
-  return div.innerHTML;
-}
-function openCutListWindow() {
-  if (lastBomRows.length === 0) return;
-  exportCutListPdf(lastBomRows, { projectName: 'Cut List', mode: 'open' });
-}
 
-function openNestingPlan() {
-  if (lastBomRows.length === 0) return;
-  const nestResults = nestCutList(lastBomRows, MATERIAL_CATALOG, {});
-  const summary = summarizeNestingResult(nestResults, MATERIAL_CATALOG);
-  lastNestingResult = { nestResults, summary, signature: bomRowsSignature(lastBomRows) }; // <-- missing
-  renderNestingSummary(); // <-- missing
-  exportNestingPdf(nestResults, summary, { projectName: 'Nesting Plan', mode: 'open' });
-}
 
-function renderNestingSummary() {
-  if (!nestingSummaryEl) return;
 
-  if (!lastNestingResult) {
-    nestingSummaryEl.innerHTML = '';
-    return;
-  }
 
-  const { summary, signature } = lastNestingResult;
-  const stale = signature !== bomRowsSignature(lastBomRows);
-  const unplacedMaterials = summary.perMaterial.filter((m) => m.unplacedCount > 0);
 
-  nestingSummaryEl.innerHTML = `
-    <div class="section-title">Nesting Plan</div>
 
-    ${stale ? `
-      <div class="warning-banner">
-        Design changed since this was last nested — numbers below may be out of date. Re-run "Nest Cut List" to refresh.
-      </div>
-    ` : ''}
 
-    <div style="font-size:12px; color:#3a3126; margin-bottom:12px; line-height:1.6;">
-      ${summary.totals.sheetsUsed} sheet(s) &middot;
-      ${(summary.totals.utilization * 100).toFixed(1)}% utilization
-      ${summary.totals.totalCost > 0 ? ` &middot; ${summary.totals.totalCost.toFixed(2)} total` : ''}
-    </div>
-
-    ${unplacedMaterials.length > 0 ? `
-      <div class="warning-banner">
-        <strong>${summary.totals.unplacedCount} piece(s) don't fit any configured stock sheet:</strong>
-        <br>
-        ${unplacedMaterials
-          .map((m) => `${escapeHtmlLocal(m.material)}: ${m.unplacedLabels.map(escapeHtmlLocal).join(', ')} (${m.unplacedCount} pc, ${m.unplacedAreaM2.toFixed(2)}m²)`)
-          .join('<br>')}
-      </div>
-    ` : ''}
-  `;
-}
 // Ctrl/Cmd-click — in the panel list OR either 2D/3D view — toggles
 // membership here; "Group selected" (see groupSelectedPanels below)
 // turns the current set into a real group and clears it. Only ever
@@ -173,178 +134,16 @@ const multiSelectedIds = new Set();
 let groupDragStartOffsets = null; // Map<nodeId, {x,y,z}> | null
 let moveDragBefore = null;
 let moveDragIsGroup = false;
-// -------------------------------------------------------------
-// Design limits (DESIGN_LIMITS_MM, in modules.js): the overall space
-// a design may occupy, checked at every edit entry point below — not
-// a view/camera clipping limit. Move-drags CLAMP per axis (so the
-// panel slides smoothly and just stops at the wall); resize-drags and
-// typed inspector fields REJECT the whole edit outright (simpler and
-// clearer than silently shrinking a typed value to whatever fits).
-// -------------------------------------------------------------
-const AXIS_LABEL = { x: 'width (X)', y: 'height (Y)', z: 'depth (Z)' };
+
 let designLimitHideTimer = null;
 
-// Shared toast plumbing for every short-lived status/error message in
-// this file (design-limit hits, panel-size hits, and — see
-// startCollinearMode below — the collinear tool's own "select a
-// face..." guidance). `autoHide` distinguishes a self-clearing error
-// flash from a STATUS message that should stay up until the caller
-// explicitly changes or clears it (e.g. while a multi-step pick is
-// still in progress).
 
-function showToast(text, autoHide = true) {
-  const toastEl =
-    document.getElementById('toolbar-properties-toast');
 
-  if (!toastEl) {
-    return;
-  }
 
-  toastEl.innerHTML = `
-    <div class="properties-hint">
-      ${escapeHtmlLocal(text)}
-    </div>
-  `;
 
-  clearTimeout(designLimitHideTimer);
 
-  if (autoHide) {
-    designLimitHideTimer = setTimeout(() => {
-      hideToast();
-    }, 2200);
-  }
-}
 
-function hideToast() {
-  clearTimeout(designLimitHideTimer);
 
-  const toastEl =
-    document.getElementById('toolbar-properties-toast');
-
-  if (!toastEl) {
-    return;
-  }
-
-  toastEl.innerHTML = '';
-}
-
-function showDesignLimitError(axis) {
-  showToast(`Design limit reached for ${AXIS_LABEL[axis]}`);
-}
-
-function applyBoxResize(sourceNodeId, deltaMm) {
-  const source = panels.find((p) => p.id === sourceNodeId);
-  if (!source) return;
-
-  const nextOffset = {
-    ...source.offset,
-    x: source.offset.x + deltaMm.x,
-    y: source.offset.y + deltaMm.y,
-    z: source.offset.z + deltaMm.z,
-  };
-
-  const { offset, hitAxis } =
-    clampOffsetToDesignLimits(source, nextOffset);
-
-  updateNode(sourceNodeId, {
-    offset,
-  });
-
-  if (hitAxis) {
-    showDesignLimitError(hitAxis);
-  }
-}
-
-// Move-drags: clamps the PROPOSED offset per axis against the panel's
-// own true world-space size (computeWorldHalfExtents accounts for
-// rotation — a Horizontal panel's thickness is what extends along Z,
-// not its width). basePosition never changes, so it's always the
-// correct zero-offset reference to clamp relative to.
-function clampOffsetToDesignLimits(node, proposedOffset) {
-  const halfExtents = computeWorldHalfExtents(node);
-  const base = node.basePosition;
-  const clamped = { ...proposedOffset };
-  let hitAxis = null;
-  ['x', 'y', 'z'].forEach((axis) => {
-    const limit = DESIGN_LIMITS_MM[axis];
-    const minAbs = limit.min + halfExtents[axis];
-    const maxAbs = limit.max - halfExtents[axis];
-    const proposedAbs = base[axis] + (proposedOffset[axis] || 0);
-    if (proposedAbs < minAbs) {
-      clamped[axis] = minAbs - base[axis];
-      hitAxis = axis;
-    } else if (proposedAbs > maxAbs) {
-      clamped[axis] = maxAbs - base[axis];
-      hitAxis = axis;
-    }
-  });
-  return { offset: clamped, hitAxis };
-}
-
-// Group move-drags: like clampOffsetToDesignLimits above, but for a
-// RIGID multi-member move. Finds each member's own allowed per-axis
-// delta range (from its own world half-extents and drag-start
-// position), intersects those ranges across every member to get the
-// single most restrictive range for the whole group, then clamps the
-// proposed delta to THAT — so all members are held to the exact same
-// reduced delta and the group never loses its rigidity at the
-// boundary (as opposed to each member independently clamping to its
-// own limit and drifting apart from the others).
-function clampGroupOffsetToDesignLimits(members, startOffsets, proposedDeltaMm) {
-  const clamped = { ...proposedDeltaMm };
-  let hitAxis = null;
-  ['x', 'y', 'z'].forEach((axis) => {
-    const limit = DESIGN_LIMITS_MM[axis];
-    let groupMin = -Infinity;
-    let groupMax = Infinity;
-    members.forEach((node) => {
-      const start = startOffsets.get(node.id);
-      if (!start) return;
-      const halfExtents = computeWorldHalfExtents(node);
-      const baseAbs = node.basePosition[axis] + start[axis]; // this member's absolute position at drag-start (delta is applied on top of this)
-      groupMin = Math.max(groupMin, limit.min + halfExtents[axis] - baseAbs);
-      groupMax = Math.min(groupMax, limit.max - halfExtents[axis] - baseAbs);
-    });
-    const proposed = proposedDeltaMm[axis] || 0;
-    if (proposed < groupMin) {
-      clamped[axis] = groupMin;
-      hitAxis = axis;
-    } else if (proposed > groupMax) {
-      clamped[axis] = groupMax;
-      hitAxis = axis;
-    }
-  });
-  return { delta: clamped, hitAxis };
-}
-
-// Resize-drags and typed fields: outright rejects if a panel's own
-// width/height would exceed PANEL_SIZE_LIMITS_MM — returns the
-// offending field ('width'|'height'), or null if within limits.
-// Separate from findDesignLimitViolation below, which bounds the
-// overall scene rather than any single panel's own dimensions.
-function findPanelSizeViolation(dims) {
-  if (dims.width > PANEL_SIZE_LIMITS_MM.width) return 'width';
-  if (dims.height > PANEL_SIZE_LIMITS_MM.height) return 'height';
-  return null;
-}
-
-function showPanelSizeLimitError(field) {
-  showToast(`Maximum panel ${field} is ${PANEL_SIZE_LIMITS_MM[field]}mm`);
-}
-
-// Resize-drags and typed fields: outright rejects if the FINAL
-// position + dimensions would violate any axis — returns the
-// offending axis, or null if the edit is fine as proposed.
-function findDesignLimitViolation(rotation, positionMm, dims) {
-  const halfExtents = computeWorldHalfExtents({ rotation, ...dims });
-  for (const axis of ['x', 'y', 'z']) {
-    const limit = DESIGN_LIMITS_MM[axis];
-    const min = positionMm[axis] - halfExtents[axis];
-    const max = positionMm[axis] + halfExtents[axis];
-    if (min < limit.min - 0.01 || max > limit.max + 0.01) return axis;
-  }
-  return null;
-}
 
 // ---- DOM refs ----
 const canvas = document.getElementById('canvas');
@@ -592,30 +391,8 @@ let collinearPick1 = null; // { nodeId, faceName, axis, sign, dimField } | null
 let collinearGapMm = 0; // user-editable, see the toolbar's own gap input — read fresh at commit time, not captured per-pick, so changing it mid-pick before the second click still applies
 const AXIS_TO_POSITION_FIELD = { x: 'positionX', y: 'positionY', z: 'positionZ' };
 
-function startCollinearMode() {
-  if (shelfMode) cancelShelfMode(); // mutually exclusive — both are single-slot pick-mode tools sharing setFacePickMode
-  collinearActive = true;
-  collinearPick1 = null;
-  setSelectedId(null);
-  setSelectedGroupId(null);
-  multiSelectedIds.clear();
-  setFaceHighlight(null, null); // clean start, in case a prior session was interrupted before clearing this itself
-  setFacePickMode(true, handleFacePick);
-  showToast(
-    collinearGapMm ? `Collinear (${collinearGapMm}mm gap): pick a face or edge on the panel to constrain` : 'Collinear: pick a face or edge on the panel to constrain',
-    false
-  );
-  renderAll();
-}
 
-function cancelCollinearMode() {
-  collinearActive = false;
-  collinearPick1 = null;
-  setSelectedId(null);
-  setFacePickMode(false, null);
-  hideToast();
-  renderAll();
-}
+
 
 // -------------------------------------------------------------
 // SHELF TOOL — box-only. Pick two BOUNDARY panels on the same axis and
@@ -659,519 +436,36 @@ function cancelCollinearMode() {
 // share HORIZONTAL_ROTATION.
 const SHELF_BOUNDARY_ROTATION = { horizontal: () => VERTICAL_ROTATION, vertical: () => HORIZONTAL_ROTATION };
 
-function rotationsMatch(a, b) {
-  return a.x === b.x && a.y === b.y && a.z === b.z;
-}
+
 
 let shelfMode = null;
 let shelfPick1 = null;
 let shelfPick1ClickMm = null; // desired position along the shelf's free axis, from where the first pick was clicked — null if unavailable (e.g. 2D view), in which case addShelf falls back to auto-placement
 
-function startShelfMode(mode) {
-  if (collinearActive) cancelCollinearMode();
-  shelfMode = mode;
-  shelfPick1 = null;
-  shelfPick1ClickMm = null;
-  setSelectedId(null);
-  setSelectedGroupId(null);
-  multiSelectedIds.clear();
-  setFaceHighlight(null, null);
-  setFacePickMode(true, handleShelfPick);
-  const kind = mode === 'horizontal' ? 'Left/Right (or an existing vertical shelf)' : 'Top/Bottom (or an existing horizontal shelf)';
-  showToast(`${mode === 'horizontal' ? 'Horizontal' : 'Vertical'} shelf: pick a box's ${kind}`, false);
-  renderAll();
-}
-
-function cancelShelfMode() {
-  shelfMode = null;
-  shelfPick1 = null;
-  shelfPick1ClickMm = null;
-  setSelectedId(null);
-  setFaceHighlight(null, null);
-  setFacePickMode(false, null);
-  hideToast();
-  renderAll();
-}
-
-function handleShelfPick(nodeId, faceName, worldPoint) {
-  const node = panels.find((p) => p.id === nodeId);
-  if (!node) return;
-
-  const wantRotation = SHELF_BOUNDARY_ROTATION[shelfMode]();
-  const kindLabel = shelfMode === 'horizontal' ? 'a Left/Right panel or an existing vertical shelf' : 'a Top/Bottom panel or an existing horizontal shelf';
-  if (!node.groupId || !rotationsMatch(node.rotation, wantRotation)) {
-    showToast(`Pick ${kindLabel}`);
-    return;
-  }
-
-  if (!shelfPick1) {
-    shelfPick1 = node;
-    const freeAxis = shelfMode === 'horizontal' ? 'y' : 'x';
-    shelfPick1ClickMm = worldPoint ? computeClickOffsetMm(node, worldPoint, freeAxis) : null;
-    setPanelHighlight(nodeId, faceName);
-    showToast(`Now pick the OTHER boundary of the SAME box (${kindLabel})`, false);
-    renderAll();
-    return;
-  }
-
-  if (shelfPick1.id === nodeId) {
-    showToast('Pick a DIFFERENT panel, not the same one again');
-    return;
-  }
-  if (shelfPick1.groupId !== node.groupId) {
-    showToast('Both panels must belong to the same box');
-    return;
-  }
-
-  addShelf(shelfPick1, node);
-  cancelShelfMode();
-}
-
-// Box siblings are found by groupId + role name (see addBox — every
-// box panel is named exactly 'Left'/'Right'/'Top'/'Bottom'/'Back'/
-// 'Front') rather than by any stored per-role id list, since that's
-// already the single source of truth addBox itself relies on. Always
-// the box's REAL Back/Front — a shelf's depth always reaches the
-// actual box walls/door, never another shelf, regardless of which
-// two boundary panels were picked for width/height.
-function findBoxSibling(groupId, name) {
-  return panels.find((p) => p.groupId === groupId && p.name === name);
-}
-
-// Which of a resolved node's LOCAL faces both (a) aligns with `axis`
-// and (b) points TOWARD `otherResolved` — i.e. the one face of the
-// two possible (+/-) candidates that actually faces the other picked
-// boundary, determined from their real current positions rather than
-// assumed from role/name. This is what makes picking an existing
-// shelf as a boundary work exactly like picking Left/Right/Top/Bottom
-// — it doesn't matter which literal side of the box either one is on.
-function facingFace(resolved, axis, otherResolved) {
-  const towardSign = Math.sign(otherResolved.position[axis] - resolved.position[axis]) || 1;
-  for (const faceName of Object.keys(LOCAL_FACES)) {
-    const aligned = getAlignedAxis(resolved.rotation, faceName);
-    if (aligned && aligned.axis === axis && aligned.sign === towardSign) return faceName;
-  }
-  return null; // defensive — every panel in this app is axis-aligned, so one of the two candidate faces always matches
-}
-
-
-// Converts a raycast hit point (world units) into an offset-space mm
-// value along one axis, relative to the box's shared basePosition —
-// same space every shelf/wall offset already lives in.
-function computeClickOffsetMm(node, worldPoint, axis) {
-  const worldMm = { x: worldPoint.x / MM_TO_UNIT, y: worldPoint.y / MM_TO_UNIT, z: worldPoint.z / MM_TO_UNIT };
-  return worldMm[axis] - node.basePosition[axis];
-}
-
-// Given same-axis slabs (sorted ascending by center) and a shelf of
-// `thickness` to place, finds the gap-clamped center closest to
-// `desiredMm` among ONLY the gaps big enough to actually fit the
-// shelf with MIN_WALL_GAP_MM clearance on both sides. A gap too
-// small to fit is skipped entirely rather than rejecting placement
-// outright — a nearby gap not being big enough shouldn't block a
-// perfectly good gap further away. Returns { fits:false } only if
-// NO gap anywhere on this axis can fit the shelf.
-function pickGapForPosition(sortedSlabs, desiredMm, thickness) {
-  const halfT = thickness / 2;
-  const requiredSpan = thickness + 2 * MIN_WALL_GAP_MM;
-  let best = null;
-
-  for (let i = 0; i < sortedSlabs.length - 1; i++) {
-    const prevOuter = sortedSlabs[i].center + sortedSlabs[i].halfThickness;
-    const nextOuter = sortedSlabs[i + 1].center - sortedSlabs[i + 1].halfThickness;
-    const clearSpan = nextOuter - prevOuter;
-    if (clearSpan < requiredSpan) continue; // this gap can't hold the shelf at all — try the next one
-
-    const minCenter = prevOuter + MIN_WALL_GAP_MM + halfT;
-    const maxCenter = nextOuter - MIN_WALL_GAP_MM - halfT;
-    const center = Math.min(maxCenter, Math.max(minCenter, desiredMm)); // exact click point if it already fits, else clamped to the nearest valid spot in THIS gap
-    const dist = Math.abs(desiredMm - center);
-
-    if (!best || dist < best.dist) best = { center, dist };
-  }
-
-  return best ? { fits: true, center: best.center } : { fits: false };
-}
-
-// Given same-axis slabs (already sorted ascending by center) and a
-// thickness to fit, finds the largest gap between consecutive slabs
-// and returns where a new slab's CENTER would sit if placed in the
-// middle of that gap, plus how much clear space that gap actually
-// has (so the caller can tell "fits" from "doesn't"). Used instead
-// of a fixed midpoint so a second/third shelf on the same pair of
-// boundaries doesn't always land on top of the first one.
-function findBestShelfSlot(sortedSlabs, thickness) {
-  let best = null;
-  for (let i = 0; i < sortedSlabs.length - 1; i++) {
-    const prevOuter = sortedSlabs[i].center + sortedSlabs[i].halfThickness;
-    const nextOuter = sortedSlabs[i + 1].center - sortedSlabs[i + 1].halfThickness;
-    const clearSpan = nextOuter - prevOuter;
-    if (!best || clearSpan > best.clearSpan) {
-      best = { center: (prevOuter + nextOuter) / 2, clearSpan };
-    }
-  }
-  return best;
-}
-
-function addShelf(pick1, pick2) {
-  const groupId = pick1.groupId;
-  const back = findBoxSibling(groupId, 'Back');
-  const front = findBoxSibling(groupId, 'Front');
-  if (!back || !front) return;
-
-  const resolved = resolveConstraints(panels);
-  const r1 = resolved.find((r) => r.id === pick1.id);
-  const r2 = resolved.find((r) => r.id === pick2.id);
-  if (!r1 || !r2) return;
-
-  const spanAxis = shelfMode === 'horizontal' ? 'x' : 'y';
-  const face1 = facingFace(r1, spanAxis, r2);
-  const face2 = facingFace(r2, spanAxis, r1);
-  if (!face1 || !face2) return;
-
-  const freeAxis = shelfMode === 'horizontal' ? 'y' : 'x';
-  const anchor = pick1.basePosition;
-  const thickness = pick1.thickness;
-  const existingSlabs = collectAxisSlabs(groupId, freeAxis).sort((a, b) => a.center - b.center);
-
-  let proposedFreeOffset;
-  if (shelfPick1ClickMm != null) {
-    const picked = pickGapForPosition(existingSlabs, shelfPick1ClickMm, thickness);
-    if (!picked.fits) {
-      showToast('Not enough space for a shelf there');
-      return;
-    }
-    proposedFreeOffset = picked.center;
-  } else {
-    const slot = findBestShelfSlot(existingSlabs, thickness);
-    const requiredSpan = thickness + 2 * MIN_WALL_GAP_MM;
-    if (!slot || slot.clearSpan < requiredSpan) {
-      showToast('Not enough space for another shelf here');
-      return;
-    }
-    proposedFreeOffset = slot.center;
-  }
-  const spanFieldForBoundary = shelfMode === 'horizontal' ? 'width' : 'height';
-  const startWidthOrHeight = Math.abs(r2.position[spanAxis] - r1.position[spanAxis]);
-  const rotation = shelfMode === 'horizontal' ? HORIZONTAL_ROTATION : VERTICAL_ROTATION;
-  const material = pick1.material;
-
-  const spanToBoundaries = {
-    field: spanFieldForBoundary, type: 'spansBetween', overridden: false,
-    from: { node: pick1.id, face: face1, offset: 0 },
-    to: { node: pick2.id, face: face2, offset: 0 },
-    id: nextConstraintId(),
-  };
-  const spanToDepth = shelfMode === 'horizontal'
-    ? { field: 'height', type: 'spansBetween', overridden: false,
-        from: { node: back.id, face: 'front', offset: 0 }, to: { node: front.id, face: 'back', offset: 0 }, id: nextConstraintId() }
-    : { field: 'width', type: 'spansBetween', overridden: false,
-        from: { node: back.id, face: 'front', offset: 0 }, to: { node: front.id, face: 'back', offset: 0 }, id: nextConstraintId() };
-
-  const shelf = createPanelNode({
-    name: shelfMode === 'horizontal' ? 'Shelf (H)' : 'Shelf (V)',
-    width: shelfMode === 'horizontal' ? startWidthOrHeight : DEFAULT_BOX_DEPTH_MM,
-    height: shelfMode === 'horizontal' ? DEFAULT_BOX_DEPTH_MM : startWidthOrHeight,
-    thickness, material, rotation,
-    groupId,
-    lockedMoveAxes: shelfMode === 'horizontal' ? ['x', 'z'] : ['y', 'z'],
-    lockedResizeAxes: ['x', 'y', 'z'], // both dimension fields are constraint-derived (spanToBoundaries/spanToDepth) — same reasoning as box walls, dragging a dot wouldn't stick
-    constraints: [spanToBoundaries, spanToDepth],
-  });
-
-  shelf.basePosition = anchor;
-  shelf.offset = { x: 0, y: 0, z: 0 };
-  shelf.offset[freeAxis] = proposedFreeOffset;
-
-  const before = panels;
-  panels = [...panels, shelf];
-  const after = panels;
-  recordHistoryCommand(AddShelfCommand,before,after);
-  setSelectedGroupId(groupId);
-  setSelectedId(shelf.id);
-  renderAll();
-}
-
-// other than the collinear tool itself — an explicit constraint on
-// that field, or a box panel's static structural lock? If so, MOVING
-// it would either override that other relation or fight the box's
-// own geometry, so applyCollinear should resize instead.
-function isAxisPositionLocked(node, axis) {
-  const field = AXIS_TO_POSITION_FIELD[axis];
-  const hasConstraint = (node.constraints || []).some((c) => !c.overridden && c.field === field);
-  const hasStaticBoxLock = (node.lockedMoveAxes || []).includes(axis);
-  return hasConstraint || hasStaticBoxLock;
-}
-
-function handleFacePick(nodeId, faceName) {
-  const resolved = resolveConstraints(panels).find((r) => r.id === nodeId);
-  if (!resolved) return;
-
-  // Any face is a valid PICK — whether it ends up moving or resizing
-  // panel A is decided later, in applyCollinear, once we know both
-  // panels and can check isAxisPositionLocked.
-  const dimField = FACE_TO_DIM_FIELD[faceName];
-  const aligned = getAlignedAxis(resolved.rotation, faceName);
-  if (!aligned) return; // defensive: every panel in this app is axis-aligned, this should never actually happen
-
-  if (!collinearPick1) {
-    collinearPick1 = { nodeId, faceName, axis: aligned.axis, sign: aligned.sign, dimField };
-    setFaceHighlight(nodeId, faceName); // highlights exactly the picked face/edge, not the whole panel — see scene.js's setFaceHighlight
-    showToast(
-      collinearGapMm ? `Now pick a PARALLEL face/edge on a different panel (${collinearGapMm}mm gap)` : 'Now pick a PARALLEL face/edge on a different panel',
-      false
-    );
-    renderAll();
-    return;
-  }
-
-  if (collinearPick1.nodeId === nodeId) {
-    showToast('Pick a face/edge on a DIFFERENT panel');
-    return; // keep pick1 as-is, let them retry
-  }
-
-  if (collinearPick1.axis !== aligned.axis) {
-    showToast('Those faces are not parallel — try again');
-    collinearPick1 = null;
-    setFaceHighlight(null, null);
-    renderAll();
-    return; // stay in collinear mode, just reset back to step 1
-  }
-
-  const applied = applyCollinear(collinearPick1, { nodeId, faceName, axis: aligned.axis, sign: aligned.sign, dimField });
-  if (applied) cancelCollinearMode(); // one-shot PICKING tool — done after a single successful pair; a rejection (see applyCollinear) leaves pick1 as-is so they can retry with a different second pick
-}
-
-// -------------------------------------------------------------
-// COLLINEAR BOX TRANSLATION
-//
-// Box walls are structural members of a single rigid assembly.
-// When a box wall is the FIRST collinear pick, the wall itself must
-// never move/resize independently. Instead, translate every member
-// of the box by the same delta along the collinear axis.
-//
-// The target is calculated from the currently resolved position of
-// pick1's selected face and pick2's selected face. The gap value is
-// applied in the same direction as the existing attachedTo logic.
-//
-// Returns true when the whole box was translated successfully.
-// -------------------------------------------------------------
-function applyCollinearBoxTranslation(pick1, pick2) {
-  const node1 = panels.find((p) => p.id === pick1.nodeId);
-  const node2 = panels.find((p) => p.id === pick2.nodeId);
-
-  if (!node1 || !node2 || !node1.groupId) return false;
-
-  const groupId = node1.groupId;
-
-  // IMPORTANT:
-  // Hidden members must still be part of the box transformation.
-  // `hidden` should only control rendering, not whether the model
-  // position is updated.
-  const members = panels.filter(
-    (p) => p.groupId === groupId
-  );
-
-  if (members.length === 0) return false;
-
-  const resolved = resolveConstraints(panels);
-  const resolved1 = resolved.find((p) => p.id === pick1.nodeId);
-  const resolved2 = resolved.find((p) => p.id === pick2.nodeId);
-
-  if (!resolved1 || !resolved2) return false;
-
-  const axis = pick1.axis;
-
-  const face1Mm =
-    resolved1.position[axis] +
-    pick1.sign * (resolved1[pick1.dimField] / 2);
-
-  const face2Mm =
-    resolved2.position[axis] +
-    pick2.sign * (resolved2[pick2.dimField] / 2);
-
-  const targetMm =
-    face2Mm + pick2.sign * collinearGapMm;
-
-  const deltaMm = targetMm - face1Mm;
-
-  if (Math.abs(deltaMm) < 0.0001) {
-    return true;
-  }
-
-  // Test the COMPLETE group, including hidden members.
-  const testPanels = panels.map((p) => {
-    if (p.groupId !== groupId) return p;
-
-    return {
-      ...p,
-      offset: {
-        ...p.offset,
-        [axis]: p.offset[axis] + deltaMm,
-      },
-    };
-  });
-
-  const testResolved = resolveConstraints(testPanels);
-
-  for (const member of members) {
-    const testNode = testResolved.find((p) => p.id === member.id);
-    if (!testNode) return false;
-
-    const dims = {
-      width: testNode.width,
-      height: testNode.height,
-      thickness: testNode.thickness,
-    };
-
-    const hitAxis = findDesignLimitViolation(
-      testNode.rotation,
-      testNode.position,
-      dims
-    );
-
-    if (hitAxis) {
-      showDesignLimitError(hitAxis);
-      return false;
-    }
-  }
-
-  const before = panels;
-
-  // IMPORTANT:
-  // Apply the translation to ALL group members, hidden or visible.
-  panels = panels.map((p) => {
-    if (p.groupId !== groupId) return p;
-
-    return {
-      ...p,
-      offset: {
-        ...p.offset,
-        [axis]: p.offset[axis] + deltaMm,
-      },
-    };
-  });
-
-  const after = panels;
-
-  recordHistoryCommand(MoveGroupCommand, before, after);
-
-  renderAll();
-
-  return true;
-}
-
-function applyCollinear(pick1, pick2) {
-  const node1 = panels.find((p) => p.id === pick1.nodeId);
-  if (!node1) return false;
-
-  const axis = pick1.axis;
-
-  // -----------------------------------------------------------
-  // BOX MEMBER
-  //
-  // A box wall is part of a rigid six-panel assembly. It must
-  // never be independently moved or resized by collinear.
-  // Translate the entire box instead.
-  // -----------------------------------------------------------
-  if (node1.groupId) {
-    return applyCollinearBoxTranslation(pick1, pick2);
-  }
-
-  if (!isAxisPositionLocked(node1, axis)) {
-    // MOVE — live attachedTo constraint on the position field. `myFace`
-    // and `from.face` don't need to be the SAME named face (e.g. panel
-    // A's "right" face can be made collinear with panel B's "left"
-    // face) — only that they resolve to the same world axis, already
-    // guaranteed by the axis-match check in handleFacePick above.
-    const newConstraint = {
-      field: AXIS_TO_POSITION_FIELD[axis],
-      type: 'attachedTo',
-      overridden: false,
-      myFace: pick1.faceName,
-      from: { node: pick2.nodeId, face: pick2.faceName, offset: collinearGapMm },
-    };
-    // A field can only be governed by one constraint at a time — if
-    // this panel already had some other constraint on this exact
-    // field, replace it rather than stacking a second, conflicting
-    // one (isAxisPositionLocked above already ruled out that case
-    // here, so in practice this filter is a no-op today, but it keeps
-    // this function correct if that check's rules ever change).
-    const otherConstraints = (node1.constraints || []).filter((c) => c.field !== newConstraint.field);
-    const before = panels;
-    updateNode(pick1.nodeId, { constraints: [...otherConstraints, newConstraint] });
-    const after = panels;
-    recordHistoryCommand(AddConstraintCommand,before,after); // resolveConstraints picks up the new constraint immediately — if it happens to create a dependency cycle, the resolver already handles that gracefully (a warning on the affected node, not a crash) rather than needing special-cased detection here
-    renderAll();
-    return true;
-  }
-
-  // BLOCKED — fall back to a PERSISTENT RESIZE constraint. Never
-  // allowed to touch thickness: if the blocked axis is also this
-  // panel's thickness face, there's genuinely no way to satisfy the
-  // request.
-  if (pick1.dimField === 'thickness') {
-    showToast("Can't satisfy that — this panel can't move on this axis, and thickness can't be resized");
-    return false;
-  }
-
-  const resolved = resolveConstraints(panels);
-  const resolved1 = resolved.find((r) => r.id === pick1.nodeId);
-  if (!resolved1) return false;
-
-  const sign1 = pick1.sign;
-  // pick1's OPPOSITE face — captured as a literal, fixed SNAPSHOT (see
-  // the `{ mm }` literal-endpoint support added to snap.js's
-  // resolveFacePointMm specifically for this), not re-derived from
-  // anything. Only pick2's side of the constraint below is a live
-  // reference — which is exactly what makes "resized once now, then
-  // keeps adjusting automatically if panel B moves again later" work,
-  // without needing a self-referential (and therefore circular)
-  // constraint back onto this panel's own current position.
-  const oppositeMm = resolved1.position[axis] - sign1 * (resolved1[pick1.dimField] / 2);
-
-  const newConstraint = {
-    field: pick1.dimField,
-    type: 'spansBetween',
-    overridden: false,
-    from: { mm: oppositeMm },
-    to: { node: pick2.nodeId, face: pick2.faceName, offset: collinearGapMm },
-  };
-  // A field can only be governed by one constraint at a time — replace
-  // any existing one on this exact dimension field rather than
-  // stacking a second, conflicting one.
-  const otherConstraints = (node1.constraints || []).filter((c) => c.field !== pick1.dimField);
-
-  // Validate BEFORE committing — same PANEL_SIZE_LIMITS_MM / scene
-  // bounds checks every other resize path uses — by test-resolving a
-  // scratch copy of `panels` with the constraint already applied,
-  // since a constraint-derived dimension doesn't go through
-  // applyDimensionChange the way a literal offset/dims edit does.
-  const testPanels = panels.map((p) =>
-    p.id === pick1.nodeId ? { ...p, constraints: [...otherConstraints, newConstraint] } : p
-  );
-  const testResolved1 = resolveConstraints(testPanels).find((r) => r.id === pick1.nodeId);
-  if (!testResolved1) return false;
-  const testDims = { width: testResolved1.width, height: testResolved1.height, thickness: testResolved1.thickness };
-  const sizeViolation = findPanelSizeViolation(testDims);
-  if (sizeViolation) {
-    showPanelSizeLimitError(sizeViolation);
-    return false;
-  }
-  const hitAxis = findDesignLimitViolation(testResolved1.rotation, testResolved1.position, testDims);
-  if (hitAxis) {
-    showDesignLimitError(hitAxis);
-    return false;
-  }
-
-  const before = panels;
-  updateNode(pick1.nodeId, { constraints: [...otherConstraints, newConstraint] });
-  const after = panels;
-  recordHistoryCommand(AddConstraintCommand,before,after);
-  renderAll();
-  showToast('Movement was blocked — resized instead. This will keep re-adjusting automatically if the other panel changes.', false);
-  return true;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Escape cancels an in-progress collinear pick, same as it already
 // does for nothing else in this app (no other modal/multi-step tool
@@ -1240,7 +534,7 @@ document.addEventListener('keydown', (e) => {
 // every function below patches `panels` through this one function
 // instead of each hand-rolling its own `.map(...)`).
 // -------------------------------------------------------------
-function updateNode(id, patch) {
+export function updateNode(id, patch) {
   panels = panels.map((p) => (p.id === id ? { ...p, ...patch } : p));
 }
 
@@ -1261,114 +555,15 @@ function updateNode(id, patch) {
 // true if applied, false if rejected (a toast has already been shown
 // either way).
 // -------------------------------------------------------------
-const MIN_WALL_GAP_MM = 15;
 
-// Checks a set of axis-aligned slabs (each { center, halfThickness,
-// label }, all offsets in the SAME axis) for at least MIN_WALL_GAP_MM
-// between every pair of neighbors once sorted along that axis. Walls
-// and shelves are indistinguishable here — a wall is just a slab that
-// happens to also be getting relaid-out this call.
-// Sorts a set of same-axis slabs and checks every neighbor pair keeps
-// at least MIN_WALL_GAP_MM of clear space between them.
-function checkMinGap(elements) {
-  const sorted = [...elements].sort((a, b) => a.center - b.center);
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const gap = (sorted[i + 1].center - sorted[i + 1].halfThickness) - (sorted[i].center + sorted[i].halfThickness);
-    if (gap < MIN_WALL_GAP_MM) {
-      return { ok: false, a: sorted[i].label, b: sorted[i + 1].label };
-    }
-  }
-  return { ok: true };
-}
 
-// Builds the full set of same-axis slabs for a box — the two bounding
-// walls (Bottom/Top for axis 'y', Left/Right for axis 'x') plus every
-// shelf sharing that axis (horizontal shelves live on 'y', vertical
-// on 'x') — with `overrides` swapping in a PROPOSED value for
-// whichever element is currently being dragged/resized/created.
-// `overrides` maps nodeId -> {center, halfThickness, label}; the
-// special key '__new__' holds a not-yet-created candidate (used by
-// addShelf's pre-creation check, where there's no id yet). This is
-// the one place that knows "what counts as a slab on this axis" —
-// wall drags, shelf drags, and shelf creation all go through it.
-function collectAxisSlabs(groupId, axis, overrides = {}) {
-  const relevantRotation = axis === 'y' ? HORIZONTAL_ROTATION : VERTICAL_ROTATION;
-  const wallRoleLow = axis === 'y' ? 'Bottom' : 'Left';
-  const wallRoleHigh = axis === 'y' ? 'Top' : 'Right';
 
-  const slabs = [];
-  panels.forEach((p) => {
-    if (p.groupId !== groupId) return;
-    if (p.hidden) return; // a hidden (removed-but-restorable) panel no longer occupies space — see removeSelected()
-    const isRelevantWall = p.isBoxWall && (p.name === wallRoleLow || p.name === wallRoleHigh);
-    const isRelevantShelf = !p.isBoxWall && rotationsMatch(p.rotation, relevantRotation);
-    if (!isRelevantWall && !isRelevantShelf) return;
-    const o = overrides[p.id];
-    slabs.push(
-      o
-        ? { center: o.center, halfThickness: o.halfThickness, label: o.label || p.name || 'Shelf' }
-        : { center: p.offset[axis], halfThickness: p.thickness / 2, label: p.name || 'Shelf' }
-    );
-  });
-  if (overrides.__new__) slabs.push(overrides.__new__);
-  return slabs;
-}
 
-function isShelf(node) {
-  return !!node.groupId && !node.isBoxWall &&
-    (rotationsMatch(node.rotation, HORIZONTAL_ROTATION) || rotationsMatch(node.rotation, VERTICAL_ROTATION));
-}
 
-function relayoutBox(groupId) {
-  const roles = {
-    left: findBoxSibling(groupId, 'Left'), right: findBoxSibling(groupId, 'Right'),
-    top: findBoxSibling(groupId, 'Top'), bottom: findBoxSibling(groupId, 'Bottom'),
-    back: findBoxSibling(groupId, 'Back'), front: findBoxSibling(groupId, 'Front'),
-  };
-  if (Object.values(roles).some((n) => !n)) return true;
 
-  const layout = computeBoxLayout(roles);
 
-  for (const [role, node] of Object.entries(roles)) {
-    const dims = { width: layout[role].width, height: layout[role].height, thickness: node.thickness };
-    if (dims.width < MIN_PANEL_DIM_MM || dims.height < MIN_PANEL_DIM_MM) {
-      showToast("Can't shrink the box that far — walls would overlap");
-      return false;
-    }
-    const sizeViolation = findPanelSizeViolation(dims);
-    if (sizeViolation) { showPanelSizeLimitError(sizeViolation); return false; }
-    const positionMm = {
-      x: node.basePosition.x + layout[role].offset.x,
-      y: node.basePosition.y + layout[role].offset.y,
-      z: node.basePosition.z + layout[role].offset.z,
-    };
-    const hitAxis = findDesignLimitViolation(node.rotation, positionMm, dims);
-    if (hitAxis) { showDesignLimitError(hitAxis); return false; }
-  }
 
-  const yCheck = checkMinGap(collectAxisSlabs(groupId, 'y', {
-    [roles.bottom.id]: { center: layout.bottom.offset.y, halfThickness: roles.bottom.thickness / 2, label: 'Bottom' },
-    [roles.top.id]:    { center: layout.top.offset.y,    halfThickness: roles.top.thickness / 2,    label: 'Top' },
-  }));
-  if (!yCheck.ok) {
-    showToast(`Can't fit — ${yCheck.a} and ${yCheck.b} would be closer than ${MIN_WALL_GAP_MM}mm`);
-    return false;
-  }
 
-  const xCheck = checkMinGap(collectAxisSlabs(groupId, 'x', {
-    [roles.left.id]:  { center: layout.left.offset.x,  halfThickness: roles.left.thickness / 2,  label: 'Left' },
-    [roles.right.id]: { center: layout.right.offset.x, halfThickness: roles.right.thickness / 2, label: 'Right' },
-  }));
-  if (!xCheck.ok) {
-    showToast(`Can't fit — ${xCheck.a} and ${xCheck.b} would be closer than ${MIN_WALL_GAP_MM}mm`);
-    return false;
-  }
-
-  for (const [role, node] of Object.entries(roles)) {
-    updateNode(node.id, { width: layout[role].width, height: layout[role].height, offset: layout[role].offset });
-  }
-  return true;
-}
 
 // -------------------------------------------------------------
 // Two-level selection: a group (e.g. the box) selects as a WHOLE
@@ -1488,7 +683,7 @@ function ungroupSelected() {
   renderAll();
 }
 
-function renderAll() {
+export function renderAll() {
   const selectedId = getSelectedId();
   const selectedGroupId = getSelectedGroupId();
   const selectedBoxWallId = selectedId && panels.find(p => p.id === selectedId)?.isBoxWall ? selectedId : null;
@@ -1872,21 +1067,6 @@ function updateSelectedTransformField(group, axis, value) {
   renderAll();
 }
 
-// Orientation is decided at creation time now, not via a post-creation
-// toggle — see the Vertical/Horizontal/Parallel buttons in the panel
-// list. VERTICAL matches createPanelNode's own default rotation (a
-// standing divider in the YZ plane); HORIZONTAL matches what the old
-// Vertical/Horizontal inspector toggle produced for a flat shelf;
-// PARALLEL is identity rotation — face lies in the XY plane,
-// thickness along Z, same orientation the box preset already uses
-// for its 'back' panel. Unlike the other two, a Parallel panel shows
-// its full face (not an edge-on sliver) in the 2D front view, and
-// both its width and height are 2D-edge-draggable there — see
-// view2d.js, which derives this from rotation directly via
-// getAlignedAxis rather than a hardcoded Vertical/Horizontal check.
-const VERTICAL_ROTATION = { x: 0, y: 90, z: 0 };
-const HORIZONTAL_ROTATION = { x: 90, y: 0, z: 0 };
-const PARALLEL_ROTATION = { x: 0, y: 0, z: 0 };
 
 function createAndSelectPanel(rotation) {
   const before = capturePanelsState(); // to aliment history (undo/redo) before the new panel is added
@@ -2061,160 +1241,44 @@ function unlinkOrRemoveConstraint(identifier, opts = {}) {
  * exact same math a later drag will use, so the box starts out
  * indistinguishable from "just been dragged into this shape".
  */
-const DEFAULT_BOX_DEPTH_MM = 400;
-const DEFAULT_BOX_WIDTH_MM = 500;
-const DEFAULT_BOX_HEIGHT_MM = 700;
 
-const BOX_GIZMO_LOCKS = {
-  leftRight: {
-    lockedMoveAxes: ['y', 'z'],
-    lockedResizeAxes: ['x', 'y', 'z'],
-    lockedFields: {
-      positionY: true,
-      positionZ: true,
-    },
-  },
+// const DEFAULT_BOX_DEPTH_MM = 400;
+// const DEFAULT_BOX_WIDTH_MM = 500;
+// const DEFAULT_BOX_HEIGHT_MM = 700;
 
-  topBottom: {
-    lockedMoveAxes: ['x', 'z'],
-    lockedResizeAxes: ['x', 'y', 'z'],
-    lockedFields: {
-      positionX: true,
-      positionZ: true,
-    },
-  },
+// const BOX_GIZMO_LOCKS = {
+//   leftRight: {
+//     lockedMoveAxes: ['y', 'z'],
+//     lockedResizeAxes: ['x', 'y', 'z'],
+//     lockedFields: {
+//       positionY: true,
+//       positionZ: true,
+//     },
+//   },
 
-  frontBack: {
-    lockedMoveAxes: ['x', 'y'],
-    lockedResizeAxes: ['x', 'y', 'z'],
-    lockedFields: {
-      positionX: true,
-      positionY: true,
-    },
-  },
-};
+//   topBottom: {
+//     lockedMoveAxes: ['x', 'z'],
+//     lockedResizeAxes: ['x', 'y', 'z'],
+//     lockedFields: {
+//       positionX: true,
+//       positionZ: true,
+//     },
+//   },
+
+//   frontBack: {
+//     lockedMoveAxes: ['x', 'y'],
+//     lockedResizeAxes: ['x', 'y', 'z'],
+//     lockedFields: {
+//       positionX: true,
+//       positionY: true,
+//     },
+//   },
+// };
 
 function isBoxWall(mesh) {
   return mesh?.userData?.isBoxWall === true;
 }
 
-function addBox() {
-  const W = DEFAULT_BOX_WIDTH_MM;
-  const H = DEFAULT_BOX_HEIGHT_MM;
-  const D = DEFAULT_BOX_DEPTH_MM;
-  const material = MATERIAL_CATALOG[0].name;
-  const T = MATERIAL_CATALOG[0].thicknessMm;
-
-  const left = createPanelNode({
-    name: 'Left',
-    width: D, height: H, thickness: T, material,
-    rotation: { x: 0, y: 90, z: 0 },
-    isBoxPanel: true,
-    isBoxWall: true,
-    lockedMoveAxes: BOX_GIZMO_LOCKS.leftRight.lockedMoveAxes,
-    lockedResizeAxes: BOX_GIZMO_LOCKS.leftRight.lockedResizeAxes,
-    lockedFields: { ...BOX_GIZMO_LOCKS.leftRight.lockedFields },
-  });
-  const right = createPanelNode({
-    name: 'Right',
-    width: D, height: H, thickness: T, material,
-    rotation: { x: 0, y: 90, z: 0 },
-    isBoxPanel: true,
-    isBoxWall: true,
-    lockedMoveAxes: BOX_GIZMO_LOCKS.leftRight.lockedMoveAxes,
-    lockedResizeAxes: BOX_GIZMO_LOCKS.leftRight.lockedResizeAxes,
-    lockedFields: { ...BOX_GIZMO_LOCKS.leftRight.lockedFields },
-  });
-  const top = createPanelNode({
-    name: 'Top',
-    width: W, height: D, thickness: T, material,
-    rotation: { x: 90, y: 0, z: 0 },
-    isBoxPanel: true,
-    isBoxWall: true,
-    lockedMoveAxes: BOX_GIZMO_LOCKS.topBottom.lockedMoveAxes,
-    lockedResizeAxes: BOX_GIZMO_LOCKS.topBottom.lockedResizeAxes,
-    lockedFields: { ...BOX_GIZMO_LOCKS.topBottom.lockedFields },
-  });
-  const bottom = createPanelNode({
-    name: 'Bottom',
-    width: W, height: D, thickness: T, material,
-    rotation: { x: 90, y: 0, z: 0 },
-    isBoxPanel: true,
-    isBoxWall: true,
-    lockedMoveAxes: BOX_GIZMO_LOCKS.topBottom.lockedMoveAxes,
-    lockedResizeAxes: BOX_GIZMO_LOCKS.topBottom.lockedResizeAxes,
-    lockedFields: { ...BOX_GIZMO_LOCKS.topBottom.lockedFields },
-  });
-  const back = createPanelNode({
-    name: 'Back',
-    // Covers all 4 outer edges of the assembly (H+2T) — like a real
-    // cabinet's solid back sheet, nailed across the whole carcass
-    // rather than let into it. Same as the old design; now just a
-    // starting value instead of a fixed literal, since relayoutBox()
-    // will recompute it (to this exact number, for these inputs) the
-    // moment it runs.
-    width: W, height: H + 2 * T, thickness: T, material,
-    rotation: { x: 0, y: 0, z: 0 },
-    isBoxPanel: true,
-    isBoxWall: true,
-    lockedMoveAxes: BOX_GIZMO_LOCKS.frontBack.lockedMoveAxes,
-    lockedResizeAxes: BOX_GIZMO_LOCKS.frontBack.lockedResizeAxes,
-    lockedFields: { ...BOX_GIZMO_LOCKS.frontBack.lockedFields },
-  });
-  const front = createPanelNode({
-    name: 'Front',
-    // Inner-fitted footprint — grooved between the sides, W-2T.
-    width: W - 2 * T, height: H, thickness: T, material,
-    rotation: { x: 0, y: 0, z: 0 },
-    isBoxPanel: true,
-    isBoxWall: true,
-    lockedMoveAxes: BOX_GIZMO_LOCKS.frontBack.lockedMoveAxes,
-    lockedResizeAxes: BOX_GIZMO_LOCKS.frontBack.lockedResizeAxes,
-    lockedFields: { ...BOX_GIZMO_LOCKS.frontBack.lockedFields },
-  });
-
-  const boxPanels = [left, right, top, bottom, back, front];
-  boxPanels.forEach((p) => { p.groupId = left.id; }); // left's own id doubles as the group's identifier — no separate id generator needed
-
-  // All 6 box panels share ONE basePosition — the box's own single
-  // far-right placement slot (treating its WxH front footprint like
-  // one panel for that purpose) — rather than each independently
-  // claiming its own row slot the way plain "add panel" does.
-  // computeBoxLayout() (and therefore relayoutBox()) works entirely
-  // in offset-space relative to this shared anchor, so the anchor
-  // itself is never touched again after this.
-  const anchor = computeNextBasePosition(resolveConstraints(panels), { width: W, height: H, thickness: T, rotation: { x: 0, y: 0, z: 0 } });
-  anchor.y = H / 2 + T;
-  boxPanels.forEach((p) => { p.basePosition = anchor; });
-
-  // Starting offsets — each wall's OWN driving axis, same numbers the
-  // old design used. Every other offset field gets overwritten by
-  // relayoutBox() immediately below regardless of what's set here.
-  left.offset = { x: -(W / 2 - T / 2), y: 0, z: 0 };
-  right.offset = { x: +(W / 2 - T / 2), y: 0, z: 0 };
-  bottom.offset = { x: 0, y: -H / 2 - T / 2, z: 0 };
-  top.offset = { x: 0, y: +H / 2 + T / 2, z: 0 };
-  back.offset = { x: 0, y: 0, z: -D / 2 - T / 2 };
-  front.offset = { x: 0, y: 0, z: +D / 2 + T / 2 };
-
-  const before = panels;
-  panels = [...panels, ...boxPanels];
-  relayoutBox(left.id);
-  updateNode(front.id, { hidden: true });
-  const after = panels;
-  recordHistoryCommand(AddBoxCommand, before, after);
-
-  setSelectedGroupId(left.id);
-  setSelectedId(null);
-  renderAll();
-}
-
-// Initial state: a full box. addBox() reads MATERIAL_CATALOG[0]
-// (see its own comment), which is only populated once
-// loadMaterialCatalog() resolves — everything ABOVE this point (DOM
-// refs, scene/gizmo wiring, every function declaration) has no
-// dependency on the catalog and already ran synchronously at module
-// load; only this first box needs to wait.
 async function bootstrap() {
   await loadMaterialCatalog();
   addBox();

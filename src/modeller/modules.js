@@ -470,45 +470,4 @@ export function computeNextBasePosition(resolvedPanels, newDims) {
   };
 }
 
-// ---- BOX LAYOUT (Stage 3) ----
-// Pure function: given the box's 6 wall nodes (each just needs
-// .thickness and .offset), returns each wall's new width/height/
-// offset so the assembly stays airtight no matter which wall(s) were
-// dragged. Only left.offset.x / right.offset.x / top.offset.y /
-// bottom.offset.y / back.offset.z / front.offset.z are ever treated
-// as "driving" values — everything else here is derived. All
-// measurements are in OFFSET space (relative to the box's shared
-// basePosition anchor) — it cancels out of every difference used
-// here, so the anchor itself is never read.
-export function computeBoxLayout({ left, right, top, bottom, back, front }) {
-  const lx = left.offset.x, rx = right.offset.x;
-  const ty = top.offset.y, by = bottom.offset.y;
-  const bz = back.offset.z, fz = front.offset.z;
 
-  const xOuterMin = lx - left.thickness / 2, xOuterMax = rx + right.thickness / 2;
-  const xInnerMin = lx + left.thickness / 2, xInnerMax = rx - right.thickness / 2;
-  const yOuterMin = by - bottom.thickness / 2, yOuterMax = ty + top.thickness / 2;
-  const yInnerMin = by + bottom.thickness / 2, yInnerMax = ty - top.thickness / 2;
-  const zInnerMin = bz - back.thickness / 2, zInnerMax = fz + front.thickness / 2;
-
-  const outerWidth = xOuterMax - xOuterMin;
-  const innerWidth = xInnerMax - xInnerMin;
-  const outerHeight = yOuterMax - yOuterMin;
-  const innerHeight = yInnerMax - yInnerMin;
-  const innerDepth = zInnerMax - zInnerMin;
-
-  const outerWidthCenterX = (xOuterMin + xOuterMax) / 2;
-  const innerWidthCenterX = (xInnerMin + xInnerMax) / 2;
-  const outerHeightCenterY = (yOuterMin + yOuterMax) / 2;
-  const innerHeightCenterY = (yInnerMin + yInnerMax) / 2;
-  const innerDepthCenterZ = (zInnerMin + zInnerMax) / 2;
-
-  return {
-    left:   { width: innerDepth, height: innerHeight, offset: { x: lx, y: innerHeightCenterY, z: innerDepthCenterZ } },
-    right:  { width: innerDepth, height: innerHeight, offset: { x: rx, y: innerHeightCenterY, z: innerDepthCenterZ } },
-    top:    { width: outerWidth, height: innerDepth,  offset: { x: outerWidthCenterX, y: ty, z: innerDepthCenterZ } },
-    bottom: { width: outerWidth, height: innerDepth,  offset: { x: outerWidthCenterX, y: by, z: innerDepthCenterZ } },
-    back:   { width: innerWidth, height: innerHeight, offset: { x: innerWidthCenterX, y: outerHeightCenterY, z: bz } },
-    front:  { width: innerWidth, height: innerHeight, offset: { x: innerWidthCenterX, y: innerHeightCenterY, z: fz } },
-  };
-}

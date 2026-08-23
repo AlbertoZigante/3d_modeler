@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Attachment Strategies — Technical Documentation</title>
+<style>
+:root {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --surface-2: #eef2f6;
+  --text: #17202a;
+  --muted: #5f6b76;
+  --border: #d9e0e7;
+  --accent: #2563eb;
+  --accent-soft: #e8f0ff;
+  --success: #16835b;
+  --warning: #b7791f;
+  --danger: #c24141;
+  --code: #111827;
+  --shadow: 0 4px 18px rgba(20, 32, 48, .07);
+  --sidebar: 285px;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.layout { display: flex; min-height: 100vh; }
+
+.sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: var(--sidebar);
+  overflow-y: auto;
+  background: #111827;
+  color: #e5e7eb;
+  padding: 24px 18px;
+  z-index: 20;
+}
+.brand { padding: 0 10px 22px; border-bottom: 1px solid #293241; }
+.brand h1 { font-size: 18px; margin: 0 0 4px; color: white; }
+.brand p { margin: 0; color: #9ca3af; font-size: 12px; }
+
+.nav { margin-top: 18px; }
+.nav details { border-bottom: 1px solid #252f3d; }
+.nav summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 11px 10px;
+  font-weight: 650;
+  font-size: 13px;
+}
+.nav summary::-webkit-details-marker { display:none; }
+.nav summary:before { content: "▸"; margin-right: 8px; color: #93c5fd; }
+.nav details[open] > summary:before { content: "▾"; }
+.nav a {
+  display: block;
+  padding: 6px 10px 7px 29px;
+  color: #b8c2cf;
+  font-size: 13px;
+}
+.nav a:hover, .nav a.active {
+  color: white;
+  background: #1d2938;
+  text-decoration: none;
+  border-radius: 6px;
+}
+
+.main {
+  margin-left: var(--sidebar);
+  width: calc(100% - var(--sidebar));
+  padding: 42px 48px 80px;
+}
+.content { max-width: 1120px; margin: auto; }
+
+.hero {
+  background: linear-gradient(135deg, #172033, #253b67);
+  color: white;
+  border-radius: 18px;
+  padding: 42px;
+  box-shadow: var(--shadow);
+  margin-bottom: 30px;
+}
+.hero h1 { margin: 0 0 12px; font-size: clamp(30px, 4vw, 48px); line-height: 1.1; }
+.hero p { max-width: 850px; color: #dbeafe; font-size: 17px; margin: 0 0 22px; }
+.badges { display: flex; gap: 8px; flex-wrap: wrap; }
+.badge {
+  border: 1px solid rgba(255,255,255,.25);
+  background: rgba(255,255,255,.1);
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+section { scroll-margin-top: 24px; margin: 34px 0; }
+h2 { font-size: 28px; margin: 0 0 14px; }
+h3 { font-size: 20px; margin: 25px 0 9px; }
+h4 { margin: 17px 0 6px; }
+.lead { color: var(--muted); font-size: 16px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 22px;
+  box-shadow: var(--shadow);
+  margin: 14px 0;
+}
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+.grid.three { grid-template-columns: repeat(3, minmax(0,1fr)); }
+
+.strategy {
+  border-left: 4px solid var(--accent);
+}
+.strategy h3 { margin-top: 0; }
+.meta { display:flex; gap:8px; flex-wrap:wrap; margin: 8px 0 14px; }
+.tag {
+  background: var(--accent-soft);
+  color: #1e4fa3;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 650;
+}
+.tag.green { background:#e7f6ef; color:#176b4e; }
+.tag.yellow { background:#fff5db; color:#8a5b08; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 14px 0 20px;
+}
+th, td { padding: 11px 13px; text-align:left; vertical-align:top; border-bottom: 1px solid var(--border); }
+th { background: var(--surface-2); font-size: 13px; }
+tr:last-child td { border-bottom: none; }
+
+pre {
+  background: var(--code);
+  color: #e5e7eb;
+  border-radius: 9px;
+  padding: 17px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.55;
+}
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+:not(pre) > code {
+  background: #edf0f4;
+  color: #344154;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.callout {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--success);
+  background: #f7fbf9;
+  padding: 15px 17px;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+.callout.warning { border-left-color: var(--warning); background:#fffaf0; }
+.callout.danger { border-left-color: var(--danger); background:#fff7f7; }
+
+.diagram {
+  background: #fbfcfe;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 16px;
+  overflow-x: auto;
+}
+.diagram pre { margin:0; background:transparent; color:#17202a; padding:8px; }
+
+.search {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(245,247,250,.92);
+  backdrop-filter: blur(8px);
+  padding: 0 0 14px;
+}
+.search input {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 9px;
+  padding: 12px 14px;
+  font-size: 14px;
+  outline: none;
+}
+.search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #dbeafe; }
+
+details.section-menu {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 12px 0;
+  overflow: hidden;
+}
+details.section-menu summary {
+  cursor: pointer;
+  padding: 14px 17px;
+  font-weight: 700;
+  background: var(--surface-2);
+}
+details.section-menu > div { padding: 0 17px 16px; }
+
+ol, ul { padding-left: 22px; }
+li { margin: 5px 0; }
+
+.footer {
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  margin-top: 60px;
+  padding-top: 20px;
+  font-size: 13px;
+}
+
+.mobile-menu { display:none; }
+
+@media (max-width: 900px) {
+  :root { --sidebar: 240px; }
+  .main { padding: 30px 25px 60px; }
+  .grid, .grid.three { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+  .sidebar { display:none; }
+  .main { margin-left:0; width:100%; padding:20px 15px 50px; }
+  .mobile-menu {
+    display:block;
+    margin-bottom:15px;
+  }
+  .mobile-menu details {
+    background:#111827; color:white; border-radius:9px; padding:9px 13px;
+  }
+  .mobile-menu a { display:block; color:#dbeafe; padding:5px; }
+  .hero { padding:27px 23px; }
+}
+</style>
+</head>
+
+<body>
+<div class="layout">
+
+<aside class="sidebar">
+  <div class="brand">
+    <h1>Panel Attachment</h1>
+    <p>Technical strategy documentation</p>
+  </div>
+
+  <nav class="nav">
+    <details open>
+      <summary>Overview</summary>
+      <a href="#overview">Introduction</a>
+      <a href="#goals">Goals & principles</a>
+      <a href="#terminology">Terminology</a>
+    </details>
+
+    <details open>
+      <summary>Attachment strategies</summary>
+      <a href="#endpoint">Endpoint attachment</a>
+      <a href="#t-joint">T-junction</a>
+      <a href="#corner">Corner / L-joint</a>
+      <a href="#collinear">Collinear joint</a>
+      <a href="#crossing">Crossing / X-joint</a>
+      <a href="#y-joint">Y-junction</a>
+      <a href="#multiway">Multi-way joint</a>
+      <a href="#overlap">Overlap / coincident</a>
+      <a href="#curve">Curve attachments</a>
+      <a href="#tangent">Tangent attachment</a>
+    </details>
+
+    <details>
+      <summary>Detection model</summary>
+      <a href="#pipeline">Detection pipeline</a>
+      <a href="#tolerance">Tolerances</a>
+      <a href="#classification">Classification</a>
+      <a href="#deduplication">Deduplication</a>
+      <a href="#confidence">Confidence</a>
+    </details>
+
+    <details>
+      <summary>Implementation</summary>
+      <a href="#data-model">Data model</a>
+      <a href="#pseudocode">Pseudocode</a>
+      <a href="#api">Suggested API</a>
+    </details>
+
+    <details>
+      <summary>Validation</summary>
+      <a href="#tests">Test matrix</a>
+      <a href="#edgecases">Edge cases</a>
+      <a href="#roadmap">Implementation roadmap</a>
+    </details>
+  </nav>
+</aside>
+
+<main class="main">
+<div class="content">
+
+  <div class="mobile-menu">
+    <details>
+      <summary>☰ Documentation index</summary>
+      <a href="#overview">Overview</a>
+      <a href="#endpoint">Attachment strategies</a>
+      <a href="#pipeline">Detection model</a>
+      <a href="#data-model">Implementation</a>
+      <a href="#tests">Validation</a>
+    </details>
+  </div>
+
+  <header class="hero">
+    <h1>Panel Attachment Strategies</h1>
+    <p>
+      A technical reference for describing, classifying and detecting the ways
+      panels or geometric elements attach to one another. The document is
+      designed to provide a common vocabulary for implementation of
+      <code>detectJoints()</code>.
+    </p>
+    <div class="badges">
+      <span class="badge">Geometry</span>
+      <span class="badge">Topology</span>
+      <span class="badge">Joint detection</span>
+      <span class="badge">Implementation guide</span>
+    </div>
+  </header>
+
+  <div class="search">
+    <input id="search" type="search" placeholder="Search this documentation…">
+  </div>
+
+  <section id="overview">
+    <h2>1. Introduction</h2>
+    <p class="lead">
+      A panel attachment is a geometric relationship between two or more
+      elements where their boundaries, centerlines or surfaces establish a
+      meaningful connection.
+    </p>
+
+    <div class="card">
+      <h3>Core principle</h3>
+      <p>
+        The detection system should separate <strong>geometry</strong> from
+        <strong>topology</strong>: first determine where elements interact,
+        then determine how they interact.
+      </p>
+      <pre><code>elements
+   │
+   ▼
+geometric intersections
+   │
+   ▼
+candidate attachment points
+   │
+   ▼
+topological classification
+   │
+   ▼
+normalized Joint objects</code></pre>
+    </div>
+  </section>
+
+  <section id="goals">
+    <h2>2. Goals & principles</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Robustness</h3>
+        <p>Do not depend on exact floating-point equality. All spatial and angular decisions should use configurable tolerances.</p>
+      </div>
+      <div class="card">
+        <h3>Extensibility</h3>
+        <p>Adding a new joint type should not require rewriting the intersection engine.</p>
+      </div>
+      <div class="card">
+        <h3>Topology first</h3>
+        <p>A physical three-way joint should be represented as one joint even if several pairwise intersections generated it.</p>
+      </div>
+      <div class="card">
+        <h3>Explainability</h3>
+        <p>Each detected joint should retain enough information to explain why it was classified that way.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="terminology">
+    <h2>3. Terminology</h2>
+    <table>
+      <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>Element</td><td>A panel boundary, segment, edge, line, arc, curve or other detectable geometric component.</td></tr>
+        <tr><td>Endpoint</td><td>The start or end point of an element.</td></tr>
+        <tr><td>Intersection</td><td>A geometric location shared by two or more elements.</td></tr>
+        <tr><td>Joint</td><td>A normalized topological representation of an attachment.</td></tr>
+        <tr><td>Supporting line</td><td>The infinite line on which a finite segment lies.</td></tr>
+        <tr><td>Tolerance</td><td>An allowed geometric deviation used to handle numerical precision and imperfect input.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="strategies">
+    <h2>4. Attachment strategies</h2>
+    <p class="lead">
+      The following strategies form the recommended initial vocabulary for
+      <code>detectJoints()</code>.
+    </p>
+
+    <details class="section-menu" open>
+      <summary>Priority guide</summary>
+      <div>
+        <table>
+          <tr><th>Priority</th><th>Strategies</th><th>Reason</th></tr>
+          <tr><td>High</td><td>Endpoint, T, L/corner, collinear, X</td><td>Simple, common and highly useful for topology.</td></tr>
+          <tr><td>Medium</td><td>Y, multi-way, overlap</td><td>Requires grouping or more contextual reasoning.</td></tr>
+          <tr><td>Later</td><td>Curve, tangent</td><td>Requires curve geometry and tangent calculations.</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <article class="card strategy" id="endpoint">
+      <h3>4.1 Endpoint attachment</h3>
+      <div class="meta"><span class="tag green">High priority</span><span class="tag">2 elements</span></div>
+      <p>Two elements meet at one or both endpoints.</p>
+      <div class="diagram"><pre><code>────────●────────
+        │
+        │
+        │</code></pre></div>
+      <h4>Detection rule</h4>
+      <p>The intersection is within <code>endpointTolerance</code> of an endpoint of the participating element(s).</p>
+      <h4>Important distinction</h4>
+      <p>If both elements have the same direction, classify it as <a href="#collinear">collinear</a>. If their directions differ substantially, classify it as a corner/L-joint.</p>
+    </article>
+
+    <article class="card strategy" id="t-joint">
+      <h3>4.2 T-junction</h3>
+      <div class="meta"><span class="tag green">High priority</span><span class="tag">2 elements</span></div>
+      <p>One element terminates against the interior of another element.</p>
+      <div class="diagram"><pre><code>──────────────────
+         │
+         │
+         │</code></pre></div>
+      <h4>Detection rule</h4>
+      <ul>
+        <li>The intersection lies near an endpoint of element A.</li>
+        <li>The intersection lies in the interior of element B.</li>
+        <li>The two elements are not considered coincident.</li>
+      </ul>
+      <h4>Topology</h4>
+      <p>The supporting element has continuity through the joint, while the attached element terminates at it.</p>
+    </article>
+
+    <article class="card strategy" id="corner">
+      <h3>4.3 Corner / L-joint</h3>
+      <div class="meta"><span class="tag green">High priority</span><span class="tag">2 elements</span></div>
+      <p>Two elements meet at their endpoints and form a non-collinear angle.</p>
+      <div class="diagram"><pre><code>────────●
+        │
+        │</code></pre></div>
+      <h4>Detection rule</h4>
+      <p>Both elements terminate at the joint and the angle between their directions is outside the collinear tolerance.</p>
+      <p>The exact angle does not have to be 90°. A 45° or arbitrary-angle corner should still be represented as a corner if the application does not require finer semantic classification.</p>
+    </article>
+
+    <article class="card strategy" id="collinear">
+      <h3>4.4 Collinear joint</h3>
+      <div class="meta"><span class="tag green">High priority</span><span class="tag">2 elements</span></div>
+      <p>Two elements meet end-to-end and lie on approximately the same supporting line.</p>
+      <div class="diagram"><pre><code>──────────●──────────</code></pre></div>
+      <h4>Detection rule</h4>
+      <p>Endpoint proximity is satisfied and the absolute angle between the supporting directions is approximately 0° (or 180°, depending on orientation convention).</p>
+      <div class="callout">
+        <strong>Why keep this type?</strong> It prevents a continuous chain of separately modeled panels from being mistaken for a corner.
+      </div>
+    </article>
+
+    <article class="card strategy" id="crossing">
+      <h3>4.5 Crossing / X-joint</h3>
+      <div class="meta"><span class="tag green">High priority</span><span class="tag">2 elements</span></div>
+      <p>Two elements intersect in their interiors, without either one terminating at the intersection.</p>
+      <div class="diagram"><pre><code>\        /
+ \      /
+  \    /
+   \  /
+    \/
+    /\
+   /  \
+  /    \
+ /      \</code></pre></div>
+      <h4>Detection rule</h4>
+      <p>The intersection is interior to both finite elements and is not within endpoint tolerance of either one.</p>
+      <h4>Optional refinement</h4>
+      <p>Store the crossing angle. This allows downstream consumers to distinguish perpendicular crossings from shallow-angle crossings.</p>
+    </article>
+
+    <article class="card strategy" id="y-joint">
+      <h3>4.6 Y-junction</h3>
+      <div class="meta"><span class="tag yellow">Medium priority</span><span class="tag">3 elements</span></div>
+      <p>Three elements converge at a common physical joint.</p>
+      <div class="diagram"><pre><code>       /
+      /
+─────●
+      \
+       \</code></pre></div>
+      <h4>Detection rule</h4>
+      <p>Generate pairwise intersections first, then spatially cluster nearby candidates. If three distinct elements participate in the same cluster, classify the cluster as a Y-junction when their endpoint/interior relationships match the intended topology.</p>
+    </article>
+
+    <article class="card strategy" id="multiway">
+      <h3>4.7 Multi-way joint</h3>
+      <div class="meta"><span class="tag yellow">Medium priority</span><span class="tag">4+ elements</span></div>
+      <p>A single location connects four or more elements.</p>
+      <div class="diagram"><pre><code>        │
+        │
+────────●────────
+      / │ \
+     /  │  \</code></pre></div>
+      <p>It is preferable to model this as one joint with multiple participating elements rather than many independent pairwise joints.</p>
+    </article>
+
+    <article class="card strategy" id="overlap">
+      <h3>4.8 Overlap / coincident attachment</h3>
+      <div class="meta"><span class="tag yellow">Medium priority</span><span class="tag">special case</span></div>
+      <p>Two elements occupy the same or substantially overlapping geometry.</p>
+      <div class="diagram"><pre><code>Element A: ─────────────────
+Element B: ─────────────────</code></pre></div>
+      <div class="callout warning">
+        <strong>Do not treat this as a normal point intersection.</strong>
+        Coincident geometry produces an interval of intersection rather than a single point.
+      </div>
+      <p>This should normally be detected by a separate overlap test before point-intersection classification.</p>
+    </article>
+
+    <article class="card strategy" id="curve">
+      <h3>4.9 Curve attachment</h3>
+      <div class="meta"><span class="tag yellow">Later</span><span class="tag">line/curve or curve/curve</span></div>
+      <p>One or both participating elements are curved.</p>
+      <p>Examples include line-to-arc, arc-to-arc and spline intersections. The same topological concepts apply, but direction should be derived from the local tangent rather than a single endpoint vector.</p>
+    </article>
+
+    <article class="card strategy" id="tangent">
+      <h3>4.10 Tangent attachment</h3>
+      <div class="meta"><span class="tag yellow">Later</span><span class="tag">curve geometry</span></div>
+      <p>Two elements meet with approximately equal tangent directions.</p>
+      <div class="diagram"><pre><code>          ______
+       ___
+──────●</code></pre></div>
+      <p>Use tangent comparison to distinguish a tangential connection from a crossing.</p>
+    </article>
+  </section>
+
+  <section id="pipeline">
+    <h2>5. Detection pipeline</h2>
+    <div class="card">
+      <pre><code>detectJoints(elements)
+        │
+        ├── 1. Validate / normalize elements
+        │
+        ├── 2. Build candidate pairs
+        │
+        ├── 3. Detect geometric intersections
+        │
+        ├── 4. Detect endpoint proximity
+        │
+        ├── 5. Classify pairwise relationships
+        │
+        ├── 6. Cluster nearby candidates
+        │
+        ├── 7. Re-classify multi-element clusters
+        │
+        ├── 8. Remove duplicates / invalid joints
+        │
+        └── 9. Return normalized Joint objects</code></pre>
+    </div>
+
+    <h3>5.1 Candidate generation</h3>
+    <p>For large models, avoid testing every possible pair. Use a spatial index, bounding boxes or another broad-phase mechanism to eliminate pairs that cannot intersect.</p>
+
+    <h3>5.2 Narrow-phase intersection</h3>
+    <p>Perform the precise line-line, line-curve or curve-curve calculation only for candidate pairs.</p>
+  </section>
+
+  <section id="tolerance">
+    <h2>6. Tolerances</h2>
+    <p>Geometric detection should never depend on exact floating-point equality.</p>
+    <table>
+      <tr><th>Tolerance</th><th>Purpose</th><th>Example</th></tr>
+      <tr><td><code>positionTolerance</code></td><td>Determines whether two locations represent the same physical point.</td><td>Merge (100.01, 50.00) and (100.00, 50.01).</td></tr>
+      <tr><td><code>endpointTolerance</code></td><td>Determines whether an intersection counts as an endpoint.</td><td>Intersection 0.02 units from endpoint.</td></tr>
+      <tr><td><code>angleTolerance</code></td><td>Determines whether directions are considered parallel/collinear.</td><td>1° deviation may still be considered collinear.</td></tr>
+      <tr><td><code>overlapTolerance</code></td><td>Determines whether near-coincident geometry is considered overlapping.</td><td>Useful for imported/noisy geometry.</td></tr>
+    </table>
+    <div class="callout warning">
+      Tolerances should ideally be configurable and, where appropriate, expressed relative to model scale rather than hard-coded globally.
+    </div>
+  </section>
+
+  <section id="classification">
+    <h2>7. Classification</h2>
+    <p>A useful classification sequence is:</p>
+    <ol>
+      <li>Is the intersection empty? → no joint.</li>
+      <li>Is the intersection an interval? → overlap/coincident case.</li>
+      <li>Are there endpoint matches? → endpoint/T/L/collinear candidate.</li>
+      <li>Is the intersection interior to both elements? → crossing candidate.</li>
+      <li>Are curves involved? → use local tangents.</li>
+      <li>After clustering, how many unique elements participate? → Y or multi-way classification.</li>
+    </ol>
+
+    <table>
+      <tr><th>Endpoint A</th><th>Endpoint B</th><th>Angle</th><th>Classification</th></tr>
+      <tr><td>yes</td><td>yes</td><td>non-collinear</td><td>L / corner</td></tr>
+      <tr><td>yes</td><td>no</td><td>any</td><td>T-junction</td></tr>
+      <tr><td>yes</td><td>yes</td><td>collinear</td><td>Collinear</td></tr>
+      <tr><td>no</td><td>no</td><td>any</td><td>X / crossing</td></tr>
+    </table>
+  </section>
+
+  <section id="deduplication">
+    <h2>8. Deduplication and clustering</h2>
+    <p>Pairwise intersection detection can produce several candidates for the same physical joint.</p>
+    <pre><code>A-B → (100.00, 50.01)
+A-C → (100.02, 50.00)
+B-C → (100.01, 50.00)
+
+             ↓ cluster by positionTolerance
+
+Joint J1
+position ≈ (100.01, 50.00)
+elements = [A, B, C]</code></pre>
+    <p>The final joint should contain a unique list of participating element identifiers.</p>
+  </section>
+
+  <section id="confidence">
+    <h2>9. Confidence</h2>
+    <p>For imperfect input, consider attaching a confidence score or diagnostic information to each joint.</p>
+    <table>
+      <tr><th>Factor</th><th>High confidence</th><th>Low confidence</th></tr>
+      <tr><td>Position</td><td>Intersection well within tolerances</td><td>Near tolerance boundary</td></tr>
+      <tr><td>Angle</td><td>Clearly separated categories</td><td>Ambiguous angle</td></tr>
+      <tr><td>Endpoint</td><td>Very close to endpoint</td><td>Almost endpoint</td></tr>
+      <tr><td>Topology</td><td>Clear number of participants</td><td>Several candidates almost overlap</td></tr>
+    </table>
+  </section>
+
+  <section id="data-model">
+    <h2>10. Suggested data model</h2>
+    <pre><code>Joint {
+    id
+    type
+    position
+    participatingElements[]
+    angleData[]
+    confidence
+    diagnostics
+}</code></pre>
+
+    <h3>Recommended joint types</h3>
+    <pre><code>ENDPOINT
+T_JUNCTION
+CORNER
+COLLINEAR
+CROSSING
+Y_JUNCTION
+MULTI_WAY
+OVERLAP
+CURVE_INTERSECTION
+TANGENT</code></pre>
+
+    <p>Keep the type vocabulary small initially. More specialized semantic types can be introduced later without changing the underlying geometry representation.</p>
+  </section>
+
+  <section id="pseudocode">
+    <h2>11. Pseudocode</h2>
+    <pre><code>function detectJoints(elements):
+    candidates = []
+
+    normalized = normalize(elements)
+
+    pairs = findCandidatePairs(normalized)
+
+    for (a, b) in pairs:
+        result = intersect(a, b)
+
+        if result.isOverlap:
+            candidates.add(makeOverlapJoint(a, b, result))
+            continue
+
+        if not result.hasPoint:
+            continue
+
+        p = result.point
+
+        aEnd = isNearEndpoint(a, p)
+        bEnd = isNearEndpoint(b, p)
+
+        angle = angleAt(a, b, p)
+
+        type = classifyPair(aEnd, bEnd, angle)
+
+        candidates.add(
+            makeCandidate(p, type, [a.id, b.id])
+        )
+
+    clusters = clusterByPosition(candidates)
+
+    joints = []
+
+    for cluster in clusters:
+        joint = mergeCluster(cluster)
+        joint.type = classifyTopology(joint)
+        joints.add(joint)
+
+    return removeInvalidAndDuplicates(joints)</code></pre>
+  </section>
+
+  <section id="api">
+    <h2>12. Suggested API</h2>
+    <pre><code>detectJoints(
+    elements,
+    {
+        positionTolerance,
+        endpointTolerance,
+        angleTolerance,
+        overlapTolerance
+    }
+) -> Joint[]</code></pre>
+
+    <h3>Optional diagnostics API</h3>
+    <pre><code>detectJointsDetailed(...) -> {
+    joints: Joint[],
+    rejectedCandidates: Candidate[],
+    diagnostics: Diagnostic[]
+}</code></pre>
+    <p>The detailed variant is particularly useful during development and automated testing.</p>
+  </section>
+
+  <section id="tests">
+    <h2>13. Test matrix</h2>
+    <table>
+      <tr><th>Scenario</th><th>Expected result</th><th>Priority</th></tr>
+      <tr><td>Endpoint-to-endpoint, 90°</td><td>CORNER</td><td>Critical</td></tr>
+      <tr><td>Endpoint to segment interior</td><td>T_JUNCTION</td><td>Critical</td></tr>
+      <tr><td>Endpoint-to-endpoint, same line</td><td>COLLINEAR</td><td>Critical</td></tr>
+      <tr><td>Interior-to-interior crossing</td><td>CROSSING</td><td>Critical</td></tr>
+      <tr><td>Three elements at one point</td><td>Y_JUNCTION</td><td>High</td></tr>
+      <tr><td>Four elements at one point</td><td>MULTI_WAY</td><td>High</td></tr>
+      <tr><td>Duplicate elements</td><td>Deduplicated</td><td>High</td></tr>
+      <tr><td>Nearly coincident points</td><td>One clustered joint</td><td>High</td></tr>
+      <tr><td>Overlapping segments</td><td>OVERLAP</td><td>Medium</td></tr>
+      <tr><td>Line/arc intersection</td><td>CURVE_INTERSECTION</td><td>Later</td></tr>
+      <tr><td>Tangent line/curve</td><td>TANGENT</td><td>Later</td></tr>
+    </table>
+  </section>
+
+  <section id="edgecases">
+    <h2>14. Edge cases</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Very short elements</h3>
+        <p>Elements shorter than the endpoint tolerance can become ambiguous. Consider rejecting them or applying special handling.</p>
+      </div>
+      <div class="card">
+        <h3>Near-parallel elements</h3>
+        <p>Numerical errors can create unstable intersection points. Apply angular and positional tolerances.</p>
+      </div>
+      <div class="card">
+        <h3>Duplicate geometry</h3>
+        <p>Two identical elements should not create duplicate physical joints.</p>
+      </div>
+      <div class="card">
+        <h3>Nearly coincident endpoints</h3>
+        <p>Cluster nearby candidates before final topology classification.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <h2>15. Implementation roadmap</h2>
+    <div class="card">
+      <h3>Phase 1 — Core straight geometry</h3>
+      <ol>
+        <li>Normalize line/segment representation.</li>
+        <li>Implement robust line intersection.</li>
+        <li>Implement endpoint proximity.</li>
+        <li>Implement L, T, collinear and X classification.</li>
+        <li>Add unit tests for tolerance boundaries.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h3>Phase 2 — Topology</h3>
+      <ol>
+        <li>Cluster candidate intersections.</li>
+        <li>Merge participating element IDs.</li>
+        <li>Implement Y-junctions.</li>
+        <li>Implement multi-way joints.</li>
+        <li>Handle duplicate candidates.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h3>Phase 3 — Advanced geometry</h3>
+      <ol>
+        <li>Add overlap detection.</li>
+        <li>Add line/curve intersections.</li>
+        <li>Add curve/curve intersections.</li>
+        <li>Add tangent classification.</li>
+        <li>Add confidence and diagnostics.</li>
+      </ol>
+    </div>
+
+    <div class="callout">
+      <strong>Recommended implementation boundary:</strong>
+      Keep <code>detectJoints()</code> responsible for geometric/topological
+      relationships. Domain-specific meanings such as hinge, weld, screw,
+      bracket or adhesive attachment should preferably be interpreted by a
+      higher-level component.
+    </div>
+  </section>
+
+  <footer class="footer">
+    Panel Attachment Strategies — Technical Documentation<br>
+    Intended as a living specification for the implementation and evolution of
+    <code>detectJoints()</code>.
+  </footer>
+
+</div>
+</main>
+</div>
+
+<script>
+(function () {
+  const input = document.getElementById('search');
+  const sections = Array.from(document.querySelectorAll('main section, main article'));
+
+  input.addEventListener('input', function () {
+    const q = input.value.trim().toLowerCase();
+
+    sections.forEach(el => {
+      if (!q) {
+        el.style.display = '';
+        return;
+      }
+      const matches = el.innerText.toLowerCase().includes(q);
+      el.style.display = matches ? '' : 'none';
+    });
+  });
+
+  // Highlight the active documentation link while scrolling.
+  const links = Array.from(document.querySelectorAll('.nav a'));
+  const targets = links
+    .map(a => document.querySelector(a.getAttribute('href')))
+    .filter(Boolean);
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        links.forEach(a => a.classList.remove('active'));
+        const link = links.find(a => a.getAttribute('href') === '#' + entry.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  targets.forEach(t => observer.observe(t));
+
+  // Close the mobile menu after navigation.
+  document.querySelectorAll('.mobile-menu a').forEach(a => {
+    a.addEventListener('click', () => {
+      const d = a.closest('details');
+      if (d) d.removeAttribute('open');
+    });
+  });
+})();
+</script>
+</body>
+</html>

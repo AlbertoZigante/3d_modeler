@@ -1,0 +1,3 @@
+startAttachMode()
+handleAttachPick()
+confirmAttach()
