@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel Attachment Strategies — Technical Documentation</title>
+<title>3D Modeler — Architecture Reference</title>
 <style>
 :root {
   --bg: #f5f7fa;
@@ -20,68 +20,268 @@
   --code: #111827;
   --shadow: 0 4px 18px rgba(20, 32, 48, .07);
   --sidebar: 285px;
+
+  /* Status colors used by the existing documentation data model. */
+  --ok: #16835b;
+  --ok-bg: #e7f6ef;
+  --warn: #b7791f;
+  --warn-bg: #fff5db;
+  --stub: #6b7280;
+  --stub-bg: #eef2f6;
+  --blue: #2563eb;
+  --danger-bg: #fff7f7;
+
+  /* Keep the reference document's type system. */
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 15px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font: 15px/1.65 var(--sans);
+  overflow-x: hidden;
 }
-a { color: var(--accent); text-decoration: none; }
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
 a:hover { text-decoration: underline; }
 
-.layout { display: flex; min-height: 100vh; }
+/* ---------- responsive shell ---------- */
+
+.shell {
+  display: block;
+  min-height: 100vh;
+}
 
 .sidebar {
   position: fixed;
   inset: 0 auto 0 0;
   width: var(--sidebar);
   overflow-y: auto;
+  overflow-x: hidden;
   background: #111827;
   color: #e5e7eb;
   padding: 24px 18px;
   z-index: 20;
+  border: 0;
+  height: 100vh;
 }
-.brand { padding: 0 10px 22px; border-bottom: 1px solid #293241; }
-.brand h1 { font-size: 18px; margin: 0 0 4px; color: white; }
-.brand p { margin: 0; color: #9ca3af; font-size: 12px; }
 
-.nav { margin-top: 18px; }
-.nav details { border-bottom: 1px solid #252f3d; }
-.nav summary {
+main {
+  margin-left: var(--sidebar);
+  width: calc(100% - var(--sidebar));
+  max-width: none;
+  min-width: 0;
+  padding: 42px 48px 80px;
+}
+
+main > * {
+  width: min(100%, 1120px);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ---------- reference-style sidebar ---------- */
+
+.brand {
+  padding: 0 10px 22px;
+  margin: 0 0 18px;
+  border-bottom: 1px solid #293241;
+  display: block;
+}
+
+.brand h1 {
+  font-size: 18px;
+  line-height: 1.25;
+  margin: 0 0 4px;
+  color: white;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.brand-mark {
+  display: none;
+}
+
+.brand-sub {
+  margin: 0;
+  color: #9ca3af;
+  font: 12px/1.5 var(--sans);
+}
+
+.search-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0 -2px 6px;
+  padding: 0 2px 14px;
+  background: rgba(17,24,39,.96);
+  backdrop-filter: blur(8px);
+}
+
+.search-wrap input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #374151;
+  background: #1f2937;
+  color: #f9fafb;
+  border-radius: 9px;
+  padding: 11px 12px 11px 31px;
+  font: 13px var(--sans);
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.search-wrap input:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(37,99,235,.22);
+}
+
+.search-wrap input::placeholder { color: #9ca3af; }
+
+.search-icon {
+  left: 11px;
+  top: 38%;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.search-count {
+  color: #9ca3af;
+  font: 11px/1.4 var(--sans);
+  margin: 0 2px 14px;
+  min-height: 15px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 9px;
+  margin: 0 0 16px;
+  padding: 10px;
+  background: #1a2433;
+  border: 1px solid #293241;
+  border-radius: 9px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #b8c2cf;
+  font: 11px/1.4 var(--sans);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+}
+
+details.folder {
+  margin: 0;
+  border-bottom: 1px solid #252f3d;
+  border-radius: 0;
+}
+
+details.folder > summary {
   cursor: pointer;
   list-style: none;
-  padding: 11px 10px;
-  font-weight: 650;
-  font-size: 13px;
-}
-.nav summary::-webkit-details-marker { display:none; }
-.nav summary:before { content: "▸"; margin-right: 8px; color: #93c5fd; }
-.nav details[open] > summary:before { content: "▾"; }
-.nav a {
-  display: block;
-  padding: 6px 10px 7px 29px;
-  color: #b8c2cf;
-  font-size: 13px;
-}
-.nav a:hover, .nav a.active {
-  color: white;
-  background: #1d2938;
-  text-decoration: none;
+  padding: 10px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e5e7eb;
+  font: 650 13px/1.4 var(--sans);
+  user-select: none;
   border-radius: 6px;
 }
 
-.main {
-  margin-left: var(--sidebar);
-  width: calc(100% - var(--sidebar));
-  padding: 42px 48px 80px;
-}
-.content { max-width: 1120px; margin: auto; }
+details.folder > summary::-webkit-details-marker { display: none; }
 
-.hero {
+details.folder > summary::before {
+  content: "▸";
+  width: 9px;
+  margin-right: 0;
+  color: #93c5fd;
+  font-size: 11px;
+  transition: transform .15s;
+}
+
+details.folder[open] > summary::before {
+  content: "▾";
+  transform: none;
+}
+
+details.folder > summary:hover {
+  background: #1d2938;
+  color: white;
+}
+
+.folder-count {
+  margin-left: auto;
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.file-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0 0 0 14px;
+  border-left: 1px solid #293241;
+}
+
+.file-list li { margin: 0; }
+
+.file-link {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 6px 10px;
+  margin: 1px 0;
+  border: 0;
+  color: #b8c2cf;
+  text-decoration: none;
+  font: 13px/1.4 var(--sans);
+  border-radius: 6px;
+  transition: background .12s, color .12s;
+}
+
+.file-link:hover,
+.file-link.active {
+  color: white;
+  background: #1d2938;
+  text-decoration: none;
+}
+
+.file-link.active {
+  box-shadow: inset 3px 0 0 #60a5fa;
+}
+
+.file-link .name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- reference-style page header / hero ---------- */
+
+.page-head {
   background: linear-gradient(135deg, #172033, #253b67);
   color: white;
   border-radius: 18px;
@@ -89,800 +289,2371 @@ a:hover { text-decoration: underline; }
   box-shadow: var(--shadow);
   margin-bottom: 30px;
 }
-.hero h1 { margin: 0 0 12px; font-size: clamp(30px, 4vw, 48px); line-height: 1.1; }
-.hero p { max-width: 850px; color: #dbeafe; font-size: 17px; margin: 0 0 22px; }
-.badges { display: flex; gap: 8px; flex-wrap: wrap; }
-.badge {
-  border: 1px solid rgba(255,255,255,.25);
-  background: rgba(255,255,255,.1);
-  padding: 5px 10px;
-  border-radius: 999px;
-  font-size: 12px;
+
+.page-head .kicker {
+  color: #93c5fd;
+  font: 700 12px/1.4 var(--sans);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin: 0 0 10px;
 }
 
-section { scroll-margin-top: 24px; margin: 34px 0; }
-h2 { font-size: 28px; margin: 0 0 14px; }
-h3 { font-size: 20px; margin: 25px 0 9px; }
-h4 { margin: 17px 0 6px; }
-.lead { color: var(--muted); font-size: 16px; }
+.page-head h2 {
+  margin: 0 0 12px;
+  color: white;
+  font-size: clamp(30px, 4vw, 48px);
+  line-height: 1.1;
+  letter-spacing: -.02em;
+}
 
-.card {
+.page-head p {
+  max-width: 850px;
+  color: #dbeafe;
+  font-size: 17px;
+  line-height: 1.6;
+  margin: 0 0 10px;
+}
+
+.page-head p:last-child { margin-bottom: 0; }
+
+/* ---------- sticky search in content ---------- */
+
+main > .search-wrap { /* harmless if the search is ever moved here */
+  position: sticky;
+}
+
+#content {
+  min-width: 0;
+}
+
+.search {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* ---------- groups ---------- */
+
+section.group {
+  scroll-margin-top: 24px;
+  margin: 34px auto;
+  padding: 0;
+}
+
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+
+.group-title h3 {
+  margin: 0;
+  color: var(--text);
+  font: 700 28px/1.25 var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.group-title .rule {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.group-desc {
+  color: var(--muted);
+  font-size: 16px;
+  margin: 0 0 18px;
+}
+
+/* ---------- file cards ---------- */
+
+.file-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 22px;
   box-shadow: var(--shadow);
   margin: 14px 0;
+  scroll-margin-top: 24px;
+  min-width: 0;
 }
-.grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
-.grid.three { grid-template-columns: repeat(3, minmax(0,1fr)); }
 
-.strategy {
-  border-left: 4px solid var(--accent);
+.file-card.flash {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow);
 }
-.strategy h3 { margin-top: 0; }
-.meta { display:flex; gap:8px; flex-wrap:wrap; margin: 8px 0 14px; }
-.tag {
-  background: var(--accent-soft);
-  color: #1e4fa3;
-  padding: 3px 8px;
-  border-radius: 5px;
-  font-size: 12px;
-  font-weight: 650;
-}
-.tag.green { background:#e7f6ef; color:#176b4e; }
-.tag.yellow { background:#fff5db; color:#8a5b08; }
 
-table {
+.file-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.file-path {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font: 700 clamp(15px, 1.8vw, 19px)/1.35 var(--sans);
+  overflow-wrap: anywhere;
+}
+
+.file-path .folder-part {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.badge {
+  flex: none;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font: 650 12px/1.2 var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.badge.ok {
+  color: #176b4e;
+  background: #e7f6ef;
+  border: 1px solid #bfe7d4;
+}
+
+.badge.warn {
+  color: #8a5b08;
+  background: #fff5db;
+  border: 1px solid #f0d99c;
+}
+
+.badge.stub {
+  color: #4b5563;
+  background: #eef2f6;
+  border: 1px solid #d9e0e7;
+}
+
+.badge.danger {
+  color: #a33131;
+  background: #fff7f7;
+  border: 1px solid #f0c5c5;
+}
+
+.file-role {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.65;
+  margin: 0 0 14px;
+  max-width: 90ch;
+}
+
+.file-note {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #8a5b08;
+  background: #fffaf0;
+  border: 1px solid #f1dfb1;
+  border-left: 4px solid var(--warning);
+  padding: 12px 14px;
+  border-radius: 8px;
+  margin: 0 0 16px;
+}
+
+.file-note.danger {
+  color: #a33131;
+  background: #fff7f7;
+  border-color: #f0c5c5;
+  border-left-color: var(--danger);
+}
+
+/* ---------- tables: readable + horizontally scrollable ---------- */
+
+.fn-table {
   width: 100%;
+  min-width: 760px;
   border-collapse: collapse;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  margin: 14px 0 20px;
+  margin: 14px 0 0;
+  table-layout: auto;
 }
-th, td { padding: 11px 13px; text-align:left; vertical-align:top; border-bottom: 1px solid var(--border); }
-th { background: var(--surface-2); font-size: 13px; }
-tr:last-child td { border-bottom: none; }
+
+.fn-table th,
+.fn-table td {
+  padding: 11px 13px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+
+.fn-table th {
+  background: var(--surface-2);
+  color: var(--text);
+  font: 650 12px/1.4 var(--sans);
+}
+
+.fn-table td {
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.fn-table tr:last-child td { border-bottom: none; }
+
+.fn-name {
+  color: var(--accent);
+  font: 650 13px/1.45 var(--mono);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.fn-name .internal-tag {
+  display: block;
+  color: var(--muted);
+  font: 600 10px/1.3 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-top: 3px;
+}
+
+.fn-role {
+  color: var(--muted);
+  max-width: 48ch;
+}
+
+.fn-io {
+  color: var(--code);
+  font: 12px/1.55 var(--mono);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.fn-io b { color: var(--accent); font-weight: 600; }
+.fn-io .arrow { color: var(--muted); margin: 0 4px; }
+.fn-io .ret { color: var(--success); }
+
+.fn-calls {
+  max-width: 42ch;
+  min-width: 220px;
+}
+
+.call-line {
+  display: block;
+  position: relative;
+  padding-left: 14px;
+  color: var(--muted);
+  font: 12px/1.55 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.call-line::before {
+  content: "↳";
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+}
+
+.calls-pending,
+.no-fn {
+  color: var(--muted);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.no-fn { padding: 6px 0 0; }
+
+/* Put wide tables inside a scrollable visual boundary without changing markup. */
+.file-card:has(.fn-table) {
+  overflow-x: auto;
+}
+
+/* ---------- imports / exports ---------- */
+
+.io-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 16px 0 18px;
+  padding: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.io-col {
+  min-width: 0;
+}
+
+.io-col h4 {
+  margin: 0 0 9px;
+  color: var(--muted);
+  font: 700 12px/1.3 var(--sans);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.import-row { margin: 0 0 8px; }
+
+.import-from {
+  display: block;
+  color: var(--accent);
+  font: 12px/1.45 var(--mono);
+  overflow-wrap: anywhere;
+  margin-bottom: 3px;
+}
+
+.import-names,
+.export-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.pill {
+  max-width: 100%;
+  background: white;
+  color: #344154;
+  padding: 3px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  font: 11px/1.35 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.export-names .pill {
+  color: #1e4fa3;
+  border-color: #bfd2f8;
+  background: #f7faff;
+}
+
+.io-empty {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-style: italic;
+}
+
+/* ------------------------------------------------------------
+   Documentation symbol links
+   ------------------------------------------------------------ */
+
+.symbol-link,
+.file-definition-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  max-width: 100%;
+  padding: 3px 7px;
+
+  background: white;
+  color: #344154;
+
+  border: 1px solid var(--border);
+  border-radius: 5px;
+
+  font: inherit;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+
+  text-decoration: none;
+  cursor: pointer;
+
+  transition:
+    color .15s ease,
+    background-color .15s ease,
+    border-color .15s ease,
+    text-decoration .15s ease;
+}
+
+/* Behaves visually like a link on hover */
+.symbol-link:hover,
+.file-definition-link:hover {
+  color: var(--blue);
+  background: #f7faff;
+  border-color: #bfd2f8;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.symbol-link:focus-visible,
+.file-definition-link:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.function-link {
+  font-family: inherit;
+}
+
+.file-ref-link {
+  font-weight: 600;
+}
+
+.symbol-unresolved {
+  opacity: .75;
+}
+
+.call-location {
+  opacity: .7;
+}
+
+.call-location .file-ref-link {
+  font-weight: 500;
+}
+
+.symbol-link:hover,
+.file-definition-link:hover {
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 7%, var(--surface));
+  border-color: var(--blue);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.symbol-link:focus-visible,
+.file-definition-link:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.function-link {
+  font-family: inherit;
+}
+
+.file-ref-link {
+  font-weight: 600;
+}
+
+.symbol-unresolved {
+  opacity: .75;
+}
+
+.call-location {
+  opacity: .7;
+}
+
+.call-location .file-ref-link {
+  font-weight: 500;
+}
+.symbol-link,
+.file-definition-link {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+  cursor: pointer;
+  transition:
+    color .15s ease,
+    background-color .15s ease,
+    border-color .15s ease;
+}
+
+.symbol-link:hover,
+.file-definition-link:hover {
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 10%, transparent);
+  border-bottom-style: solid;
+}
+
+.function-link {
+  font-family: inherit;
+}
+
+.file-ref-link {
+  font-weight: 600;
+}
+
+.symbol-unresolved {
+  opacity: .75;
+}
+
+.call-location {
+  opacity: .7;
+}
+
+.call-location .file-ref-link {
+  font-weight: 500;
+}
+
+.function-anchor {
+  position: relative;
+  display: block;
+  height: 0;
+  scroll-margin-top: 90px;
+}
+
+/*
+ * Make the target function row visibly flash when reached
+ * through a function link.
+ */
+.fn-table tr:has(.function-link:target) {
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+}
+
+.file-card:target {
+  scroll-margin-top: 90px;
+}
+
+/*
+ * Existing .flash behaviour can be reused for file links.
+ */
+.file-card.flash {
+  animation: docTargetFlash .9s ease;
+}
+
+@keyframes docTargetFlash {
+  0% {
+    outline: 2px solid var(--blue);
+    outline-offset: 4px;
+  }
+
+  100% {
+    outline: 2px solid transparent;
+    outline-offset: 4px;
+  }
+}
+
+/* ---------- code / inline markup ---------- */
+
+mark {
+  background: #dbeafe;
+  color: #17202a;
+  border-radius: 3px;
+  padding: 1px 3px;
+}
 
 pre {
   background: var(--code);
   color: #e5e7eb;
   border-radius: 9px;
   padding: 17px;
-  overflow-x: auto;
-  font-size: 13px;
-  line-height: 1.55;
+  overflow: auto;
+  max-width: 100%;
+  font: 13px/1.55 var(--mono);
+  tab-size: 2;
 }
-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+code {
+  font-family: var(--mono);
+}
+
 :not(pre) > code {
   background: #edf0f4;
   color: #344154;
   padding: 2px 5px;
   border-radius: 4px;
+  overflow-wrap: anywhere;
 }
 
-.callout {
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--success);
-  background: #f7fbf9;
-  padding: 15px 17px;
-  border-radius: 8px;
-  margin: 16px 0;
-}
-.callout.warning { border-left-color: var(--warning); background:#fffaf0; }
-.callout.danger { border-left-color: var(--danger); background:#fff7f7; }
+/* ---------- footer ---------- */
 
-.diagram {
-  background: #fbfcfe;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  padding: 16px;
-  overflow-x: auto;
-}
-.diagram pre { margin:0; background:transparent; color:#17202a; padding:8px; }
-
-.search {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: rgba(245,247,250,.92);
-  backdrop-filter: blur(8px);
-  padding: 0 0 14px;
-}
-.search input {
-  width: 100%;
-  border: 1px solid var(--border);
-  background: white;
-  border-radius: 9px;
-  padding: 12px 14px;
-  font-size: 14px;
-  outline: none;
-}
-.search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #dbeafe; }
-
-details.section-menu {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  margin: 12px 0;
-  overflow: hidden;
-}
-details.section-menu summary {
-  cursor: pointer;
-  padding: 14px 17px;
-  font-weight: 700;
-  background: var(--surface-2);
-}
-details.section-menu > div { padding: 0 17px 16px; }
-
-ol, ul { padding-left: 22px; }
-li { margin: 5px 0; }
-
-.footer {
+footer {
+  max-width: 1120px;
   color: var(--muted);
   border-top: 1px solid var(--border);
-  margin-top: 60px;
+  margin-top: 60px !important;
   padding-top: 20px;
-  font-size: 13px;
+  padding-bottom: 0;
+  font: 13px/1.5 var(--sans);
 }
 
-.mobile-menu { display:none; }
+/* ---------- exact documentation targets ---------- */
+
+.function-anchor {
+  display: block;
+  position: relative;
+  width: 0;
+  height: 0;
+  scroll-margin-top: 90px;
+}
+
+.file-card-head {
+  scroll-margin-top: 90px;
+}
+
+.fn-table tr:has(.function-anchor) {
+  scroll-margin-top: 90px;
+}
+
+.function-target-flash {
+  animation: functionTargetFlash .9s ease;
+}
+
+@keyframes functionTargetFlash {
+  0% {
+    background: color-mix(
+      in srgb,
+      var(--blue) 14%,
+      transparent
+    );
+  }
+
+  100% {
+    background: transparent;
+  }
+}
+
+.file-card.flash {
+  animation: docTargetFlash .9s ease;
+}
+
+@keyframes docTargetFlash {
+  0% {
+    outline: 2px solid var(--blue);
+    outline-offset: 4px;
+  }
+
+  100% {
+    outline: 2px solid transparent;
+    outline-offset: 4px;
+  }
+}
+
+/* ---------- scrolling ---------- */
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ---------- responsive typography/layout ---------- */
+
+@media (max-width: 1100px) {
+  main {
+    padding: 34px 30px 70px;
+  }
+
+  .page-head {
+    padding: 34px;
+  }
+
+  .group-title h3 {
+    font-size: 25px;
+  }
+}
 
 @media (max-width: 900px) {
   :root { --sidebar: 240px; }
-  .main { padding: 30px 25px 60px; }
-  .grid, .grid.three { grid-template-columns: 1fr; }
+
+  main {
+    margin-left: var(--sidebar);
+    width: calc(100% - var(--sidebar));
+    padding: 30px 25px 60px;
+  }
+
+  .page-head {
+    padding: 30px;
+    border-radius: 15px;
+  }
+
+  .page-head h2 {
+    font-size: clamp(29px, 6vw, 42px);
+  }
+
+  .page-head p {
+    font-size: 16px;
+  }
+
+  .io-panel {
+    grid-template-columns: 1fr;
+  }
 }
+
 @media (max-width: 700px) {
-  .sidebar { display:none; }
-  .main { margin-left:0; width:100%; padding:20px 15px 50px; }
-  .mobile-menu {
-    display:block;
-    margin-bottom:15px;
+  .sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+    max-height: 48vh;
+    padding: 16px 14px 18px;
+    overflow-y: auto;
   }
-  .mobile-menu details {
-    background:#111827; color:white; border-radius:9px; padding:9px 13px;
+
+  main {
+    margin-left: 0;
+    width: 100%;
+    padding: 18px 14px 50px;
   }
-  .mobile-menu a { display:block; color:#dbeafe; padding:5px; }
-  .hero { padding:27px 23px; }
+
+  main > * {
+    width: 100%;
+  }
+
+  .brand {
+    padding: 0 8px 16px;
+    margin-bottom: 12px;
+  }
+
+  .brand h1 {
+    font-size: 17px;
+  }
+
+  .legend {
+    margin-bottom: 10px;
+  }
+
+  .page-head {
+    padding: 26px 22px;
+    margin-bottom: 20px;
+    border-radius: 13px;
+  }
+
+  .page-head h2 {
+    font-size: clamp(28px, 9vw, 38px);
+  }
+
+  .page-head p {
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  section.group {
+    margin: 28px auto;
+  }
+
+  .group-title {
+    align-items: flex-end;
+  }
+
+  .group-title h3 {
+    font-size: 22px;
+  }
+
+  .file-card {
+    padding: 17px 15px;
+    border-radius: 10px;
+  }
+
+  .file-path {
+    font-size: 16px;
+  }
+
+  .file-role {
+    font-size: 14px;
+  }
+
+  .fn-table {
+    min-width: 680px;
+  }
+
+  .io-panel {
+    padding: 13px;
+  }
+
+  footer {
+    margin-top: 40px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  main {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .page-head {
+    padding: 22px 18px;
+  }
+
+  .file-card {
+    padding: 15px 12px;
+  }
+
+  .group-title .rule {
+    display: none;
+  }
+
+  .badge {
+    white-space: normal;
+  }
 }
 </style>
 </head>
-
 <body>
-<div class="layout">
 
-<aside class="sidebar">
-  <div class="brand">
-    <h1>Panel Attachment</h1>
-    <p>Technical strategy documentation</p>
-  </div>
+<div class="shell">
+  <!-- ============= SIDEBAR ============= -->
+  <nav class="sidebar" id="sidebar">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <h1>3D Modeler</h1>
+    </div>
+    <p class="brand-sub">architecture reference · Joints branch</p>
 
-  <nav class="nav">
-    <details open>
-      <summary>Overview</summary>
-      <a href="#overview">Introduction</a>
-      <a href="#goals">Goals & principles</a>
-      <a href="#terminology">Terminology</a>
-    </details>
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input id="search" type="text" placeholder="Search files or functions…" autocomplete="off">
+    </div>
+    <div class="search-count" id="searchCount"></div>
 
-    <details open>
-      <summary>Attachment strategies</summary>
-      <a href="#endpoint">Endpoint attachment</a>
-      <a href="#t-joint">T-junction</a>
-      <a href="#corner">Corner / L-joint</a>
-      <a href="#collinear">Collinear joint</a>
-      <a href="#crossing">Crossing / X-joint</a>
-      <a href="#y-joint">Y-junction</a>
-      <a href="#multiway">Multi-way joint</a>
-      <a href="#overlap">Overlap / coincident</a>
-      <a href="#curve">Curve attachments</a>
-      <a href="#tangent">Tangent attachment</a>
-    </details>
+    <div class="legend">
+      <span class="legend-item"><span class="dot" style="background:var(--ok)"></span>corrected</span>
+      <span class="legend-item"><span class="dot" style="background:var(--blue)"></span>verified</span>
+      <span class="legend-item"><span class="dot" style="background:var(--warn)"></span>needs attention</span>
+      <span class="legend-item"><span class="dot" style="background:var(--stub)"></span>stub / empty</span>
+    </div>
 
-    <details>
-      <summary>Detection model</summary>
-      <a href="#pipeline">Detection pipeline</a>
-      <a href="#tolerance">Tolerances</a>
-      <a href="#classification">Classification</a>
-      <a href="#deduplication">Deduplication</a>
-      <a href="#confidence">Confidence</a>
-    </details>
-
-    <details>
-      <summary>Implementation</summary>
-      <a href="#data-model">Data model</a>
-      <a href="#pseudocode">Pseudocode</a>
-      <a href="#api">Suggested API</a>
-    </details>
-
-    <details>
-      <summary>Validation</summary>
-      <a href="#tests">Test matrix</a>
-      <a href="#edgecases">Edge cases</a>
-      <a href="#roadmap">Implementation roadmap</a>
-    </details>
+    <div id="sidebarTree"></div>
   </nav>
-</aside>
 
-<main class="main">
-<div class="content">
-
-  <div class="mobile-menu">
-    <details>
-      <summary>☰ Documentation index</summary>
-      <a href="#overview">Overview</a>
-      <a href="#endpoint">Attachment strategies</a>
-      <a href="#pipeline">Detection model</a>
-      <a href="#data-model">Implementation</a>
-      <a href="#tests">Validation</a>
-    </details>
-  </div>
-
-  <header class="hero">
-    <h1>Panel Attachment Strategies</h1>
-    <p>
-      A technical reference for describing, classifying and detecting the ways
-      panels or geometric elements attach to one another. The document is
-      designed to provide a common vocabulary for implementation of
-      <code>detectJoints()</code>.
-    </p>
-    <div class="badges">
-      <span class="badge">Geometry</span>
-      <span class="badge">Topology</span>
-      <span class="badge">Joint detection</span>
-      <span class="badge">Implementation guide</span>
-    </div>
-  </header>
-
-  <div class="search">
-    <input id="search" type="search" placeholder="Search this documentation…">
-  </div>
-
-  <section id="overview">
-    <h2>1. Introduction</h2>
-    <p class="lead">
-      A panel attachment is a geometric relationship between two or more
-      elements where their boundaries, centerlines or surfaces establish a
-      meaningful connection.
-    </p>
-
-    <div class="card">
-      <h3>Core principle</h3>
-      <p>
-        The detection system should separate <strong>geometry</strong> from
-        <strong>topology</strong>: first determine where elements interact,
-        then determine how they interact.
-      </p>
-      <pre><code>elements
-   │
-   ▼
-geometric intersections
-   │
-   ▼
-candidate attachment points
-   │
-   ▼
-topological classification
-   │
-   ▼
-normalized Joint objects</code></pre>
-    </div>
-  </section>
-
-  <section id="goals">
-    <h2>2. Goals & principles</h2>
-    <div class="grid">
-      <div class="card">
-        <h3>Robustness</h3>
-        <p>Do not depend on exact floating-point equality. All spatial and angular decisions should use configurable tolerances.</p>
-      </div>
-      <div class="card">
-        <h3>Extensibility</h3>
-        <p>Adding a new joint type should not require rewriting the intersection engine.</p>
-      </div>
-      <div class="card">
-        <h3>Topology first</h3>
-        <p>A physical three-way joint should be represented as one joint even if several pairwise intersections generated it.</p>
-      </div>
-      <div class="card">
-        <h3>Explainability</h3>
-        <p>Each detected joint should retain enough information to explain why it was classified that way.</p>
-      </div>
-    </div>
-  </section>
-
-  <section id="terminology">
-    <h2>3. Terminology</h2>
-    <table>
-      <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
-      <tbody>
-        <tr><td>Element</td><td>A panel boundary, segment, edge, line, arc, curve or other detectable geometric component.</td></tr>
-        <tr><td>Endpoint</td><td>The start or end point of an element.</td></tr>
-        <tr><td>Intersection</td><td>A geometric location shared by two or more elements.</td></tr>
-        <tr><td>Joint</td><td>A normalized topological representation of an attachment.</td></tr>
-        <tr><td>Supporting line</td><td>The infinite line on which a finite segment lies.</td></tr>
-        <tr><td>Tolerance</td><td>An allowed geometric deviation used to handle numerical precision and imperfect input.</td></tr>
-      </tbody>
-    </table>
-  </section>
-
-  <section id="strategies">
-    <h2>4. Attachment strategies</h2>
-    <p class="lead">
-      The following strategies form the recommended initial vocabulary for
-      <code>detectJoints()</code>.
-    </p>
-
-    <details class="section-menu" open>
-      <summary>Priority guide</summary>
-      <div>
-        <table>
-          <tr><th>Priority</th><th>Strategies</th><th>Reason</th></tr>
-          <tr><td>High</td><td>Endpoint, T, L/corner, collinear, X</td><td>Simple, common and highly useful for topology.</td></tr>
-          <tr><td>Medium</td><td>Y, multi-way, overlap</td><td>Requires grouping or more contextual reasoning.</td></tr>
-          <tr><td>Later</td><td>Curve, tangent</td><td>Requires curve geometry and tangent calculations.</td></tr>
-        </table>
-      </div>
-    </details>
-
-    <article class="card strategy" id="endpoint">
-      <h3>4.1 Endpoint attachment</h3>
-      <div class="meta"><span class="tag green">High priority</span><span class="tag">2 elements</span></div>
-      <p>Two elements meet at one or both endpoints.</p>
-      <div class="diagram"><pre><code>────────●────────
-        │
-        │
-        │</code></pre></div>
-      <h4>Detection rule</h4>
-      <p>The intersection is within <code>endpointTolerance</code> of an endpoint of the participating element(s).</p>
-      <h4>Important distinction</h4>
-      <p>If both elements have the same direction, classify it as <a href="#collinear">collinear</a>. If their directions differ substantially, classify it as a corner/L-joint.</p>
-    </article>
-
-    <article class="card strategy" id="t-joint">
-      <h3>4.2 T-junction</h3>
-      <div class="meta"><span class="tag green">High priority</span><span class="tag">2 elements</span></div>
-      <p>One element terminates against the interior of another element.</p>
-      <div class="diagram"><pre><code>──────────────────
-         │
-         │
-         │</code></pre></div>
-      <h4>Detection rule</h4>
-      <ul>
-        <li>The intersection lies near an endpoint of element A.</li>
-        <li>The intersection lies in the interior of element B.</li>
-        <li>The two elements are not considered coincident.</li>
-      </ul>
-      <h4>Topology</h4>
-      <p>The supporting element has continuity through the joint, while the attached element terminates at it.</p>
-    </article>
-
-    <article class="card strategy" id="corner">
-      <h3>4.3 Corner / L-joint</h3>
-      <div class="meta"><span class="tag green">High priority</span><span class="tag">2 elements</span></div>
-      <p>Two elements meet at their endpoints and form a non-collinear angle.</p>
-      <div class="diagram"><pre><code>────────●
-        │
-        │</code></pre></div>
-      <h4>Detection rule</h4>
-      <p>Both elements terminate at the joint and the angle between their directions is outside the collinear tolerance.</p>
-      <p>The exact angle does not have to be 90°. A 45° or arbitrary-angle corner should still be represented as a corner if the application does not require finer semantic classification.</p>
-    </article>
-
-    <article class="card strategy" id="collinear">
-      <h3>4.4 Collinear joint</h3>
-      <div class="meta"><span class="tag green">High priority</span><span class="tag">2 elements</span></div>
-      <p>Two elements meet end-to-end and lie on approximately the same supporting line.</p>
-      <div class="diagram"><pre><code>──────────●──────────</code></pre></div>
-      <h4>Detection rule</h4>
-      <p>Endpoint proximity is satisfied and the absolute angle between the supporting directions is approximately 0° (or 180°, depending on orientation convention).</p>
-      <div class="callout">
-        <strong>Why keep this type?</strong> It prevents a continuous chain of separately modeled panels from being mistaken for a corner.
-      </div>
-    </article>
-
-    <article class="card strategy" id="crossing">
-      <h3>4.5 Crossing / X-joint</h3>
-      <div class="meta"><span class="tag green">High priority</span><span class="tag">2 elements</span></div>
-      <p>Two elements intersect in their interiors, without either one terminating at the intersection.</p>
-      <div class="diagram"><pre><code>\        /
- \      /
-  \    /
-   \  /
-    \/
-    /\
-   /  \
-  /    \
- /      \</code></pre></div>
-      <h4>Detection rule</h4>
-      <p>The intersection is interior to both finite elements and is not within endpoint tolerance of either one.</p>
-      <h4>Optional refinement</h4>
-      <p>Store the crossing angle. This allows downstream consumers to distinguish perpendicular crossings from shallow-angle crossings.</p>
-    </article>
-
-    <article class="card strategy" id="y-joint">
-      <h3>4.6 Y-junction</h3>
-      <div class="meta"><span class="tag yellow">Medium priority</span><span class="tag">3 elements</span></div>
-      <p>Three elements converge at a common physical joint.</p>
-      <div class="diagram"><pre><code>       /
-      /
-─────●
-      \
-       \</code></pre></div>
-      <h4>Detection rule</h4>
-      <p>Generate pairwise intersections first, then spatially cluster nearby candidates. If three distinct elements participate in the same cluster, classify the cluster as a Y-junction when their endpoint/interior relationships match the intended topology.</p>
-    </article>
-
-    <article class="card strategy" id="multiway">
-      <h3>4.7 Multi-way joint</h3>
-      <div class="meta"><span class="tag yellow">Medium priority</span><span class="tag">4+ elements</span></div>
-      <p>A single location connects four or more elements.</p>
-      <div class="diagram"><pre><code>        │
-        │
-────────●────────
-      / │ \
-     /  │  \</code></pre></div>
-      <p>It is preferable to model this as one joint with multiple participating elements rather than many independent pairwise joints.</p>
-    </article>
-
-    <article class="card strategy" id="overlap">
-      <h3>4.8 Overlap / coincident attachment</h3>
-      <div class="meta"><span class="tag yellow">Medium priority</span><span class="tag">special case</span></div>
-      <p>Two elements occupy the same or substantially overlapping geometry.</p>
-      <div class="diagram"><pre><code>Element A: ─────────────────
-Element B: ─────────────────</code></pre></div>
-      <div class="callout warning">
-        <strong>Do not treat this as a normal point intersection.</strong>
-        Coincident geometry produces an interval of intersection rather than a single point.
-      </div>
-      <p>This should normally be detected by a separate overlap test before point-intersection classification.</p>
-    </article>
-
-    <article class="card strategy" id="curve">
-      <h3>4.9 Curve attachment</h3>
-      <div class="meta"><span class="tag yellow">Later</span><span class="tag">line/curve or curve/curve</span></div>
-      <p>One or both participating elements are curved.</p>
-      <p>Examples include line-to-arc, arc-to-arc and spline intersections. The same topological concepts apply, but direction should be derived from the local tangent rather than a single endpoint vector.</p>
-    </article>
-
-    <article class="card strategy" id="tangent">
-      <h3>4.10 Tangent attachment</h3>
-      <div class="meta"><span class="tag yellow">Later</span><span class="tag">curve geometry</span></div>
-      <p>Two elements meet with approximately equal tangent directions.</p>
-      <div class="diagram"><pre><code>          ______
-       ___
-──────●</code></pre></div>
-      <p>Use tangent comparison to distinguish a tangential connection from a crossing.</p>
-    </article>
-  </section>
-
-  <section id="pipeline">
-    <h2>5. Detection pipeline</h2>
-    <div class="card">
-      <pre><code>detectJoints(elements)
-        │
-        ├── 1. Validate / normalize elements
-        │
-        ├── 2. Build candidate pairs
-        │
-        ├── 3. Detect geometric intersections
-        │
-        ├── 4. Detect endpoint proximity
-        │
-        ├── 5. Classify pairwise relationships
-        │
-        ├── 6. Cluster nearby candidates
-        │
-        ├── 7. Re-classify multi-element clusters
-        │
-        ├── 8. Remove duplicates / invalid joints
-        │
-        └── 9. Return normalized Joint objects</code></pre>
+  <!-- ============= MAIN ============= -->
+  <main>
+    <div class="page-head">
+      <p class="kicker">Internal documentation</p>
+      <h2>Project structure</h2>
+      <p>Every script in the modeller, grouped by folder, with each file's role and — where the file has been reviewed in detail — the input/output of every function it exports.</p>
+      <p>Every file and function is now documented from real source — pulled directly from the repository, not inferred. The four-tier status badges reflect what's been fixed in this restructure: <b>corrected</b> (rewritten/fixed as part of this pass), <b>needs attention</b> (a real, flagged problem — duplication, missing dependency, or a stale carcass convention), and <b>stub</b> (genuinely empty, not yet implemented).</p>
     </div>
 
-    <h3>5.1 Candidate generation</h3>
-    <p>For large models, avoid testing every possible pair. Use a spatial index, bounding boxes or another broad-phase mechanism to eliminate pairs that cannot intersect.</p>
+    <div id="content"></div>
 
-    <h3>5.2 Narrow-phase intersection</h3>
-    <p>Perform the precise line-line, line-curve or curve-curve calculation only for candidate pairs.</p>
-  </section>
+    <div class="empty-state" id="emptyState">No files or functions match "<span id="emptyQuery"></span>".</div>
 
-  <section id="tolerance">
-    <h2>6. Tolerances</h2>
-    <p>Geometric detection should never depend on exact floating-point equality.</p>
-    <table>
-      <tr><th>Tolerance</th><th>Purpose</th><th>Example</th></tr>
-      <tr><td><code>positionTolerance</code></td><td>Determines whether two locations represent the same physical point.</td><td>Merge (100.01, 50.00) and (100.00, 50.01).</td></tr>
-      <tr><td><code>endpointTolerance</code></td><td>Determines whether an intersection counts as an endpoint.</td><td>Intersection 0.02 units from endpoint.</td></tr>
-      <tr><td><code>angleTolerance</code></td><td>Determines whether directions are considered parallel/collinear.</td><td>1° deviation may still be considered collinear.</td></tr>
-      <tr><td><code>overlapTolerance</code></td><td>Determines whether near-coincident geometry is considered overlapping.</td><td>Useful for imported/noisy geometry.</td></tr>
-    </table>
-    <div class="callout warning">
-      Tolerances should ideally be configurable and, where appropriate, expressed relative to model scale rather than hard-coded globally.
-    </div>
-  </section>
-
-  <section id="classification">
-    <h2>7. Classification</h2>
-    <p>A useful classification sequence is:</p>
-    <ol>
-      <li>Is the intersection empty? → no joint.</li>
-      <li>Is the intersection an interval? → overlap/coincident case.</li>
-      <li>Are there endpoint matches? → endpoint/T/L/collinear candidate.</li>
-      <li>Is the intersection interior to both elements? → crossing candidate.</li>
-      <li>Are curves involved? → use local tangents.</li>
-      <li>After clustering, how many unique elements participate? → Y or multi-way classification.</li>
-    </ol>
-
-    <table>
-      <tr><th>Endpoint A</th><th>Endpoint B</th><th>Angle</th><th>Classification</th></tr>
-      <tr><td>yes</td><td>yes</td><td>non-collinear</td><td>L / corner</td></tr>
-      <tr><td>yes</td><td>no</td><td>any</td><td>T-junction</td></tr>
-      <tr><td>yes</td><td>yes</td><td>collinear</td><td>Collinear</td></tr>
-      <tr><td>no</td><td>no</td><td>any</td><td>X / crossing</td></tr>
-    </table>
-  </section>
-
-  <section id="deduplication">
-    <h2>8. Deduplication and clustering</h2>
-    <p>Pairwise intersection detection can produce several candidates for the same physical joint.</p>
-    <pre><code>A-B → (100.00, 50.01)
-A-C → (100.02, 50.00)
-B-C → (100.01, 50.00)
-
-             ↓ cluster by positionTolerance
-
-Joint J1
-position ≈ (100.01, 50.00)
-elements = [A, B, C]</code></pre>
-    <p>The final joint should contain a unique list of participating element identifiers.</p>
-  </section>
-
-  <section id="confidence">
-    <h2>9. Confidence</h2>
-    <p>For imperfect input, consider attaching a confidence score or diagnostic information to each joint.</p>
-    <table>
-      <tr><th>Factor</th><th>High confidence</th><th>Low confidence</th></tr>
-      <tr><td>Position</td><td>Intersection well within tolerances</td><td>Near tolerance boundary</td></tr>
-      <tr><td>Angle</td><td>Clearly separated categories</td><td>Ambiguous angle</td></tr>
-      <tr><td>Endpoint</td><td>Very close to endpoint</td><td>Almost endpoint</td></tr>
-      <tr><td>Topology</td><td>Clear number of participants</td><td>Several candidates almost overlap</td></tr>
-    </table>
-  </section>
-
-  <section id="data-model">
-    <h2>10. Suggested data model</h2>
-    <pre><code>Joint {
-    id
-    type
-    position
-    participatingElements[]
-    angleData[]
-    confidence
-    diagnostics
-}</code></pre>
-
-    <h3>Recommended joint types</h3>
-    <pre><code>ENDPOINT
-T_JUNCTION
-CORNER
-COLLINEAR
-CROSSING
-Y_JUNCTION
-MULTI_WAY
-OVERLAP
-CURVE_INTERSECTION
-TANGENT</code></pre>
-
-    <p>Keep the type vocabulary small initially. More specialized semantic types can be introduced later without changing the underlying geometry representation.</p>
-  </section>
-
-  <section id="pseudocode">
-    <h2>11. Pseudocode</h2>
-    <pre><code>function detectJoints(elements):
-    candidates = []
-
-    normalized = normalize(elements)
-
-    pairs = findCandidatePairs(normalized)
-
-    for (a, b) in pairs:
-        result = intersect(a, b)
-
-        if result.isOverlap:
-            candidates.add(makeOverlapJoint(a, b, result))
-            continue
-
-        if not result.hasPoint:
-            continue
-
-        p = result.point
-
-        aEnd = isNearEndpoint(a, p)
-        bEnd = isNearEndpoint(b, p)
-
-        angle = angleAt(a, b, p)
-
-        type = classifyPair(aEnd, bEnd, angle)
-
-        candidates.add(
-            makeCandidate(p, type, [a.id, b.id])
-        )
-
-    clusters = clusterByPosition(candidates)
-
-    joints = []
-
-    for cluster in clusters:
-        joint = mergeCluster(cluster)
-        joint.type = classifyTopology(joint)
-        joints.add(joint)
-
-    return removeInvalidAndDuplicates(joints)</code></pre>
-  </section>
-
-  <section id="api">
-    <h2>12. Suggested API</h2>
-    <pre><code>detectJoints(
-    elements,
-    {
-        positionTolerance,
-        endpointTolerance,
-        angleTolerance,
-        overlapTolerance
-    }
-) -> Joint[]</code></pre>
-
-    <h3>Optional diagnostics API</h3>
-    <pre><code>detectJointsDetailed(...) -> {
-    joints: Joint[],
-    rejectedCandidates: Candidate[],
-    diagnostics: Diagnostic[]
-}</code></pre>
-    <p>The detailed variant is particularly useful during development and automated testing.</p>
-  </section>
-
-  <section id="tests">
-    <h2>13. Test matrix</h2>
-    <table>
-      <tr><th>Scenario</th><th>Expected result</th><th>Priority</th></tr>
-      <tr><td>Endpoint-to-endpoint, 90°</td><td>CORNER</td><td>Critical</td></tr>
-      <tr><td>Endpoint to segment interior</td><td>T_JUNCTION</td><td>Critical</td></tr>
-      <tr><td>Endpoint-to-endpoint, same line</td><td>COLLINEAR</td><td>Critical</td></tr>
-      <tr><td>Interior-to-interior crossing</td><td>CROSSING</td><td>Critical</td></tr>
-      <tr><td>Three elements at one point</td><td>Y_JUNCTION</td><td>High</td></tr>
-      <tr><td>Four elements at one point</td><td>MULTI_WAY</td><td>High</td></tr>
-      <tr><td>Duplicate elements</td><td>Deduplicated</td><td>High</td></tr>
-      <tr><td>Nearly coincident points</td><td>One clustered joint</td><td>High</td></tr>
-      <tr><td>Overlapping segments</td><td>OVERLAP</td><td>Medium</td></tr>
-      <tr><td>Line/arc intersection</td><td>CURVE_INTERSECTION</td><td>Later</td></tr>
-      <tr><td>Tangent line/curve</td><td>TANGENT</td><td>Later</td></tr>
-    </table>
-  </section>
-
-  <section id="edgecases">
-    <h2>14. Edge cases</h2>
-    <div class="grid">
-      <div class="card">
-        <h3>Very short elements</h3>
-        <p>Elements shorter than the endpoint tolerance can become ambiguous. Consider rejecting them or applying special handling.</p>
-      </div>
-      <div class="card">
-        <h3>Near-parallel elements</h3>
-        <p>Numerical errors can create unstable intersection points. Apply angular and positional tolerances.</p>
-      </div>
-      <div class="card">
-        <h3>Duplicate geometry</h3>
-        <p>Two identical elements should not create duplicate physical joints.</p>
-      </div>
-      <div class="card">
-        <h3>Nearly coincident endpoints</h3>
-        <p>Cluster nearby candidates before final topology classification.</p>
-      </div>
-    </div>
-  </section>
-
-  <section id="roadmap">
-    <h2>15. Implementation roadmap</h2>
-    <div class="card">
-      <h3>Phase 1 — Core straight geometry</h3>
-      <ol>
-        <li>Normalize line/segment representation.</li>
-        <li>Implement robust line intersection.</li>
-        <li>Implement endpoint proximity.</li>
-        <li>Implement L, T, collinear and X classification.</li>
-        <li>Add unit tests for tolerance boundaries.</li>
-      </ol>
-    </div>
-
-    <div class="card">
-      <h3>Phase 2 — Topology</h3>
-      <ol>
-        <li>Cluster candidate intersections.</li>
-        <li>Merge participating element IDs.</li>
-        <li>Implement Y-junctions.</li>
-        <li>Implement multi-way joints.</li>
-        <li>Handle duplicate candidates.</li>
-      </ol>
-    </div>
-
-    <div class="card">
-      <h3>Phase 3 — Advanced geometry</h3>
-      <ol>
-        <li>Add overlap detection.</li>
-        <li>Add line/curve intersections.</li>
-        <li>Add curve/curve intersections.</li>
-        <li>Add tangent classification.</li>
-        <li>Add confidence and diagnostics.</li>
-      </ol>
-    </div>
-
-    <div class="callout">
-      <strong>Recommended implementation boundary:</strong>
-      Keep <code>detectJoints()</code> responsible for geometric/topological
-      relationships. Domain-specific meanings such as hinge, weld, screw,
-      bracket or adhesive attachment should preferably be interpreted by a
-      higher-level component.
-    </div>
-  </section>
-
-  <footer class="footer">
-    Panel Attachment Strategies — Technical Documentation<br>
-    Intended as a living specification for the implementation and evolution of
-    <code>detectJoints()</code>.
-  </footer>
-
-</div>
-</main>
+    <footer>3d_modeler — Joints branch · generated reference, not auto-synced with source</footer>
+  </main>
 </div>
 
 <script>
-(function () {
-  const input = document.getElementById('search');
-  const sections = Array.from(document.querySelectorAll('main section, main article'));
-
-  input.addEventListener('input', function () {
-    const q = input.value.trim().toLowerCase();
-
-    sections.forEach(el => {
-      if (!q) {
-        el.style.display = '';
-        return;
+/* ======================================================================
+   DATA MODEL
+   status values: "ok" (corrected in this pass), "verified" (reviewed,
+   already correct, untouched), "warn" (needs attention — duplicate,
+   missing implementation, or unresolved dependency), "stub" (empty /
+   placeholder, not yet real code)
+   ====================================================================== */
+const GROUPS = [
+  {
+    id: 'root',
+    title: 'root',
+    desc: 'Application entry point.',
+    files: [
+      {
+        path: 'modeller-main.js',
+        status: 'ok',
+        imports: [{from:'./modeller/modules.js',names:['createPanelNode','computeNextBasePosition','MM_TO_UNIT','MATERIAL_CATALOG','loadMaterialCatalog']},{from:'./modeller/snap.js',names:['resolveConstraints']},{from:'./modeller/scene.js',names:['createModellerScene']},{from:'./modeller/selection.js',names:['getSelectedId','setSelectedId','getSelectedGroupId','setSelectedGroupId']},{from:'./engine/bom.js',names:['computeBom']},{from:'./engine/pdfExport.js',names:['exportCutListPdf']},{from:'./ui/properties.js',names:['renderProperties']},{from:'./ui/toolbar.js',names:['renderPanelList']},{from:'./ui/relations.js',names:['renderRelations']},{from:'./ui/layout.js',names:['initResizableLayout']},{from:'./ui/toast.js',names:['showToast','showDesignLimitError','showPanelSizeLimitError']},{from:'./ui/cutlist.js',names:['openCutListWindow','openNestingPlan','renderNestingSummary','setBomRows','getLastBomRows']},{from:'./shared/geometry.js',names:['clampOffsetToDesignLimits','clampGroupOffsetToDesignLimits','findPanelSizeViolation','findDesignLimitViolation','collectAxisSlabs','checkMinGap','rotationsMatch','VERTICAL_ROTATION','HORIZONTAL_ROTATION','PARALLEL_ROTATION','MIN_WALL_GAP_MM']},{from:'./features/box.js',names:['addBox','relayoutBox']},{from:'./features/shelf.js',names:['isShelf']},{from:'./tools/shelfTool.js',names:['startShelfMode','cancelShelfMode','getShelfMode','setShelfToolContext']},{from:'./tools/collinearTool.js',names:['startCollinearMode','cancelCollinearMode','isCollinearActive','getCollinearGapMm','setCollinearGapMm','setCollinearToolContext']},{from:'./tools/attachTool.js',names:['setAttachToolContext']},{from:'./history/history.js',names:['history','createStateCommand','MovePanelCommand','MoveGroupCommand','ResizePanelCommand','ChangeMaterialCommand','ChangeGroupMaterialCommand','RenamePanelCommand','AddPanelCommand','DeletePanelCommand','AddBoxCommand','DeleteBoxCommand','GroupPanelsCommand','UngroupPanelsCommand','DeleteShelfCommand','RemoveConstraintCommand','UnlinkConstraintCommand','HideBoxWallCommand','RestoreBoxWallCommand']}],
+        exportsList: [],
+        role: 'The single writer of the graph. Owns application state (panels, selection, drag state), DOM refs, scene wiring, and every commit path. Every feature/tool module is pure and returns data — this file is the only place that mutates panels, records history, or triggers a render.',
+        fns: [
+          { name:'capturePanelsState', io:'() → <b>Array</b>', role:'Returns the current panels reference, for history snapshots.' , calls: [] },
+          { name:'restorePanelsState', io:'(nextPanels: Array) → <span class="ret">void</span>', role:'Sets panels and re-renders — the undo/redo apply function.' , calls: ['renderAll() — same file'] },
+          { name:'recordHistoryCommand', io:'(CommandClass, before: Array, after: Array) → <span class="ret">void</span>', role:'Wraps a before/after panels pair into a history command.' , calls: ['createStateCommand() — history/history.js','history.record() — history/history.js'] },
+          { name:'commitAddedNodes', io:'(nodes: Array, CommandClass) → <span class="ret">void</span>', role:'Shared append + history path for anything that ADDS nodes (box, shelf, future drawer/door/plinth).' , calls: ['recordHistoryCommand() — same file'] },
+          { name:'applyDimensionChange', io:'(nodeId, dims, offsetDeltaMm) → <b>boolean</b>', role:'Validates + commits a gizmo/edge-drag resize.' , calls: ['findPanelSizeViolation() — shared/geometry.js','showPanelSizeLimitError() — ui/toast.js','findDesignLimitViolation() — shared/geometry.js','showDesignLimitError() — ui/toast.js','updateNode() — same file','recordHistoryCommand() — same file','renderAll() — same file'] },
+          { name:'applyRelayoutResult', io:'(result: RelayoutResult) → <b>boolean</b>', role:'Maps features/box.js#relayoutBox()\'s result to a toast (on failure) or applies its patches (on success).' , calls: ['showDesignLimitError() — ui/toast.js','showToast() — ui/toast.js','showPanelSizeLimitError() — ui/toast.js','updateNode() — same file'] },
+          { name:'switchView', io:'(mode: "3d"|"2d") → <span class="ret">void</span>', role:'Toggles the 3D/2D view mode.' , calls: ['setSelectedId() — modeller/selection.js','setViewMode() — modeller/scene.js (scene handle)','renderAll() — same file'] },
+          { name:'updateNode', io:'(id, patch: Object) → <span class="ret">void</span>', role:'The sole graph-mutation primitive — every other function in the file patches panels through this.', tag:'internal' , calls: [] },
+          { name:'handleCanvasSelectClick', io:'(clickedId, ctrlKey) → <span class="ret">void</span>', role:'Two-level (group → panel) selection from the 3D/2D canvas.' , calls: ['setSelectedGroupId() / setSelectedId() — modeller/selection.js','renderAll() — same file'] },
+          { name:'handleListSelectPanel', io:'(clickedId, ctrlKey) → <span class="ret">void</span>', role:'Direct panel selection from the panel list.' , calls: ['setSelectedGroupId() / setSelectedId() — modeller/selection.js','renderAll() — same file'] },
+          { name:'handleListSelectGroup', io:'(groupId) → <span class="ret">void</span>', role:'Direct group selection from the panel list.' , calls: ['setSelectedGroupId() / setSelectedId() — modeller/selection.js','renderAll() — same file'] },
+          { name:'groupSelectedPanels', io:'() → <span class="ret">void</span>', role:'Turns the current multi-select into a real group.' , calls: ['recordHistoryCommand() — same file','setSelectedGroupId() / setSelectedId() — modeller/selection.js','renderAll() — same file'] },
+          { name:'ungroupSelected', io:'() → <span class="ret">void</span>', role:'Dissolves the selected group back into standalone panels.' , calls: ['getSelectedGroupId() — modeller/selection.js','recordHistoryCommand() — same file','setSelectedGroupId() / setSelectedId() — modeller/selection.js','renderAll() — same file'] },
+          { name:'renderAll', io:'() → <span class="ret">void</span>', role:'Resolves constraints, re-renders scene + panel list + inspector + BOM.' , calls: ['getSelectedId() / getSelectedGroupId() — modeller/selection.js','resolveConstraints() — modeller/snap.js','reconcile() — modeller/scene.js (scene handle)','renderPanelList() — ui/toolbar.js','renderInspectorOnly() — same file','computeBom() — engine/bom.js','setBomRows() / renderNestingSummary() / openCutListWindow() / openNestingPlan() — ui/cutlist.js','isCollinearActive() / cancelCollinearMode() / startCollinearMode() / getCollinearGapMm() / setCollinearGapMm() — tools/collinearTool.js','getShelfMode() / cancelShelfMode() / startShelfMode() — tools/shelfTool.js','handleAddBox() / addVerticalPanel() / addHorizontalPanel() / addParallelPanel() — same file (passed as callbacks)'] },
+          { name:'renderInspectorOnly', io:'() → <span class="ret">void</span>', role:'Re-renders just the properties/relations panels (high-frequency drag path).' , calls: ['getSelectedId() / getSelectedGroupId() — modeller/selection.js','resolveConstraints() — modeller/snap.js','renderProperties() — ui/properties.js','renderRelations() — ui/relations.js','updateSelectedField() / updateSelectedTransformField() / unlinkOrRemoveConstraint() / renameSelected() / removeSelected() / ungroupSelected() / restoreFace() / updateGroupMaterial() — same file (passed as callbacks)'] },
+          { name:'renameSelected', io:'(newName: string) → <span class="ret">void</span>' , calls: ['updateNode() — same file','recordHistoryCommand() — same file','renderAll() — same file'] },
+          { name:'updateSelectedField', io:'(field, value) → <span class="ret">void</span>', role:'Inspector field edits (material, width, height…) with validation.' , calls: ['findDesignLimitViolation() / findPanelSizeViolation() — shared/geometry.js','showDesignLimitError() / showPanelSizeLimitError() — ui/toast.js','updateNode() — same file','relayoutBox() — features/box.js','applyRelayoutResult() — same file','recordHistoryCommand() — same file','renderAll() — same file'] },
+          { name:'updateGroupMaterial', io:'(materialName: string) → <span class="ret">void</span>' , calls: ['relayoutBox() — features/box.js','applyRelayoutResult() — same file','findDesignLimitViolation() — shared/geometry.js','showDesignLimitError() — ui/toast.js','recordHistoryCommand() — same file','renderAll() — same file'] },
+          { name:'updateSelectedTransformField', io:'(group, axis, value) → <span class="ret">void</span>', role:'Inspector offset/position typed edits.' , calls: ['updateNode() — same file','relayoutBox() — features/box.js','applyRelayoutResult() — same file','clampOffsetToDesignLimits() — shared/geometry.js','showDesignLimitError() — ui/toast.js','recordHistoryCommand() — same file','renderAll() — same file'] },
+          { name:'createAndSelectPanel', io:'(rotation) → <span class="ret">void</span>', role:'Shared body for the three add-panel buttons.', tag:'internal' , calls: ['capturePanelsState() — same file','createPanelNode() / computeNextBasePosition() — modeller/modules.js','resolveConstraints() — modeller/snap.js','recordHistoryCommand() — same file','setSelectedId() — modeller/selection.js','renderAll() — same file'] },
+          { name:'addVerticalPanel / addHorizontalPanel / addParallelPanel', io:'() → <span class="ret">void</span>' , calls: ['createAndSelectPanel() — same file','VERTICAL_ROTATION / HORIZONTAL_ROTATION / PARALLEL_ROTATION — shared/geometry.js (constants)'] },
+          { name:'handleAddBox', io:'() → <span class="ret">void</span>', role:'Calls features/box.js#addBox(panels), commits via commitAddedNodes.' , calls: ['addBox() — features/box.js','commitAddedNodes() — same file','setSelectedGroupId() / setSelectedId() — modeller/selection.js','renderAll() — same file'] },
+          { name:'removeSelected', io:'() → <span class="ret">void</span>', role:'Delete/hide, branches on group vs. shelf vs. box wall vs. standalone panel.' , calls: ['getSelectedGroupId() / getSelectedId() — modeller/selection.js','isShelf() — features/shelf.js','setSelectedGroupId() / setSelectedId() — modeller/selection.js','recordHistoryCommand() — same file','renderAll() — same file'] },
+          { name:'restoreFace', io:'(nodeId) → <span class="ret">void</span>', role:'Un-hides a previously hidden box wall.' , calls: ['recordHistoryCommand() — same file','renderAll() — same file'] },
+          { name:'unlinkOrRemoveConstraint', io:'(identifier, opts) → <span class="ret">void</span>', role:'Detach (soft) or delete (hard) an existing constraint.' , calls: ['getSelectedId() — modeller/selection.js','updateNode() — same file','resolveConstraints() — modeller/snap.js','recordHistoryCommand() — same file','renderAll() — same file'] },
+          { name:'bootstrap', io:'() → <b>Promise&lt;void&gt;</b>', role:'Loads the material catalog, creates the first box, clears history.' , calls: ['loadMaterialCatalog() — modeller/modules.js','handleAddBox() — same file','history.clear() — history/history.js'] },
+        ]
       }
-      const matches = el.innerText.toLowerCase().includes(q);
-      el.style.display = matches ? '' : 'none';
-    });
-  });
+    ]
+  },
+  {
+    id: 'features',
+    title: 'features/',
+    desc: 'Pure creation math for each furniture element — return { nodes, groupId }, never touch history/render/selection.',
+    files: [
+      {
+        path: 'features/box.js',
+        status: 'ok',
+        imports: [{from:'../modeller/modules.js',names:['createPanelNode','computeNextBasePosition','MATERIAL_CATALOG','MIN_PANEL_DIM_MM']},{from:'../modeller/snap.js',names:['resolveConstraints']},{from:'../shared/geometry.js',names:['VERTICAL_ROTATION','HORIZONTAL_ROTATION','PARALLEL_ROTATION','collectAxisSlabs','checkMinGap','findPanelSizeViolation','findDesignLimitViolation']}],
+        exportsList: ['DEFAULT_BOX_WIDTH_MM','DEFAULT_BOX_HEIGHT_MM','DEFAULT_BOX_DEPTH_MM','computeBoxLayout','addBox','findBoxSibling','relayoutBox'],
+        role: 'Box carcass construction and relayout. Left/Right run full height+depth; Top/Bottom run the full outer width; Back overlays the whole outer footprint (W×H+2T); Front is inset only in width and created hidden ("open-front box").',
+        fns: [
+          { name:'computeBoxLayout', io:'({left,right,top,bottom,back,front}: WallNode) → <b>LayoutByRole</b>', role:'Pure carcass math — given 6 walls\' thickness+offset, returns every wall\'s width/height/offset.' , calls: [] },
+          { name:'addBox', io:'(panels: Array) → <b>{ nodes, groupId }</b>', role:'Builds a new default box. Needs panels (read-only) only to place the anchor via computeNextBasePosition.' , calls: ['createPanelNode() — modeller/modules.js (×6)','computeNextBasePosition() — modeller/modules.js','resolveConstraints() — modeller/snap.js','computeBoxLayout() — same file'] },
+          { name:'findBoxSibling', io:'(panels, groupId, name) → <b>Node | null</b>', role:'Finds one wall of a box by role name.' , calls: [] },
+          { name:'relayoutBox', io:'(panels, groupId) → <b>{ok:true,patches} | {ok:false,hitAxis|reason}</b>', role:'Recomputes every wall after one wall\'s free-axis offset changed. Pure — modeller-main.js applies the patches.' , calls: ['findBoxSibling() — same file (×6)','computeBoxLayout() — same file','findPanelSizeViolation() / findDesignLimitViolation() / checkMinGap() / collectAxisSlabs() — shared/geometry.js','MIN_PANEL_DIM_MM — modeller/modules.js (constant)'] },
+        ]
+      },
+      {
+        path: 'features/shelf.js',
+        status: 'ok',
+        imports: [{from:'../modeller/modules.js',names:['createPanelNode','nextConstraintId','getAlignedAxis','LOCAL_FACES']},{from:'../modeller/snap.js',names:['resolveConstraints']},{from:'./box.js',names:['findBoxSibling','DEFAULT_BOX_DEPTH_MM']},{from:'../shared/geometry.js',names:['collectAxisSlabs','VERTICAL_ROTATION','HORIZONTAL_ROTATION','rotationsMatch','MIN_WALL_GAP_MM']}],
+        exportsList: ['addShelf','isShelf'],
+        role: 'Shelf creation via live spansBetween constraints against two picked boundary panels, plus the box\'s Back/Front for depth.',
+        fns: [
+          { name:'addShelf', io:'(panels, pick1, pick2, {mode, clickMm}) → <b>{ok:true,node,groupId} | {ok:false,reason}</b>', role:'Builds a shelf constrained to its boundaries. Pure — tools/shelfTool.js commits the result.' , calls: ['findBoxSibling() — features/box.js','resolveConstraints() — modeller/snap.js','facingFace() / pickGapForPosition() / findBestShelfSlot() — same file','collectAxisSlabs() — shared/geometry.js','nextConstraintId() / createPanelNode() — modeller/modules.js','DEFAULT_BOX_DEPTH_MM — features/box.js (constant)','MIN_WALL_GAP_MM — shared/geometry.js (constant)'] },
+          { name:'findBestShelfSlot', io:'(sortedSlabs, thickness) → <b>{center,clearSpan} | null</b>', role:'Auto-placement: largest available gap.', tag:'internal' , calls: [] },
+          { name:'pickGapForPosition', io:'(sortedSlabs, desiredMm, thickness) → <b>{fits,center}</b>', role:'Click-placement: nearest valid spot to where the user clicked.', tag:'internal' , calls: ['MIN_WALL_GAP_MM — shared/geometry.js (constant)'] },
+          { name:'facingFace', io:'(resolved, axis, otherResolved) → <b>faceName | null</b>', role:'Which local face of a boundary panel actually faces the other pick.', tag:'internal' , calls: ['getAlignedAxis() — modeller/modules.js','LOCAL_FACES — modeller/modules.js (constant)'] },
+          { name:'isShelf', io:'(node) → <b>boolean</b>', role:'Grouped, not a box wall, rotation matches horizontal/vertical shelf.' , calls: ['rotationsMatch() — shared/geometry.js','HORIZONTAL_ROTATION / VERTICAL_ROTATION — shared/geometry.js (constants)'] },
+        ]
+      },
+      {
+        path: 'features/drawer.js',
+        status: 'stub',
+        role: 'Not yet implemented (0 bytes). Planned: createDrawer({cabinet, width, height, depth, material, slideType}) → {nodes:[front,back,left,right,bottom], relations, groupId}.',
+        fns: []
+      },
+      {
+        path: 'features/door.js',
+        status: 'stub',
+        role: 'Not yet implemented (0 bytes). Planned: createDoor({cabinet, opening, hingeSide, material}) → {nodes:[panel], relations:[{type:"hingedTo",…}], groupId}.',
+        fns: []
+      },
+      {
+        path: 'features/plinth.js',
+        status: 'stub',
+        role: 'Not yet implemented (0 bytes). Planned: createPlinth({cabinet, height, material, inset}) → {nodes, relations, groupId}. Likely doesn\'t need a dedicated tool file — triggered from the properties panel on a selected box.',
+        fns: []
+      },
+    ]
+  },
+  {
+    id: 'tools',
+    title: 'tools/',
+    desc: 'Pick-mode interaction state for each multi-click tool. Own their own local state; wired to the live app via a small context object set once from modeller-main.js.',
+    files: [
+      {
+        path: 'tools/shelfTool.js',
+        status: 'ok',
+        imports: [{from:'../modeller/selection.js',names:['setSelectedId','setSelectedGroupId']},{from:'../ui/toast.js',names:['showToast','hideToast']},{from:'../shared/geometry.js',names:['VERTICAL_ROTATION','HORIZONTAL_ROTATION','rotationsMatch']},{from:'../modeller/modules.js',names:['MM_TO_UNIT']},{from:'../features/shelf.js',names:['addShelf']},{from:'../history/history.js',names:['AddShelfCommand']}],
+        exportsList: ['setShelfToolContext','getShelfMode','startShelfMode','cancelShelfMode'],
+        role: 'Two-pick boundary selection for shelf placement. Delegates the actual creation math to features/shelf.js.',
+        fns: [
+          { name:'setShelfToolContext', io:'(context: ShelfToolContext) → <span class="ret">void</span>', role:'Wires panels/renderAll/scene handles in — call once at startup.' , calls: [] },
+          { name:'getShelfMode', io:'() → <b>"horizontal"|"vertical"|null</b>', role:'For the toolbar\'s button active-state.' , calls: [] },
+          { name:'startShelfMode / cancelShelfMode', io:'(mode) → <span class="ret">void</span>' , calls: ['startShelfMode() calls: setSelectedId() / setSelectedGroupId() — modeller/selection.js; ctx.clearMultiSelected() / ctx.setFaceHighlight() / ctx.setFacePickMode() / ctx.renderAll() — via toolContext; showToast() — ui/toast.js','cancelShelfMode() calls: setSelectedId() — modeller/selection.js; ctx.setFaceHighlight() / ctx.setFacePickMode() / ctx.renderAll() — via toolContext; hideToast() — ui/toast.js'] },
+          { name:'handleShelfPick', io:'(nodeId, faceName, worldPoint) → <span class="ret">void</span>', role:'Scene pick-mode callback — validates the boundary, commits on the 2nd valid pick.', tag:'internal' , calls: ['ctx.getPanels() — via toolContext','rotationsMatch() — shared/geometry.js','showToast() — ui/toast.js','computeClickOffsetMm() — same file','ctx.setPanelHighlight() / ctx.renderAll() — via toolContext','addShelf() — features/shelf.js','ctx.commitAddedNodes() — via toolContext (AddShelfCommand from history/history.js)','setSelectedGroupId() / setSelectedId() — modeller/selection.js','cancelShelfMode() — same file'] },
+          { name:'computeClickOffsetMm', io:'(node, worldPoint, axis) → <b>number</b>', role:'Raycast hit point → offset-space mm.', tag:'internal' , calls: ['MM_TO_UNIT — modeller/modules.js (constant)'] },
+        ]
+      },
+      {
+        path: 'tools/collinearTool.js',
+        status: 'ok',
+        imports: [{from:'../modeller/selection.js',names:['setSelectedId','setSelectedGroupId']},{from:'../ui/toast.js',names:['showToast','hideToast','showDesignLimitError','showPanelSizeLimitError']},{from:'../shared/geometry.js',names:['findPanelSizeViolation','findDesignLimitViolation']},{from:'../modeller/modules.js',names:['FACE_TO_DIM_FIELD','getAlignedAxis']},{from:'../modeller/snap.js',names:['resolveConstraints']},{from:'../history/history.js',names:['AddConstraintCommand','MoveGroupCommand']}],
+        exportsList: ['setCollinearToolContext','isCollinearActive','getCollinearGapMm','setCollinearGapMm','startCollinearMode','cancelCollinearMode'],
+        role: 'Pick a face, then a parallel face on another panel — moves (or, if blocked, resizes) panel A to align. A box-wall pick translates the whole box instead.',
+        fns: [
+          { name:'setCollinearToolContext', io:'(context: CollinearToolContext) → <span class="ret">void</span>' , calls: [] },
+          { name:'isCollinearActive', io:'() → <b>boolean</b>' , calls: [] },
+          { name:'getCollinearGapMm / setCollinearGapMm', io:'() → number / (mm) → void' , calls: [] },
+          { name:'startCollinearMode / cancelCollinearMode', io:'() → <span class="ret">void</span>' , calls: ['startCollinearMode() calls: setSelectedId() / setSelectedGroupId() — modeller/selection.js; ctx.clearMultiSelected() / ctx.setFaceHighlight() / ctx.setFacePickMode() / ctx.renderAll() — via toolContext; showToast() — ui/toast.js','cancelCollinearMode() calls: setSelectedId() — modeller/selection.js; ctx.setFacePickMode() / ctx.renderAll() — via toolContext; hideToast() — ui/toast.js'] },
+          { name:'handleFacePick', io:'(nodeId, faceName) → <span class="ret">void</span>', role:'Scene pick-mode callback.', tag:'internal' , calls: ['ctx.getPanels() — via toolContext','resolveConstraints() — modeller/snap.js','getAlignedAxis() — modeller/modules.js','FACE_TO_DIM_FIELD — modeller/modules.js (constant)','ctx.setFaceHighlight() / ctx.renderAll() — via toolContext','showToast() — ui/toast.js','applyCollinear() — same file','cancelCollinearMode() — same file'] },
+          { name:'applyCollinearBoxTranslation', io:'(pick1, pick2) → <b>boolean</b>', role:'Rigid whole-box translate when pick1 is a box wall.', tag:'internal' , calls: ['ctx.getPanels() — via toolContext','resolveConstraints() — modeller/snap.js','findDesignLimitViolation() — shared/geometry.js','showDesignLimitError() — ui/toast.js','ctx.updateNode() / ctx.recordHistoryCommand() / ctx.renderAll() — via toolContext (MoveGroupCommand from history/history.js)'] },
+          { name:'applyCollinear', io:'(pick1, pick2) → <b>boolean</b>', role:'Move via live attachedTo constraint, or fall back to a spansBetween resize if blocked.', tag:'internal' , calls: ['applyCollinearBoxTranslation() / isAxisPositionLocked() — same file','showToast() — ui/toast.js','ctx.getPanels() / ctx.updateNode() / ctx.recordHistoryCommand() / ctx.renderAll() — via toolContext (AddConstraintCommand from history/history.js)','resolveConstraints() — modeller/snap.js','findPanelSizeViolation() — shared/geometry.js','showPanelSizeLimitError() — ui/toast.js','findDesignLimitViolation() — shared/geometry.js','showDesignLimitError() — ui/toast.js'] },
+          { name:'isAxisPositionLocked', io:'(node, axis) → <b>boolean</b>', role:'Existing constraint or structural box-wall lock on this axis?', tag:'internal' , calls: [] },
+        ]
+      },
+      {
+        path: 'tools/attachTool.js',
+        status: 'warn',
+        imports: [{from:'../modeller/selection.js',names:['setSelectedId','setSelectedGroupId']},{from:'../ui/toast.js',names:['showToast','hideToast']},{from:'../engine/joints.js',names:['classifyJoint','declareJoint']},{from:'../history/history.js',names:['AddConstraintCommand']}],
+        exportsList: ['setAttachToolContext','isAttachActive','getPendingAttach','startAttachMode','cancelAttachMode','cancelPendingAttach','confirmAttach'],
+        role: 'Manual panel-to-panel joint declaration — the generic path outside any automated feature. Two-pick, then requires explicit user confirmation before writing anything to the graph.',
+        note: 'Depends on <b>engine/joints.js</b>, which is currently empty. classifyJoint()/declareJoint() need real implementations before this tool can run.',
+        fns: [
+          { name:'setAttachToolContext', io:'(context: AttachToolContext) → <span class="ret">void</span>' , calls: [] },
+          { name:'isAttachActive / getPendingAttach', io:'() → boolean / PendingAttach|null' , calls: [] },
+          { name:'startAttachMode / cancelAttachMode / cancelPendingAttach', io:'() → <span class="ret">void</span>' , calls: ['setSelectedId() / setSelectedGroupId() — modeller/selection.js','ctx.clearMultiSelected() / ctx.setFaceHighlight() / ctx.setFacePickMode() / ctx.renderAll() — via toolContext','showToast() / hideToast() — ui/toast.js'] },
+          { name:'handleAttachPick', io:'(nodeId, faceName) → <span class="ret">void</span>', role:'Classifies the picked pair, stores it as a suggestion awaiting confirm.', tag:'internal' , calls: ['ctx.getPanels() — via toolContext','classifyJoint() — engine/joints.js','ctx.setFaceHighlight() / ctx.renderAll() — via toolContext','showToast() — ui/toast.js'] },
+          { name:'confirmAttach', io:'() → <span class="ret">void</span>', role:'The only place a joint relation is actually written — mirrors the call every automated feature makes internally.' , calls: ['declareJoint() — engine/joints.js','ctx.getPanels() / ctx.updateNode() / ctx.recordHistoryCommand() — via toolContext (AddConstraintCommand from history/history.js)','cancelAttachMode() — same file'] },
+        ]
+      },
+      {
+        path: 'tools/drawerTool.js',
+        status: 'stub',
+        role: 'Not yet implemented (0 bytes). Only needed if drawer placement requires multi-click interaction (e.g. picking the opening) — may turn out unnecessary if drawers are fully specified from the properties panel.',
+        fns: []
+      },
+      {
+        path: 'tools/doorTool.js',
+        status: 'stub',
+        role: 'Not yet implemented (0 bytes). Same conditional need as drawerTool.js.',
+        fns: []
+      },
+    ]
+  },
+  {
+    id: 'shared',
+    title: 'shared/',
+    desc: 'Feature-agnostic geometry and validation helpers used by both features/ and tools/.',
+    files: [
+      {
+        path: 'shared/geometry.js',
+        status: 'ok',
+        imports: [{from:'../modeller/modules.js',names:['computeWorldHalfExtents','DESIGN_LIMITS_MM','PANEL_SIZE_LIMITS_MM']}],
+        exportsList: ['VERTICAL_ROTATION','HORIZONTAL_ROTATION','PARALLEL_ROTATION','MIN_WALL_GAP_MM','rotationsMatch','checkMinGap','collectAxisSlabs','clampOffsetToDesignLimits','clampGroupOffsetToDesignLimits','findPanelSizeViolation','findDesignLimitViolation'],
+        role: 'Rotation constants, axis-slab collection, and every design-limit / panel-size validation function. Nothing here knows what a "box" or "shelf" is.',
+        fns: [
+          { name:'VERTICAL_ROTATION / HORIZONTAL_ROTATION / PARALLEL_ROTATION', io:'<b>{x,y,z}</b> (constants)', role:'The 3 panel orientation presets.' },
+          { name:'MIN_WALL_GAP_MM', io:'<b>15</b> (constant)' },
+          { name:'rotationsMatch', io:'(a, b) → <b>boolean</b>' , calls: [] },
+          { name:'checkMinGap', io:'(elements: Slab[]) → <b>{ok:true} | {ok:false,a,b}</b>', role:'Every neighbor pair on an axis keeps ≥ MIN_WALL_GAP_MM apart.' , calls: ['MIN_WALL_GAP_MM — same file (constant)'] },
+          { name:'collectAxisSlabs', io:'(panels, groupId, axis, overrides?) → <b>Slab[]</b>', role:'Every wall/shelf sharing an axis inside a box, with a proposed override swapped in.' , calls: ['rotationsMatch() — same file','HORIZONTAL_ROTATION / VERTICAL_ROTATION — same file (constants)'] },
+          { name:'clampOffsetToDesignLimits', io:'(node, proposedOffset) → <b>{offset, hitAxis}</b>' , calls: ['computeWorldHalfExtents() — modeller/modules.js','DESIGN_LIMITS_MM — modeller/modules.js (constant)'] },
+          { name:'clampGroupOffsetToDesignLimits', io:'(members, startOffsets, proposedDeltaMm) → <b>{delta, hitAxis}</b>', role:'Rigid multi-member move, clamped to the most restrictive member.' , calls: ['computeWorldHalfExtents() — modeller/modules.js','DESIGN_LIMITS_MM — modeller/modules.js (constant)'] },
+          { name:'findPanelSizeViolation', io:'(dims) → <b>"width"|"height"|null</b>' , calls: ['PANEL_SIZE_LIMITS_MM — modeller/modules.js (constant)'] },
+          { name:'findDesignLimitViolation', io:'(rotation, positionMm, dims) → <b>axis|null</b>' , calls: ['computeWorldHalfExtents() — modeller/modules.js','DESIGN_LIMITS_MM — modeller/modules.js (constant)'] },
+        ]
+      }
+    ]
+  },
+  {
+    id: 'history',
+    title: 'history/',
+    desc: 'Undo/redo.',
+    files: [
+      {
+        path: 'history/history.js',
+        status: 'ok',
+        imports: [],
+        exportsList: ['history','createStateCommand','HistoryManager','MovePanelCommand','MoveGroupCommand','ResizePanelCommand','ChangeMaterialCommand','ChangeGroupMaterialCommand','RenamePanelCommand','AddPanelCommand','DeletePanelCommand','AddBoxCommand','DeleteBoxCommand','GroupPanelsCommand','UngroupPanelsCommand','AddShelfCommand','DeleteShelfCommand','AddConstraintCommand','RemoveConstraintCommand','UnlinkConstraintCommand','HideBoxWallCommand','RestoreBoxWallCommand'],
+        role: 'Command-pattern undo/redo stack over full before/after panels snapshots. Restored to the real master-branch implementation — a stray duplicate recordHistoryCommand() (referencing an undefined restorePanelsState) was removed.',
+        fns: [
+  { name:'cloneValue', io:'(value) &rarr; <b>any</b>', role:'Deep-clones a before/after snapshot (structuredClone, JSON fallback) so a later panels mutation can never retroactively change a history entry.', calls:['structuredClone &mdash; browser API'], tag:'internal' },
+  { name:'assertFunction', io:'(value, name) &rarr; <span class=&quot;ret&quot;>void (throws)</span>', calls:[], tag:'internal' },
+  { name:'ModelCommand', io:'<b>class</b>', role:'Base command: constructor({label,before,after,applyState}) clones both snapshots; execute() applies after, undo() applies before, redo() calls execute().', calls:['cloneValue() &mdash; same file'] },
+  { name:'AddPanelCommand … RestoreBoxWallCommand', io:'<b>19 classes, each extends ModelCommand</b>', role:'Thin subclasses that only set a semantic label (&quot;Add panel&quot;, &quot;Move group&quot;, etc) &mdash; used throughout modeller-main.js to name each undo step.', calls:['ModelCommand — same file'] },
+  { name:'CompositeCommand', io:'<b>class</b>', role:'Groups several commands into one user-visible undo step; add(command), execute() runs all in order, undo() runs all in REVERSE order.', calls:[] },
+  { name:'HistoryManager', io:'<b>class</b>', role:'The undo/redo stack itself.', calls:['CompositeCommand — same file (beginTransaction)'] },
+  { name:'HistoryManager.record', io:'(command) &rarr; <b>command</b>', role:'Pushes onto undoStack, clears redoStack, trims to maxHistory. Routes into the open transaction instead, if any.', calls:[], tag:'method' },
+  { name:'HistoryManager.undo / redo', io:'() &rarr; <b>boolean</b>', role:'Pop + apply + push to the other stack.', calls:[], tag:'method' },
+  { name:'HistoryManager.canUndo / canRedo', io:'() &rarr; <b>boolean</b>', calls:[], tag:'method' },
+  { name:'HistoryManager.clear', io:'() &rarr; <span class=&quot;ret&quot;>void</span>', role:'Empties both stacks &mdash; used on load so you can never undo into pre-load state.', calls:[], tag:'method' },
+  { name:'HistoryManager.beginTransaction / commitTransaction / cancelTransaction', io:'(label) / () / ()', role:'Collect several commands into one history entry (not currently used by modeller-main.js, which always records single commands).', calls:[], tag:'method' },
+  { name:'createStateCommand', io:'({CommandClass, before, after, applyState}) &rarr; <b>Command</b>', role:'Convenience constructor &mdash; what modeller-main.js&#39;s recordHistoryCommand() calls.', calls:['new CommandClass() &mdash; same file'] },
+  { name:'history', io:'<b>HistoryManager instance</b>', role:'The shared singleton, maxHistory:20.', calls:[] },
+]
+      }
+    ]
+  },
+  {
+    id: 'modeller',
+    title: 'modeller/',
+    desc: 'Graph primitives, the constraint resolver, and the Three.js view layer.',
+    files: [
+      {
+        path: 'modeller/modules.js',
+        status: 'ok',
+        imports: [{from:'three (external)',names:['THREE']}],
+        exportsList: ['nextId','MIN_PANEL_DIM_MM','LOCAL_FACES','FACE_TO_DIM_FIELD','FIELD_TO_AXIS','getAlignedAxis','classifyFacesByThickness','nextConstraintId','MATERIAL_CATALOG','loadMaterialCatalog','createPanelNode','bandableEdgeFaces','getDisplayName','MM_TO_UNIT','DIM_FIELD_PROBE_FACE','computeWorldHalfExtents','FLOOR_MM','DESIGN_LIMITS_MM','PANEL_SIZE_LIMITS_MM','clampToFloor','computeNextBasePosition'],
+        role: 'Node primitives, face/axis vocabulary, material catalog, design limits. Verified byte-identical to master aside from computeBoxLayout, which correctly moved to features/box.js.',
+        fns: [
+  { name:'nextId', io:'() &rarr; <b>string</b>', role:'Sequential panel id generator (&quot;panel-1&quot;, &quot;panel-2&quot;...).', calls:[] },
+  { name:'getAlignedAxis', io:'(rotationDeg, faceName) &rarr; <b>{axis,sign}|null</b>', role:'Which single world axis a local face lands on given a rotation &mdash; null if not aligned within tolerance (angled joinery unsupported).', calls:['THREE.Euler / THREE.Vector3 (rotation math) &mdash; three (external)'] },
+  { name:'classifyFacesByThickness', io:'(node) &rarr; <b>{thicknessAxis,edgeFaces,flatFaces}</b>', role:'Splits a panel&#39;s 6 faces into the 2 flat &quot;show&quot; faces and 4 edge-banding-eligible faces.', calls:['getAlignedAxis() &mdash; same file'] },
+  { name:'nextConstraintId', io:'() &rarr; <b>string</b>', role:'Sequential constraint id generator (&quot;c1&quot;, &quot;c2&quot;...).', calls:[] },
+  { name:'loadMaterialCatalog', io:'(url?) &rarr; <b>Promise&lt;Array&gt;</b>', role:'Fetches + parses the materials CSV at startup; falls back to a minimal built-in catalog on any failure.', calls:['parseMaterialsCsv() &mdash; same file', 'fetch &mdash; browser API'] },
+  { name:'createPanelNode', io:'(overrides?) &rarr; <b>Node</b>', role:'Constructs a new panel node with defaults, then assigns thicknessAxis and a permanent pieceCode.', calls:['nextId() &mdash; same file', 'getAlignedAxis() &mdash; same file', 'nextPieceCode() &mdash; same file'] },
+  { name:'bandableEdgeFaces', io:'(node) &rarr; <b>faceName[]</b>', role:'Which of a node&#39;s faces are physically edge-bandable.', calls:['classifyFacesByThickness() &mdash; same file'] },
+  { name:'getDisplayName', io:'(node) &rarr; <b>string</b>', role:'Panel display name, falling back to its stable id.', calls:[] },
+  { name:'computeWorldHalfExtents', io:'(node) &rarr; <b>{x,y,z}</b>', role:'A panel&#39;s half-size along each WORLD axis (not local width/height/thickness) &mdash; rotation-aware.', calls:['getAlignedAxis() &mdash; same file'] },
+  { name:'clampToFloor', io:'(y, halfExtentY) &rarr; <b>number</b>', role:'Guarantees an object&#39;s floor-resting center Y never sinks its bottom edge below FLOOR_MM.', calls:[] },
+  { name:'computeNextBasePosition', io:'(resolvedPanels, newDims) &rarr; <b>{x,y,z}</b>', role:'Placement for a brand-new panel &mdash; far right of everything that currently exists, on the floor.', calls:['computeWorldHalfExtents() &mdash; same file (&times;2)'] },
+  { name:'computeBoxLayout', io:'still present in master', role:'Present in master (unchanged) &mdash; on the Joints branch this moved to features/box.js, since it&#39;s box-specific, not a generic node primitive. See features/box.js for the live version.', calls:[], tag:'moved on Joints branch' },
+]
+      },
+      {
+        path: 'modeller/node.js',
+        status: 'stub',
+        role: 'Intended split target for node primitives out of modules.js — currently plain text, not real code (no export/function keywords). modules.js still covers this content today, so nothing is broken, but nothing should import from this file yet.',
+        fns: []
+      },
+      {
+        path: 'modeller/materials.js',
+        status: 'stub',
+        role: 'Intended split target for the material catalog out of modules.js — same issue as node.js: placeholder text, not implemented.',
+        fns: []
+      },
+      {
+        path: 'modeller/validation.js',
+        status: 'warn',
+        imports: [{from:'./modules.js',names:['computeWorldHalfExtents','DESIGN_LIMITS_MM','PANEL_SIZE_LIMITS_MM']}],
+        exportsList: ['findPanelSizeViolation','findDesignLimitViolation'],
+        role: 'findPanelSizeViolation / findDesignLimitViolation.',
+        note: 'Duplicates shared/geometry.js, which is the version everything actually imports. Recommend deleting this file rather than maintaining two copies of the same validators.',
+        fns: []
+      },
+      {
+        path: 'modeller/snap.js',
+        status: 'ok',
+        imports: [{from:'./modules.js',names:['LOCAL_FACES','FACE_TO_DIM_FIELD','FIELD_TO_AXIS','MIN_PANEL_DIM_MM','getAlignedAxis','DIM_FIELD_PROBE_FACE','computeWorldHalfExtents']}],
+        exportsList: ['resolveConstraints','inferSpanField'],
+        role: 'The constraint resolver — turns the raw graph (literals + spansBetween/attachedTo constraints) into a fully resolved graph (concrete numbers everywhere). The seam renderAll() calls once per render.',
+        fns: [
+  { name:'emptyResolved', io:'(node) &rarr; <b>ResolvedNode</b>', role:'Builds the starting resolved shell for one node before any constraints are applied &mdash; pass-through fields + position from basePosition+offset.', calls:[], tag:'internal' },
+  { name:'topoSort', io:'(panels) &rarr; <b>{order, cyclic}</b>', role:'Dependency-orders nodes by their constraint references; nodes in a cycle are returned separately so the caller can flag them instead of resolving them.', calls:[], tag:'internal' },
+  { name:'inferSpanField', io:'(targetNode, fromFaceRef, toFaceRef, byId) &rarr; <b>{field,axis}|{error}</b>', role:'Works out which field (width/height/thickness) a spansBetween relation should govern, from the picked From/To faces &mdash; removes the need for the relations UI to ask directly.', calls:['getAlignedAxis() &mdash; modeller/modules.js', 'DIM_FIELD_PROBE_FACE &mdash; modeller/modules.js (constant)'] },
+  { name:'resolveFacePointMm', io:'(faceRef, axisKey, resolvedById, byId) &rarr; <b>number</b>', role:'World-space mm position of a referenced face &mdash; or a literal snapshot value if faceRef carries `.mm` instead of `.node` (used by the collinear tool&#39;s resize-fallback).', calls:['getAlignedAxis() &mdash; modeller/modules.js', 'LOCAL_FACES / FACE_TO_DIM_FIELD &mdash; modeller/modules.js (constants)'], tag:'internal' },
+  { name:'axisForDimensionField', io:'(node, field) &rarr; <b>axis|null</b>', role:'Which world axis a node&#39;s own width/height/thickness currently lines up with, given its rotation.', calls:['getAlignedAxis() &mdash; modeller/modules.js', 'DIM_FIELD_PROBE_FACE &mdash; modeller/modules.js (constant)'], tag:'internal' },
+  { name:'applySpansBetween', io:'(node, constraint, resolvedById, byId, r) &rarr; <span class=&quot;ret&quot;>void (mutates r)</span>', role:'Sets a dimension field to the distance between two referenced faces, and (unless overridden) centers the node on that axis.', calls:['axisForDimensionField() &mdash; same file', 'resolveFacePointMm() &mdash; same file', 'MIN_PANEL_DIM_MM &mdash; modeller/modules.js (constant)'], tag:'internal' },
+  { name:'applyAttachedTo', io:'(node, constraint, resolvedById, byId, r) &rarr; <span class=&quot;ret&quot;>void (mutates r)</span>', role:'Positions the node so one of its own faces touches a referenced face.', calls:['resolveFacePointMm() &mdash; same file', 'getAlignedAxis() &mdash; modeller/modules.js', 'FIELD_TO_AXIS / LOCAL_FACES / FACE_TO_DIM_FIELD &mdash; modeller/modules.js (constants)'], tag:'internal' },
+  { name:'resolveConstraints', io:'(panels) &rarr; <b>ResolvedNode[]</b>', role:'THE seam: raw graph (literals + constraints) &rarr; resolved graph (concrete numbers everywhere). Dimension constraints run before position constraints on the same node.', calls:['emptyResolved() / topoSort() / applySpansBetween() / applyAttachedTo() &mdash; same file'] },
+]
+      },
+      {
+        path: 'modeller/scene.js',
+        status: 'ok',
+        imports: [{from:'three (external)',names:['THREE']},{from:'./modules.js',names:['MM_TO_UNIT','LOCAL_FACES','FACE_TO_DIM_FIELD']},{from:'./orbitControls.js',names:['createOrbitControls']},{from:'./gizmos.js',names:['createGizmos']},{from:'./view2d.js',names:['create2DControls']},{from:'./viewCube.js',names:['createViewCube']}],
+        exportsList: ['createModellerScene'],
+        role: '3D scene orchestration (Three.js). Returns the pick-mode/highlight handles every tool depends on via toolContext.',
+        fns: [
+  { name:'createModellerScene', io:'(canvas, main, {onSelect, onTransformChange, onDimensionChange, onGroupDragStart, onGroupTransformChange, axesCanvas, pipCanvas, onPipModeClick}) &rarr; <b>{reconcile, dispose, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight}</b>', role:'Owns the Three.js scene/renderer/lights, the face + panel highlight meshes, both cameras (3D perspective + 2D ortho) plus their picture-in-picture pair, and composes exactly one of orbitControls+gizmos (3D) or view2d (2D) at a time.', calls:['createOrbitControls() &mdash; modeller/orbitControls.js', 'createGizmos() &mdash; modeller/gizmos.js', 'create2DControls() &mdash; modeller/view2d.js', 'createViewCube() &mdash; modeller/viewCube.js'] },
+  { name:'reconcile', io:'(resolvedPanels, selectedId, selectedGroupId, multiSelectedIds, boxWallIds, selectedBoxWallId) &rarr; <span class=&quot;ret&quot;>void</span>', role:'THE reconciler &mdash; diffs resolvedPanels against the live mesh registry (add/remove/resize meshes), applies selection coloring, and attaches gizmos/view2d resize handles to whatever&#39;s selected. Mode-agnostic: identical regardless of which camera is active.', calls:['updateFaceHighlight() / updatePanelHighlight() &mdash; same file', 'gizmos.attachTo() / attachToGroup() / detachAll() &mdash; modeller/gizmos.js', 'view2d.setSelectedMesh() / setSelectedGroup() &mdash; modeller/view2d.js'], tag:'returned API' },
+  { name:'setViewMode', io:'(mode: &quot;3d&quot;|&quot;2d&quot;) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Tears down the current interaction layer and activates the other, then re-reconciles immediately.', calls:['deactivateCurrent() / activate2D() / activate3D() / reconcile() &mdash; same file'], tag:'returned API' },
+  { name:'setFacePickMode', io:'(active, onFacePick) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Suspends ordinary select/drag in both views; clicks report (nodeId,faceName,worldPoint) instead &mdash; used by the collinear/shelf/attach tools.', calls:['gizmos.detachAll() &mdash; modeller/gizmos.js', 'view2d.setSelectedMesh() &mdash; modeller/view2d.js', 'setFaceHighlight() / setPanelHighlight() &mdash; same file'], tag:'returned API' },
+  { name:'setFaceHighlight / setPanelHighlight', io:'(nodeId, faceName) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Targets the single-face or whole-panel highlight overlay for the next reconcile() to position.', calls:[], tag:'returned API' },
+  { name:'reportTransformToExternal', io:'(nodeId, transform) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Converts an absolute mesh transform from either interaction layer into an offset delta, calls the external onTransformChange, and snaps the live mesh back if a corrected offset comes back (e.g. a design-limit clamp).', calls:['onTransformChange &mdash; callback from modeller-main.js'], tag:'internal' },
+  { name:'activate3D / activate2D / deactivateCurrent', io:'() &rarr; <span class=&quot;ret&quot;>void</span>', role:'Creates/disposes exactly one interaction layer at a time.', calls:['createOrbitControls() + createGizmos() &mdash; orbitControls.js / gizmos.js', 'create2DControls() &mdash; view2d.js'], tag:'internal' },
+  { name:'dispose', io:'() &rarr; <span class=&quot;ret&quot;>void</span>', role:'Full teardown &mdash; cancels the render loop, disposes every mesh/geometry/material, the view cube, and both renderers.', calls:[], tag:'returned API' },
+]
+      },
+      {
+        path: 'modeller/gizmos.js',
+        status: 'ok',
+        imports: [{from:'three (external)',names:['THREE','TransformControls']},{from:'./modules.js',names:['MM_TO_UNIT','MIN_PANEL_DIM_MM','LOCAL_FACES','FACE_TO_DIM_FIELD']}],
+        exportsList: ['createGizmos'],
+        role: 'Move/resize handle rendering and drag interaction for the 3D view.',
+        fns: [
+  { name:'createGizmos', io:'(camera, canvas, scene, {onTransformChange, onDimensionChange, onGroupDragStart, onGroupTransformChange, gestureState}) &rarr; <b>{isDragging, attachTo, attachToGroup, isGroupMember, detachAll, setMeshEntryLookup, setNodeEntryLookup, dispose, controls}</b>', role:'3D move gizmo (Three.js TransformControls, translate-only, no rotation handle) plus 6 hand-rolled resize dot handles (4 interactive &mdash; width/height faces; thickness pair permanently hidden, since thickness is material-driven only). Shift-drag locks the move to whichever single axis moved most. A resize drag is asymmetric: only the dragged face moves, the opposite face&#39;s world position stays fixed.', calls:['TransformControls &mdash; three/addons (external)'] },
+  { name:'attachTo', io:'(mesh, lockedFields?) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Attaches the move gizmo + resize dots to one mesh, hiding the handle for any axis under active constraint.', calls:[], tag:'returned API' },
+  { name:'attachToGroup', io:'(memberMeshes) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Move-only gizmo for a rigid multi-member selection (no per-member resize).', calls:[], tag:'returned API' },
+  { name:'isDragging / isGroupMember', io:'() &rarr; boolean / (mesh) &rarr; boolean', calls:[], tag:'returned API' },
+  { name:'detachAll', io:'() &rarr; <span class=&quot;ret&quot;>void</span>', calls:[], tag:'returned API' },
+  { name:'setMeshEntryLookup / setNodeEntryLookup', io:'(fn) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Wires the mesh&rarr;registry-entry and nodeId&rarr;registry-entry lookups scene.js owns &mdash; the latter used by the resize-proxy redirect (a box Top/Bottom/Back/Front drag actually resizing Left/Right&#39;s own field).', calls:[], tag:'returned API' },
+  { name:'dispose', io:'() &rarr; <span class=&quot;ret&quot;>void</span>', calls:[], tag:'returned API' },
+  { name:'handleFacePointerDown / handleFacePointerMove / handleFacePointerUp', io:'(e) &rarr; <span class=&quot;ret&quot;>void</span>', role:'The resize-dot drag lifecycle &mdash; computes the asymmetric shift and reports it via onDimensionChange on release.', calls:['computeAsymmetricResize() &mdash; same file', 'onDimensionChange &mdash; callback from modeller-main.js'], tag:'internal' },
+  { name:'reportTransform', io:'(mesh) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Move-gizmo drag &rarr; onTransformChange, on every frame while dragging.', calls:['onTransformChange &mdash; callback (from scene.js&#39;s reportTransformToExternal)'], tag:'internal' },
+]
+      },
+      {
+        path: 'modeller/view2d.js',
+        status: 'ok',
+        imports: [{from:'three (external)',names:['THREE']},{from:'./modules.js',names:['MM_TO_UNIT','MIN_PANEL_DIM_MM','getAlignedAxis']}],
+        exportsList: ['create2DControls'],
+        role: '2D front-view rendering and edge-drag interaction.',
+        fns: [
+  { name:'create2DControls', io:'(canvas, camera, scene, meshRegistry, {onSelect, onTransformChange, onDimensionChange, onGroupDragStart, onGroupTransformChange, isFacePickMode, onFacePick}) &rarr; <b>{isDragging, setSelectedMesh, setSelectedGroup, isGroupMember, draggedMeshRef, setPanelOutlinesVisible, getPanelOutlinesVisible, dispose}</b>', role:'PowerPoint-style direct manipulation for the front-elevation (orthographic, looking down -Z) view: drag a panel&#39;s body to move it, drag one of its edge handles to resize, or drag a move-arrow to translate along a locked axis. Reuses the SAME scene/mesh registry scene.js owns &mdash; only the camera and which layer listens for pointer events changes. Resize is axis-restricted by orientation (getAlignedAxis decides which handles even exist), and box walls/shelves get no resize dots at all (relayoutBox / addShelf own their sizing).', calls:['getAlignedAxis() &mdash; modeller/modules.js'] },
+  { name:'setSelectedMesh / setSelectedGroup', io:'(mesh|null) / (memberMeshes) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Which mesh(es) currently show resize/move handles.', calls:[], tag:'returned API' },
+  { name:'isDragging / isGroupMember / draggedMeshRef', io:'() &rarr; boolean / (mesh) &rarr; boolean / () &rarr; Mesh|null', calls:[], tag:'returned API' },
+  { name:'setPanelOutlinesVisible / getPanelOutlinesVisible', io:'(visible) &rarr; void / () &rarr; boolean', role:'2D-only silhouette outlines for panels that are edge-on slivers from the front (e.g. a box&#39;s rotated side panels).', calls:[], tag:'returned API' },
+  { name:'dispose', io:'() &rarr; <span class=&quot;ret&quot;>void</span>', calls:[], tag:'returned API' },
+  { name:'handlePointerDown / handlePointerMove / handlePointerUp', io:'(e) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Body-drag (move) and edge-handle-drag (resize) lifecycle, plus hit-testing against the mesh list and handle groups.', calls:['hitTest() / computeResizeResult() / reportTransform() &mdash; same file', 'onTransformChange / onDimensionChange / onSelect / onFacePick &mdash; callbacks (via scene.js)'], tag:'internal' },
+  { name:'computeResizeResult', io:'(e) &rarr; <b>{isWidthEdge, field, startMm, newMm, worldShiftXmm, worldShiftYmm}</b>', role:'Asymmetric edge-resize math &mdash; same &quot;opposite face stays fixed&quot; convention as gizmos.js&#39;s 3D resize dots.', calls:[], tag:'internal' },
+  { name:'handlePanPointerDown / handlePanPointerMove / handlePanPointerUp / handleWheel', io:'(e) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Camera pan/zoom for the 2D view (its own equivalent of orbitControls.js, scoped to this file since 2D has no orbit).', calls:[], tag:'internal' },
+]
+      },
+      {
+        path: 'modeller/orbitControls.js',
+        status: 'ok',
+        role: 'Camera orbit/pan/zoom interaction for the 3D view — not part of the modeller\'s data model, purely a camera controller. Present on the Joints branch (not in master), used by scene.js.',
+        imports: [{from:'three (external)', names:['THREE']}],
+        exportsList: ['createOrbitControls'],
+        fns: [
+  { name:'createOrbitControls', io:'(canvas, camera, {isBlocked, onClick, gestureState}) &rarr; <b>{dispose, snapToFace}</b>', role:'Manual spherical-coordinate camera orbit/pan/zoom, pointer-event based (mouse/trackpad/touch identically). Shift+left-drag pans instead of orbiting. Yields the pointer via isBlocked() while a gizmo drag is active, and fires onClick only for a genuine click (no drag, not blocked).', calls:['THREE.Vector3 / camera.getWorldDirection &mdash; three (external)'] },
+  { name:'snapToFace', io:'(faceName) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Sets theta/phi directly to one of 6 preset view angles and re-applies the camera &mdash; called by viewCube.js when a cube face is clicked. Updates the SAME internal spherical state a manual drag reads, so the next drag continues smoothly from the new angle.', calls:[], tag:'returned API' },
+  { name:'dispose', io:'() &rarr; <span class=&quot;ret&quot;>void</span>', calls:[], tag:'returned API' },
+]
+      },
+      {
+        path: 'modeller/viewCube.js',
+        status: 'ok',
+        role: 'The corner view-cube widget for snapping the 3D camera to axis-aligned views. Present on the Joints branch (not in master), used by scene.js.',
+        imports: [{from:'three (external)', names:['THREE']}],
+        exportsList: ['createViewCube'],
+        fns: [
+  { name:'createViewCube', io:'(canvasEl, {onFaceClick}) &rarr; <b>{render, onResize, dispose}</b>', role:'A second, fully independent tiny Three.js renderer/scene &mdash; a clickable corner nav cube (Blender/Fusion360-style) with colored X/Y/Z axis lines drawn through it (depthTest:false so they read as passing through, not occluded). Neither the cube nor axes ever move; instead its own camera is re-oriented every frame to match the main camera&#39;s orientation.', calls:['THREE.WebGLRenderer / Raycaster &mdash; three (external)'] },
+  { name:'render', io:'(mainCamera) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Re-orients this module&#39;s camera to match mainCamera&#39;s direction, then renders its own tiny scene &mdash; called once per frame from scene.js&#39;s animate().', calls:[], tag:'returned API' },
+  { name:'onResize', io:'() &rarr; <span class=&quot;ret&quot;>void</span>', calls:[], tag:'returned API' },
+  { name:'dispose', io:'() &rarr; <span class=&quot;ret&quot;>void</span>', calls:[], tag:'returned API' },
+  { name:'handleClick', io:'(e) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Raycasts against the cube in its own scene, reads which face was hit off materialIndex, calls onFaceClick(name) &mdash; scene.js wires this straight to orbitControls.js&#39;s snapToFace().', calls:['onFaceClick &mdash; callback (from modeller/scene.js)'], tag:'internal' },
+]
+      },
+      {
+        path: 'modeller/selection.js',
+        status: 'ok',
+        imports: [],
+        exportsList: ['getSelectedId','setSelectedId','getSelectedGroupId','setSelectedGroupId'],
+        role: 'Owns selection state (selectedId, selectedGroupId) — same dedicated-module treatment as ui/cutlist.js gives BOM state.',
+        fns: [
+  { name:'getSelectedId', io:'() &rarr; <b>string|null</b>', role:'Currently drilled-into panel id.', calls:[] },
+  { name:'setSelectedId', io:'(id) &rarr; <span class=&quot;ret&quot;>void</span>', calls:[] },
+  { name:'getSelectedGroupId', io:'() &rarr; <b>string|null</b>', role:'The group whose context is currently active &mdash; still set even when a specific member is drilled into.', calls:[] },
+  { name:'setSelectedGroupId', io:'(id) &rarr; <span class=&quot;ret&quot;>void</span>', calls:[] },
+]
+      },
+    ]
+  },
+  {
+    id: 'engine',
+    title: 'engine/',
+    desc: 'Computed projections from the resolved graph — BOM, nesting, PDF export. Stateless, regenerated on demand.',
+    files: [
+      {
+        path: 'engine/bom.js',
+        status: 'ok',
+        imports: [{from:'../modeller/modules.js',names:['getDisplayName','MATERIAL_CATALOG']}],
+        exportsList: ['computeBom','computeMaterialSummary','isMaterialGrainInterchangeable'],
+        role: 'Bill of materials — a computed projection, never stored, regenerated from the resolved graph on every render.',
+        fns: [
+  { name:'materialCatalogEntry', io:'(materialName) &rarr; <b>CatalogEntry|null</b>', calls:['MATERIAL_CATALOG &mdash; modeller/modules.js (constant)'], tag:'internal' },
+  { name:'pieceBandingLengthMm', io:'(node) &rarr; <b>number</b>', role:'Total edge-banding tape length for one piece, from its bandedEdges.', calls:[], tag:'internal' },
+  { name:'bandedEdgesLabel', io:'(node) &rarr; <b>string</b>', role:'Human summary for the &quot;Edges&quot; column, e.g. &quot;L,R&quot;.', calls:[], tag:'internal' },
+  { name:'isMaterialGrainInterchangeable', io:'(materialName) &rarr; <b>boolean</b>', role:'Purely a material property, read from the catalog &mdash; default false (grain-directional) if the material or field is missing.', calls:['materialCatalogEntry() &mdash; same file'] },
+  { name:'footprintKey', io:'(node) &rarr; <b>string</b>', role:'Stable grouping key &mdash; width/height in fixed (min,max) order if the material allows rotation, else the piece&#39;s own order.', calls:['isMaterialGrainInterchangeable() &mdash; same file'], tag:'internal' },
+  { name:'buildGroupLabels', io:'(panels) &rarr; <b>Map&lt;groupId,label&gt;</b>', role:'Assigns &quot;Box N&quot; / &quot;Group N&quot; presentation labels, computed fresh every call.', calls:[], tag:'internal' },
+  { name:'assemblyLabel', io:'(node, groupLabels) &rarr; <b>string</b>', calls:[], tag:'internal' },
+  { name:'computeBom', io:'(resolvedPanels) &rarr; <b>BomRow[]</b>', role:'Per-piece cut list &mdash; rows merge only within the same assembly and only for grain-interchangeable materials.', calls:['buildGroupLabels() / assemblyLabel() / footprintKey() / isMaterialGrainInterchangeable() / bandedEdgesLabel() / pieceBandingLengthMm() / materialCatalogEntry() &mdash; same file', 'getDisplayName() &mdash; modeller/modules.js'] },
+  { name:'computeMaterialSummary', io:'(resolvedPanels) &rarr; <b>SummaryRow[]</b>', role:'Aggregate total area per material/thickness, ignoring piece/assembly identity &mdash; a separate export from computeBom on purpose (roadmap step 1 fix).', calls:[] },
+]
+      },
+      {
+        path: 'engine/nesting.js',
+        status: 'ok',
+        imports: [],
+        exportsList: ['nestCutList','summarizeNestingResult','nestPieces','GRAIN_AXIS','DEFAULT_KERF_MM'],
+        role: 'Deterministic panel-cutting layout — guillotine / first-fit-decreasing packing, no AI.',
+        fns: [
+  { name:'fitsAsGiven / fitsRotated', io:'(piece, maxW, maxH) &rarr; <b>boolean</b>', role:'Whether a piece fits a space as-is, or (if rotatable) swapped.', calls:[], tag:'internal' },
+  { name:'bestOrientationFor', io:'(piece, maxWidthMm, maxHeightMm) &rarr; <b>{widthMm,heightMm,rotated}|null</b>', role:'Chooses the orientation with less vertical slack.', calls:['fitsAsGiven() / fitsRotated() &mdash; same file'], tag:'internal' },
+  { name:'rectFits', io:'(rect, w, h) &rarr; <b>boolean</b>', calls:[], tag:'internal' },
+  { name:'fitScore / isBetterFit', io:'(rect,w,h) &rarr; score / (a,b) &rarr; boolean', role:'Best-area-fit scoring: least leftover area, tie-broken by shorter leftover side.', calls:[], tag:'internal' },
+  { name:'splitFreeRect', io:'(rect, placedW, placedH, kerfMm) &rarr; <b>Rect[]</b>', role:'Splits the L-shaped leftover space after a placement into 2 rects via one guillotine cut, keeping the larger contiguous leftover.', calls:[], tag:'internal' },
+  { name:'pruneFreeRects', io:'(rects) &rarr; <b>Rect[]</b>', role:'Drops any free rect fully contained inside a larger one.', calls:[], tag:'internal' },
+  { name:'createSheet / placeInFreeRect / sheetUsedAreaMm2 / summarizeSheet', io:'various', role:'Sheet lifecycle helpers &mdash; create, commit a placement (splits + prunes free rects), and summarize utilization.', calls:['splitFreeRect() / pruneFreeRects() / sheetUsedAreaMm2() &mdash; same file'], tag:'internal' },
+  { name:'nestPieces', io:'(pieces, stockSheet, kerfMm=DEFAULT_KERF_MM) &rarr; <b>{sheets, unplaced}</b>', role:'Free-rectangle guillotine packer (best-area-fit) for one material/stock-size group &mdash; largest pieces first, search every free rect on every sheet before opening a new one.', calls:['fitsAsGiven() / fitsRotated() / rectFits() / fitScore() / isBetterFit() / placeInFreeRect() / createSheet() / bestOrientationFor() / summarizeSheet() &mdash; same file'] },
+  { name:'nestCutList', io:'(bomRows, materialCatalog, options?) &rarr; <b>NestResult[]</b>', role:'Expands BOM rows into individual pieces, groups by material+thickness, inflates packing footprint for banded edges, nests each group independently.', calls:['nestPieces() &mdash; same file'] },
+  { name:'summarizeNestingResult', io:'(nestResults, materialCatalog) &rarr; <b>{perMaterial, totals}</b>', role:'Cost/utilization rollup &mdash; sheets used &times; catalog price per material, plus totals across all materials.', calls:[] },
+]
+      },
+      {
+        path: 'engine/pdfExport.js',
+        status: 'ok',
+        imports: [{from:'jspdf (external)',names:['jsPDF']}],
+        exportsList: ['exportCutListPdf','exportNestingPdf'],
+        role: 'Cut-list and nesting-plan PDF generation.',
+        fns: [
+  { name:'formatDim / rowCell / drawRow', io:'various', role:'Cut-list table formatting helpers.', calls:[], tag:'internal' },
+  { name:'exportCutListPdf', io:'(rows, {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Paginated cut-list table PDF. mode:&#39;open&#39; opens in a new tab (synchronous jsPDF bloburl, so it stays in the same click-handler call stack &mdash; async would get popup-blocked).', calls:['drawRow() / rowCell() &mdash; same file', 'jsPDF &mdash; jspdf (external)'] },
+  { name:'drawNestingSummaryPage', io:'(doc, summary, projectName) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Per-material sheet counts, cost, utilization, and any unplaced pieces.', calls:[], tag:'internal' },
+  { name:'drawSheetPage', io:'(doc, materialLabel, sheet, sheetNumber, totalSheets) &rarr; <span class=&quot;ret&quot;>void</span>', role:'One page per sheet, drawn to scale with every placed piece as a labeled rectangle; rotates the drawing (not the nesting coordinates) when that fits the A4 page better.', calls:['formatDim() &mdash; same file'], tag:'internal' },
+  { name:'exportNestingPdf', io:'(nestResults, summary, {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Summary page + one page per sheet.', calls:['drawNestingSummaryPage() / drawSheetPage() &mdash; same file'] },
+]
+      },
+      {
+        path: 'engine/joints.js',
+        status: 'stub',
+        role: 'Not yet implemented (0 bytes) — the single shared source of joint truth. Required by tools/attachTool.js and, eventually, by every automated feature\'s internal joint declarations.',
+        note: 'Required exports: <b>classifyJoint(panels, nodeAId, faceA, nodeBId, faceB) → {type, params} | null</b> and <b>declareJoint(nodeAId, faceA, nodeBId, faceB, type, params) → relation</b>.',
+        fns: []
+      },
+      {
+        path: 'engine/resolveConstraints.js',
+        status: 'stub',
+        role: 'Empty scaffolding — created during the restructure but never populated. The app still correctly uses modeller/snap.js#resolveConstraints; nothing imports from this file today.',
+        fns: []
+      },
+      {
+        path: 'engine/validator.js',
+        status: 'stub',
+        role: 'Empty, unused.',
+        fns: []
+      },
+      {
+        path: 'engine/extractor.js',
+        status: 'stub',
+        role: 'Empty, unused.',
+        fns: []
+      },
+    ]
+  },
+  {
+    id: 'ui',
+    title: 'ui/',
+    desc: 'Rendering + DOM-facing modules. Callback-driven — read data, fire callbacks back up to modeller-main.js.',
+    files: [
+      {
+        path: 'ui/toast.js',
+        status: 'ok',
+        imports: [{from:'../modeller/modules.js',names:['PANEL_SIZE_LIMITS_MM']}],
+        exportsList: ['showToast','hideToast','showDesignLimitError','showPanelSizeLimitError','escapeHtmlLocal'],
+        role: 'Shared toast plumbing for every short-lived status/error message and every tool\'s step-by-step pick guidance.',
+        fns: [
+          { name:'showToast', io:'(text, autoHide=true) → <span class="ret">void</span>' , calls: ['escapeHtmlLocal() — same file','hideToast() — same file (via setTimeout)'] },
+          { name:'hideToast', io:'() → <span class="ret">void</span>' , calls: [] },
+          { name:'showDesignLimitError', io:'(axis) → <span class="ret">void</span>' , calls: ['showToast() — same file','AXIS_LABEL — same file (constant)'] },
+          { name:'showPanelSizeLimitError', io:'(field) → <span class="ret">void</span>' , calls: ['showToast() — same file','PANEL_SIZE_LIMITS_MM — modeller/modules.js (constant)'] },
+          { name:'escapeHtmlLocal', io:'(value) → <b>string</b>' , calls: [] },
+        ]
+      },
+      {
+        path: 'ui/cutlist.js',
+        status: 'ok',
+        imports: [{from:'../engine/pdfExport.js',names:['exportCutListPdf','exportNestingPdf']},{from:'../engine/nesting.js',names:['nestCutList','summarizeNestingResult']},{from:'../modeller/modules.js',names:['MATERIAL_CATALOG']},{from:'./toast.js',names:['escapeHtmlLocal']}],
+        exportsList: ['setBomRows','getLastBomRows','openCutListWindow','openNestingPlan','renderNestingSummary'],
+        role: 'Owns "last computed BOM / nesting result" state, same dedicated-module treatment modeller/selection.js gives selection state.',
+        fns: [
+          { name:'setBomRows / getLastBomRows', io:'(rows) → void / () → <b>BomRow[]</b>' , calls: [] },
+          { name:'openCutListWindow / openNestingPlan', io:'() → <span class="ret">void</span>' , calls: ['openCutListWindow() calls: exportCutListPdf() — engine/pdfExport.js','openNestingPlan() calls: nestCutList() / summarizeNestingResult() — engine/nesting.js; bomRowsSignature() / renderNestingSummary() — same file; exportNestingPdf() — engine/pdfExport.js; MATERIAL_CATALOG — modeller/modules.js (constant)'] },
+          { name:'renderNestingSummary', io:'() → <span class="ret">void</span>' , calls: ['bomRowsSignature() — same file','escapeHtmlLocal() — ui/toast.js'] },
+        ]
+      },
+      {
+        path: 'ui/properties.js',
+        status: 'ok',
+        imports: [{from:'../modeller/modules.js',names:['getDisplayName','MATERIAL_CATALOG']}],
+        exportsList: ['renderProperties'],
+        role: 'The inspector panel — selected panel\'s fields, transform, material, constraint unlink. Confirmed byte-identical to master; no changes needed.',
+        fns: [
+  { name:'renderProperties', io:'(container, props) &rarr; <span class=&quot;ret&quot;>void</span>', role:'The inspector. Two distinct views: group-level (material for all members + restore-hidden-face buttons + ungroup/delete) when a group is selected with nothing drilled in, else per-panel (name, dims, thickness, material, qty, transform).', calls:['getDisplayName() &mdash; modeller/modules.js', 'dimFieldHTML() / numberFieldHTML() / axisFieldHTML() / escapeHtml() &mdash; same file', 'onFieldChange / onTransformFieldChange / onUnlinkConstraint / onRename / onRemove / onUngroup / onGroupMaterialChange / onRestoreFace &mdash; callbacks from modeller-main.js'] },
+  { name:'dimFieldHTML', io:'(field, selectedPanel, resolvedPanel, isLocked) &rarr; <b>string</b>', role:'A locked (constraint-derived, disabled + Unlink button) or editable dimension field.', calls:['numberFieldHTML() &mdash; same file'], tag:'internal' },
+  { name:'numberFieldHTML / axisFieldHTML', io:'various &rarr; <b>string</b>', role:'Generic labeled number input markup.', calls:[], tag:'internal' },
+  { name:'escapeHtml', io:'(str) &rarr; <b>string</b>', calls:[], tag:'internal' },
+]
+      },
+      {
+        path: 'ui/relations.js',
+        status: 'ok',
+        imports: [{from:'../modeller/modules.js',names:['getDisplayName']}],
+        exportsList: ['renderRelations'],
+        role: 'The "Relations" list panel — constraints on the selected panel. Confirmed byte-identical to master.',
+        fns: [
+  { name:'renderRelations', io:'(container, {selectedPanel, allPanels, onUnlinkConstraint}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Read-only list of the selected panel&#39;s constraints, each with a &times; to hard-remove it. Creating relations happens via the collinear/shelf tools, not here.', calls:['renderConstraintList() &mdash; same file', 'onUnlinkConstraint() &mdash; callback from modeller-main.js'] },
+  { name:'renderConstraintList', io:'(constraints, allPanels) &rarr; <b>string</b>', role:'Human-readable description per constraint (&quot;spans X&middot;face &harr; Y&middot;face&quot; / &quot;attached (face) to X&middot;face&quot;).', calls:['getDisplayName() &mdash; modeller/modules.js', 'escapeHtml() &mdash; same file'], tag:'internal' },
+  { name:'escapeHtml', io:'(value) &rarr; <b>string</b>', calls:[], tag:'internal' },
+]
+      },
+      {
+        path: 'ui/toolbar.js',
+        status: 'ok',
+        imports: [{from:'../modeller/modules.js',names:['getDisplayName']}],
+        exportsList: ['renderPanelList','installToolbarSectionResizers'],
+        role: 'The left panel list + every tool button (Add Box/Shelf/Collinear, cut list, nesting).',
+        fns: [
+  { name:'renderPanelList', io:'(container, props) &rarr; <span class=&quot;ret&quot;>void</span>', role:'The entire left sidebar: Elements (groups + panels + Open Cut List), Building Components (add-panel/box buttons), Building Tools (Collinear/Shelf toggles + gap input), and an inline Properties strip shown only while a tool is active. ~1200 lines &mdash; internal event-wiring closures aren&#39;t itemized individually here.', calls:['ensureComponentIconStyles() / readSectionHeights() / restoreSectionHeights() / renderPropertiesContent() / appendGroup() / appendPanelRow() &mdash; same file', 'onSelectPanel / onSelectGroup / onGroupSelected / onAddVertical / onAddHorizontal / onAddParallel / onAddBox / onCollinear / onCollinearGapChange / onShelfHorizontal / onShelfVertical / onOpenCutList / onNestCutList &mdash; callbacks from modeller-main.js'] },
+  { name:'installToolbarSectionResizers', io:'(root=document) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Wires drag-resize for the toolbar&#39;s own internal section splitters (separate from ui/layout.js&#39;s sidebar-level resizers).', calls:[] },
+  { name:'ensureComponentIconStyles', io:'() &rarr; <span class=&quot;ret&quot;>void</span>', role:'Injects the icon CSS once (idempotent).', calls:[], tag:'internal' },
+  { name:'renderPropertiesContent', io:'({collinearActive, collinearGapMm, shelfMode}) &rarr; <b>string</b>', role:'The small inline hint/gap-input panel shown while a building tool is active &mdash; distinct from ui/properties.js&#39;s main inspector.', calls:[], tag:'internal' },
+  { name:'appendGroup / appendPanelRow', io:'various', role:'DOM row builders for a group header and a single panel list row.', calls:[], tag:'internal' },
+  { name:'setGroupOpen', io:'(…) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Expand/collapse a group&#39;s member rows.', calls:[], tag:'internal' },
+  { name:'readSectionHeights / restoreSectionHeights', io:'(root) &rarr; heights / (root, heights) &rarr; void', role:'Preserves inline section heights across a full innerHTML rebuild.', calls:[], tag:'internal' },
+  { name:'escapeHtml / escapeAttribute', io:'(str) &rarr; <b>string</b>', calls:[], tag:'internal' },
+]
+      },
+      {
+        path: 'ui/layout.js',
+        status: 'ok',
+        imports: [],
+        exportsList: ['initResizableLayout'],
+        role: 'Drag-resizable panel layout (sidebar/viewport splitters).',
+        fns: [
+  { name:'initResizableLayout', io:'() &rarr; <span class=&quot;ret&quot;>void</span>', role:'Wires drag-resize + collapse-toggle for both sidebars.', calls:['setupResizer() / setupCollapseToggle() &mdash; same file (&times;2 each)'] },
+  { name:'setupResizer', io:'(resizerId, panelId, side) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Pointer-drag width resize, clamped to MIN_WIDTH/MAX_WIDTH.', calls:[], tag:'internal' },
+  { name:'setupCollapseToggle', io:'(buttonId, panelId) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Collapse/restore, remembering the last width to restore to.', calls:[], tag:'internal' },
+]
+      },
+      {
+        path: 'ui/export.js',
+        status: 'stub',
+        role: 'Empty, unused.',
+        fns: []
+      },
+    ]
+  },
+];
 
-  // Highlight the active documentation link while scrolling.
-  const links = Array.from(document.querySelectorAll('.nav a'));
-  const targets = links
-    .map(a => document.querySelector(a.getAttribute('href')))
+/* ====================================================================== */
+
+const kebab = (s) => s.toLowerCase().replace(/[\/.]/g, '-');
+
+const statusMeta = {
+  ok:       { label: 'corrected', cls: 'ok' },
+  verified: { label: 'verified', cls: 'ok' },
+  warn:     { label: 'needs attention', cls: 'warn' },
+  stub:     { label: 'stub', cls: 'stub' },
+};
+
+function fileId(path) {
+  return 'file-' + kebab(path);
+}
+
+function symbolId(path, name) {
+  return 'fn-' + kebab(path) + '-' +
+    name.toLowerCase()
+      .replace(/&[^;]+;/g, '')
+      .replace(/[^\w]+/g, '-')
+      .replace(/^-|-$/g, '');
+}
+
+function cleanSymbolName(name) {
+  return String(name || '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&[^;]+;/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function functionNames(fnName) {
+  /*
+   * Some entries document several functions together, e.g.
+   * "startShelfMode / cancelShelfMode".
+   * Give every individual function its own anchor.
+   */
+  return cleanSymbolName(fnName)
+    .split(/\s*\/\s*/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+/*
+ * Find the documented location of a function.
+ *
+ * If preferredPath is supplied, that file is searched first.
+ * This prevents a function with the same name in another file
+ * from being selected when the import/export data tells us
+ * exactly which file contains it.
+ */
+function findFunctionLocation(name, preferredPath = null) {
+  const wanted = cleanSymbolName(name)
+    .replace(/\(\)$/, '')
+    .replace(/^ctx\./, '')
+    .trim();
+
+  const searchGroups = preferredPath
+    ? [
+        ...GROUPS.map(g => ({
+          ...g,
+          files: g.files.filter(f => f.path === preferredPath)
+        })),
+        ...GROUPS
+      ]
+    : GROUPS;
+
+  const seenFiles = new Set();
+
+  for (const group of searchGroups) {
+    for (const file of group.files) {
+      /*
+       * The preferred-path pass is followed by the normal GROUPS pass.
+       * Avoid searching the same file twice.
+       */
+      if (seenFiles.has(file.path)) continue;
+      seenFiles.add(file.path);
+
+      for (const fn of file.fns || []) {
+        const names = functionNames(fn.name);
+
+        const matchedName = names.find(
+          n =>
+            cleanSymbolName(n)
+              .replace(/\(\)$/, '')
+              .replace(/^ctx\./, '')
+              .trim() === wanted
+        );
+
+        if (matchedName) {
+          return {
+            path: file.path,
+            name: matchedName,
+            id: symbolId(file.path, matchedName)
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/*
+ * Create the actual target anchors for a function row.
+ *
+ * This is intentionally placed INSIDE the function's table cell,
+ * rather than all at the top of the file card.
+ *
+ * Therefore a link to a function scrolls to that function's row.
+ */
+function functionAnchors(path, name) {
+  return functionNames(name)
+    .map(n => `
+      <span
+        id="${symbolId(path, n)}"
+        class="function-anchor"
+        aria-hidden="true"
+      ></span>
+    `)
+    .join('');
+}
+
+function functionLink(name, path = null, label = null) {
+  const location = findFunctionLocation(name, path);
+  const text = label || name;
+
+  if (!location) {
+    return `<span class="symbol-unresolved">${text}</span>`;
+  }
+
+  return `
+    <a
+      class="symbol-link function-link"
+      href="#${location.id}"
+      title="Go to ${location.path} — ${location.name}"
+    >${text}</a>
+  `;
+}
+
+function fileLink(path, label = path) {
+  const exists = GROUPS.some(
+    g => g.files.some(f => f.path === path)
+  );
+
+  if (!exists) {
+    return `<span class="symbol-unresolved">${label}</span>`;
+  }
+
+  return `
+    <a
+      class="symbol-link file-ref-link"
+      href="#${fileId(path)}"
+      title="Go to ${path}"
+    >${label}</a>
+  `;
+}
+
+function linkSymbolList(names, path = null) {
+  return names
+    .map(name => {
+      const clean = cleanSymbolName(name);
+      return functionLink(clean, path, name);
+    })
+    .join(' ');
+}
+
+/*
+ * Converts a call description such as:
+ *
+ *   "findPanelSizeViolation() / showToast() — shared/geometry.js"
+ *
+ * into links to the actual definitions.
+ */
+function renderCallReference(call, currentPath) {
+  if (!call) return '';
+
+  const parts = String(call).split(/\s+—\s+/);
+  const symbolPart = parts[0] || '';
+  const locationPart = parts.slice(1).join(' — ');
+
+  const symbols = symbolPart
+    .split(/\s*\/\s*/)
+    .map(s => s.trim())
     .filter(Boolean);
 
-  const observer = new IntersectionObserver(entries => {
+  const linkedSymbols = symbols
+    .map(symbol => {
+      const clean = symbol
+        .replace(/\(\s*\)$/, '')
+        .replace(/^ctx\./, '')
+        .trim();
+
+      /*
+       * If this call explicitly belongs to another file, use that file
+       * as the preferred search location.
+       */
+      let preferredPath = null;
+
+      if (locationPart && locationPart !== 'same file') {
+        const match = locationPart.match(
+          /((?:[\w.-]+\/)*[\w.-]+\.js)/
+        );
+
+        if (match) {
+          preferredPath = match[1];
+        }
+      }
+
+      /*
+       * For "same file", search the current file first.
+       */
+      if (locationPart === 'same file') {
+        preferredPath = currentPath;
+      }
+
+      const location = findFunctionLocation(
+        clean,
+        preferredPath
+      );
+
+      if (location) {
+        return functionLink(
+          clean,
+          location.path,
+          symbol
+        );
+      }
+
+      return `<span class="symbol-unresolved">${symbol}</span>`;
+    })
+    .join(' / ');
+
+  let suffix = '';
+
+  if (locationPart) {
+    if (locationPart === 'same file') {
+      suffix = `
+        <span class="call-location">
+          — same file
+        </span>
+      `;
+    } else {
+      /*
+       * Extract a JS path from descriptions such as:
+       *
+       * "shared/geometry.js (constant)"
+       * "modeller/modules.js"
+       * "history/history.js"
+       */
+      const match = locationPart.match(
+        /((?:[\w.-]+\/)*[\w.-]+\.js)/
+      );
+
+      if (match) {
+        const path = match[1];
+
+        suffix = `
+          <span class="call-location">
+            — ${fileLink(path, path)}
+          </span>
+        `;
+      } else {
+        suffix = `
+          <span class="call-location">
+            — ${locationPart}
+          </span>
+        `;
+      }
+    }
+  }
+
+  return linkedSymbols + suffix;
+}
+
+function renderCallReferences(fn, currentPath) {
+  if (!Array.isArray(fn.calls)) {
+    return '<span class="io-empty">—</span>';
+  }
+
+  if (fn.calls.length === 0) {
+    return '<span class="io-empty">none (pure / no external calls)</span>';
+  }
+
+  return fn.calls
+    .map(c => `
+      <span class="call-line">
+        ${renderCallReference(c, currentPath)}
+      </span>
+    `)
+    .join('');
+}
+
+/* ------------------------------------------------------------
+   Sidebar
+   ------------------------------------------------------------ */
+
+function renderSidebar() {
+  const root = document.getElementById('sidebarTree');
+
+  root.innerHTML = GROUPS.map(g => `
+    <details
+      class="folder"
+      data-group="${g.id}"
+      open
+    >
+      <summary>
+        ${g.title}
+        <span class="folder-count">${g.files.length}</span>
+      </summary>
+
+      <ul class="file-list">
+        ${g.files.map(f => `
+          <li>
+            <a
+              class="file-link"
+              href="#${fileId(f.path)}"
+              data-path="${f.path.toLowerCase()}"
+            >
+              <span
+                class="dot"
+                style="background:var(--${
+                  statusMeta[f.status].cls === 'ok'
+                    ? (f.status === 'ok' ? 'ok' : 'blue')
+                    : statusMeta[f.status].cls
+                })"
+              ></span>
+
+              <span class="name">${f.path}</span>
+            </a>
+          </li>
+        `).join('')}
+      </ul>
+    </details>
+  `).join('');
+}
+
+/* ------------------------------------------------------------
+   Main content
+   ------------------------------------------------------------ */
+
+function renderContent() {
+  const root = document.getElementById('content');
+
+  root.innerHTML = GROUPS.map(g => `
+    <section
+      class="group"
+      data-group="${g.id}"
+      id="group-${g.id}"
+    >
+      <div class="group-title">
+        <h3>${g.title}</h3>
+        <div class="rule"></div>
+      </div>
+
+      <p class="group-desc">${g.desc}</p>
+
+      ${g.files.map(f => renderFileCard(f)).join('')}
+    </section>
+  `).join('');
+}
+
+/* ------------------------------------------------------------
+   Imports / exports
+   ------------------------------------------------------------ */
+
+function renderIoPanel(f) {
+  const imports = f.imports || [];
+  const exportsList = f.exportsList || null;
+
+  if (!f.imports && !f.exportsList) {
+    return '';
+  }
+
+  const importsHtml = imports.length
+    ? imports.map(i => `
+        <div class="import-row">
+
+          <span class="import-from">
+            from ${fileLink(i.from, `'${i.from}'`)}
+          </span>
+
+          <div class="import-names">
+            ${i.names.map(n => {
+              const location = findFunctionLocation(
+                n,
+                i.from
+              );
+
+              return location
+                ? functionLink(n, i.from, n)
+                : `
+                    <span class="pill symbol-unresolved">
+                      ${n}
+                    </span>
+                  `;
+            }).join('')}
+          </div>
+
+        </div>
+      `).join('')
+    : `
+        <p class="io-empty">
+          no imports
+        </p>
+      `;
+
+  const exportsHtml = exportsList && exportsList.length
+    ? `
+      <div class="export-names">
+        ${exportsList.map(n => {
+          const location = findFunctionLocation(
+            n,
+            f.path
+          );
+
+          return location
+            ? functionLink(n, f.path, n)
+            : `
+                <span class="pill symbol-unresolved">
+                  ${n}
+                </span>
+              `;
+        }).join('')}
+      </div>
+    `
+    : `
+      <p class="io-empty">
+        no exports
+      </p>
+    `;
+
+  return `
+    <div class="io-panel">
+
+      <div class="io-col">
+        <h4>Imports</h4>
+        ${importsHtml}
+      </div>
+
+      <div class="io-col">
+        <h4>Exports</h4>
+        ${exportsHtml}
+      </div>
+
+    </div>
+  `;
+}
+
+/* ------------------------------------------------------------
+   Function calls
+   ------------------------------------------------------------ */
+
+function renderCalls(fn, currentPath) {
+  if (!Array.isArray(fn.calls)) {
+    return '<span class="io-empty">—</span>';
+  }
+
+  if (fn.calls.length === 0) {
+    return '<span class="io-empty">none (pure / no external calls)</span>';
+  }
+
+  return fn.calls
+    .map(c => `
+      <span class="call-line">
+        ${renderCallReference(c, currentPath)}
+      </span>
+    `)
+    .join('');
+}
+
+function fileHasCalls(f) {
+  return (f.fns || []).some(
+    fn => Array.isArray(fn.calls)
+  );
+}
+
+/* ------------------------------------------------------------
+   File card
+   ------------------------------------------------------------ */
+
+function renderFileCard(f) {
+  const meta = statusMeta[f.status];
+
+  const parts = f.path.split('/');
+
+  const folderPart = parts.length > 1
+    ? parts.slice(0, -1).join('/') + '/'
+    : '';
+
+  const filePart = parts[parts.length - 1];
+
+  /*
+   * IMPORTANT:
+   *
+   * The file ID is now placed on the file header rather than
+   * on the whole article.
+   *
+   * Therefore file links go directly to the file title/header.
+   */
+
+  return `
+    <article
+      class="file-card"
+      data-path="${f.path.toLowerCase()}"
+      data-fns="${[
+        ...(f.fns || []).flatMap(fn =>
+          functionNames(fn.name)
+        ),
+
+        ...(f.fns || []).flatMap(fn =>
+          fn.calls || []
+        ),
+
+        ...((f.imports || []).flatMap(i =>
+          i.names
+        )),
+
+        ...(f.exportsList || [])
+      ]
+        .join(' ')
+        .toLowerCase()
+        .replace(/"/g, '&quot;')}
+    >
+
+      <div
+        class="file-card-head"
+        id="${fileId(f.path)}"
+      >
+
+        <p class="file-path">
+          <a
+            class="file-definition-link"
+            href="#${fileId(f.path)}"
+            title="Go to ${f.path}"
+          >
+            <span class="folder-part">
+              ${folderPart}
+            </span>${filePart}
+          </a>
+        </p>
+
+        <span class="badge ${meta.cls}">
+          ${meta.label}
+        </span>
+
+      </div>
+
+      <p class="file-role">
+        ${f.role}
+      </p>
+
+      ${
+        f.note
+          ? `
+            <p class="file-note ${
+              f.status === 'warn' ? '' : ''
+            }">
+              <strong>Note —</strong>
+              ${f.note}
+            </p>
+          `
+          : ''
+      }
+
+      ${renderIoPanel(f)}
+
+      ${
+        f.fns && f.fns.length
+          ? `
+            <table class="fn-table">
+
+              <thead>
+                <tr>
+                  <th>Function</th>
+                  <th>Input → Output</th>
+                  <th>Role</th>
+                  ${
+                    fileHasCalls(f)
+                      ? '<th>External calls</th>'
+                      : ''
+                  }
+                </tr>
+              </thead>
+
+              <tbody>
+
+                ${f.fns.map(fn => `
+                  <tr>
+
+                    <td class="fn-name">
+
+                      ${functionAnchors(
+                        f.path,
+                        fn.name
+                      )}
+
+                      ${functionNames(fn.name)
+                        .map(name => `
+                          ${functionLink(
+                            name,
+                            f.path,
+                            name
+                          )}
+                        `)
+                        .join(' / ')
+                      }
+
+                      ${
+                        fn.tag
+                          ? `
+                            <span class="internal-tag">
+                              ${fn.tag}
+                            </span>
+                          `
+                          : ''
+                      }
+
+                    </td>
+
+                    <td class="fn-io">
+                      ${
+                        fn.io ||
+                        '<span class="ret">—</span>'
+                      }
+                    </td>
+
+                    <td class="fn-role">
+                      ${fn.role || ''}
+                    </td>
+
+                    ${
+                      fileHasCalls(f)
+                        ? `
+                          <td class="fn-calls">
+                            ${renderCalls(
+                              fn,
+                              f.path
+                            )}
+                          </td>
+                        `
+                        : ''
+                    }
+
+                  </tr>
+                `).join('')}
+
+              </tbody>
+            </table>
+
+            ${
+              !fileHasCalls(f)
+                ? `
+                  <p class="calls-pending">
+                    External-call tracing not done for this
+                    file yet — only file-level imports/exports
+                    (above) are confirmed.
+                  </p>
+                `
+                : ''
+            }
+
+          `
+          : `
+            <p class="no-fn">
+              No exports yet.
+            </p>
+          `
+      }
+
+    </article>
+  `;
+}
+
+/* ------------------------------------------------------------
+   Initial render
+   ------------------------------------------------------------ */
+
+renderSidebar();
+renderContent();
+
+/* ------------------------------------------------------------
+   Active sidebar link on scroll
+   ------------------------------------------------------------ */
+
+const links = Array.from(
+  document.querySelectorAll('.file-link')
+);
+
+const cards = Array.from(
+  document.querySelectorAll('.file-card')
+);
+
+const observer = new IntersectionObserver(
+  (entries) => {
     entries.forEach(entry => {
+      const link = links.find(
+        l =>
+          l.getAttribute('href') ===
+          '#' + entry.target.querySelector('.file-card-head')?.id
+      );
+
+      if (!link) return;
+
       if (entry.isIntersecting) {
-        links.forEach(a => a.classList.remove('active'));
-        const link = links.find(a => a.getAttribute('href') === '#' + entry.target.id);
-        if (link) link.classList.add('active');
+        links.forEach(l =>
+          l.classList.remove('active')
+        );
+
+        link.classList.add('active');
       }
     });
-  }, { rootMargin: '-20% 0px -70% 0px' });
+  },
+  {
+    rootMargin: '-10% 0px -75% 0px'
+  }
+);
 
-  targets.forEach(t => observer.observe(t));
+cards.forEach(c =>
+  observer.observe(c)
+);
 
-  // Close the mobile menu after navigation.
-  document.querySelectorAll('.mobile-menu a').forEach(a => {
-    a.addEventListener('click', () => {
-      const d = a.closest('details');
-      if (d) d.removeAttribute('open');
-    });
+/* ------------------------------------------------------------
+   Flash target when following sidebar file links
+   ------------------------------------------------------------ */
+
+links.forEach(link => {
+  link.addEventListener('click', () => {
+    const href = link.getAttribute('href');
+
+    if (!href || !href.startsWith('#')) return;
+
+    const targetId = href.slice(1);
+    const target = document.getElementById(targetId);
+
+    if (!target) return;
+
+    const card = target.closest('.file-card');
+
+    if (!card) return;
+
+    card.classList.add('flash');
+
+    setTimeout(() => {
+      card.classList.remove('flash');
+    }, 900);
   });
-})();
+});
+
+/* ------------------------------------------------------------
+   Flash function target when following documentation links
+   ------------------------------------------------------------ */
+
+document.addEventListener('click', event => {
+  const link = event.target.closest(
+    '.function-link, .file-definition-link'
+  );
+
+  if (!link) return;
+
+  const href = link.getAttribute('href');
+
+  if (!href || !href.startsWith('#')) return;
+
+  const target = document.getElementById(
+    href.slice(1)
+  );
+
+  if (!target) return;
+
+  /*
+   * Function links target the invisible anchor inside
+   * the function row.
+   */
+  const functionRow =
+    target.closest('tr');
+
+  if (functionRow) {
+    functionRow.classList.add('function-target-flash');
+
+    setTimeout(() => {
+      functionRow.classList.remove(
+        'function-target-flash'
+      );
+    }, 900);
+
+    return;
+  }
+
+  /*
+   * File links target the file header.
+   */
+  const card =
+    target.closest('.file-card');
+
+  if (card) {
+    card.classList.add('flash');
+
+    setTimeout(() => {
+      card.classList.remove('flash');
+    }, 900);
+  }
+});
+
+/* ------------------------------------------------------------
+   Search
+   ------------------------------------------------------------ */
+
+const searchInput =
+  document.getElementById('search');
+
+const searchCount =
+  document.getElementById('searchCount');
+
+const emptyState =
+  document.getElementById('emptyState');
+
+const emptyQuery =
+  document.getElementById('emptyQuery');
+
+function normalize(s) {
+  return (s || '').toLowerCase();
+}
+
+searchInput.addEventListener('input', () => {
+  const q =
+    normalize(searchInput.value.trim());
+
+  let visibleFiles = 0;
+
+  if (!q) {
+    cards.forEach(
+      c => c.style.display = ''
+    );
+
+    links.forEach(
+      l => l.parentElement.style.display = ''
+    );
+
+    document
+      .querySelectorAll('details.folder')
+      .forEach(d => d.style.display = '');
+
+    document
+      .querySelectorAll('section.group')
+      .forEach(s => s.style.display = '');
+
+    searchCount.textContent = '';
+
+    emptyState.style.display = 'none';
+
+    return;
+  }
+
+  document
+    .querySelectorAll('details.folder')
+    .forEach(folder => {
+
+      let anyVisibleInFolder = false;
+
+      folder
+        .querySelectorAll('.file-link')
+        .forEach(link => {
+
+          const path =
+            link.dataset.path;
+
+          const card =
+            document.getElementById(
+              link
+                .getAttribute('href')
+                .slice(1)
+            );
+
+          const fns =
+            card
+              ? card.dataset.fns
+              : '';
+
+          const roleText =
+            card
+              ? normalize(
+                  card
+                    .querySelector(
+                      '.file-role'
+                    )
+                    ?.textContent
+                )
+              : '';
+
+          const match =
+            path.includes(q) ||
+            fns.includes(q) ||
+            roleText.includes(q);
+
+          link.parentElement.style.display =
+            match ? '' : 'none';
+
+          if (card) {
+            card.style.display =
+              match ? '' : 'none';
+          }
+
+          if (match) {
+            anyVisibleInFolder = true;
+            visibleFiles++;
+          }
+        });
+
+      folder.style.display =
+        anyVisibleInFolder
+          ? ''
+          : 'none';
+
+      if (anyVisibleInFolder) {
+        folder.open = true;
+      }
+    });
+
+  document
+    .querySelectorAll('section.group')
+    .forEach(sec => {
+
+      const groupId =
+        sec.dataset.group;
+
+      const folder =
+        document.querySelector(
+          `details.folder[data-group="${groupId}"]`
+        );
+
+      sec.style.display =
+        folder &&
+        folder.style.display !== 'none'
+          ? ''
+          : 'none';
+    });
+
+  searchCount.textContent =
+    visibleFiles +
+    ' file' +
+    (visibleFiles === 1 ? '' : 's') +
+    ' match';
+
+  emptyQuery.textContent =
+    searchInput.value.trim();
+
+  emptyState.style.display =
+    visibleFiles === 0
+      ? 'block'
+      : 'none';
+});
+
+/* ------------------------------------------------------------
+   Keyboard shortcut for search
+   ------------------------------------------------------------ */
+
+document.addEventListener('keydown', e => {
+
+  if (
+    e.key === '/' &&
+    document.activeElement !== searchInput
+  ) {
+    e.preventDefault();
+    searchInput.focus();
+  }
+
+  if (
+    e.key === 'Escape' &&
+    document.activeElement === searchInput
+  ) {
+    searchInput.value = '';
+    searchInput.dispatchEvent(
+      new Event('input')
+    );
+    searchInput.blur();
+  }
+});
 </script>
 </body>
 </html>

@@ -1,10 +1,44 @@
-import {exportCutListPdf, exportNestingPdf} from '../engine/pdfExport.js'
-import {nestCutList, summarizeNestingResult} from '../engine/nesting.js'
-import {MATERIAL_CATALOG} from '../modeller/modules.js'
-import {escapeHtmlLocal} from './toast.js'
+/**
+ * ui/cutlist.js
+ *
+ * Owns the "last computed BOM / nesting result" state — the same
+ * treatment modeller/selection.js already gives selection state:
+ * genuinely separate from the panels graph, so it gets its own small
+ * module instead of living as loose variables in modeller-main.js.
+ *
+ * modeller-main.js calls setBomRows(rows) once per renderAll() (right
+ * after computeBom()), and getLastBomRows() wherever it previously
+ * read the old `lastBomRows` module-level variable directly (e.g. the
+ * "Export BOM PDF" button handler).
+ */
+import { exportCutListPdf, exportNestingPdf } from '../engine/pdfExport.js';
+import { nestCutList, summarizeNestingResult } from '../engine/nesting.js';
+import { MATERIAL_CATALOG } from '../modeller/modules.js';
+import { escapeHtmlLocal } from './toast.js';
 
-// state + accessors: setBomRows(rows), getLastBomRows()
-// (replacing the current lastBomRows module-level variable)
+const nestingSummaryEl = document.getElementById('nesting-summary');
+
+// Cached from the most recent renderAll(), so the export button and
+// nesting run always reflect exactly what's on screen without
+// recomputing the BOM.
+let lastBomRows = [];
+
+// Cached from the most recent "Nest Cut List" run — kept around so
+// the inline summary/warning banner survives ordinary re-renders
+// without re-nesting on every renderAll() (real packing work, not a
+// cheap aggregation like computeBom). `signature` is a lightweight
+// fingerprint of the BOM rows nesting was actually run against, so a
+// later design change can be flagged as "stale" without needing to
+// re-nest just to notice.
+let lastNestingResult = null; // { nestResults, summary, signature } | null
+
+export function setBomRows(rows) {
+  lastBomRows = rows;
+}
+
+export function getLastBomRows() {
+  return lastBomRows;
+}
 
 export function openCutListWindow() {
   if (lastBomRows.length === 0) return;
@@ -15,8 +49,8 @@ export function openNestingPlan() {
   if (lastBomRows.length === 0) return;
   const nestResults = nestCutList(lastBomRows, MATERIAL_CATALOG, {});
   const summary = summarizeNestingResult(nestResults, MATERIAL_CATALOG);
-  lastNestingResult = { nestResults, summary, signature: bomRowsSignature(lastBomRows) }; // <-- missing
-  renderNestingSummary(); // <-- missing
+  lastNestingResult = { nestResults, summary, signature: bomRowsSignature(lastBomRows) };
+  renderNestingSummary();
   exportNestingPdf(nestResults, summary, { projectName: 'Nesting Plan', mode: 'open' });
 }
 
@@ -62,4 +96,3 @@ export function renderNestingSummary() {
 function bomRowsSignature(rows) {
   return rows.map((r) => `${r.label}|${r.material}|${r.thicknessMm}|${r.widthMm}|${r.heightMm}|${r.quantity}`).join(';');
 }
-

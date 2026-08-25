@@ -595,14 +595,3 @@ export function createStateCommand({
 export const history = new HistoryManager({
   maxHistory: 20,
 });
-
-
-export function recordHistoryCommand(CommandClass, before, after) {
-  const command = createStateCommand({
-    CommandClass,
-    before,
-    after,
-    applyState: restorePanelsState,
-  });
-  history.record(command);
-}

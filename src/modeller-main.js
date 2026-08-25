@@ -1,87 +1,94 @@
 /**
  * Entry point for the modeller page. This is the only file that is
- * allowed to mutate `panels` — every module above only reads data or
- * fires callbacks back up here. That single-writer rule is what
- * keeps "graph -> view" one-directional as this grows.
+ * allowed to mutate `panels` — every module it imports only reads
+ * data or fires callbacks back up here (including features/box.js,
+ * features/shelf.js, and every tools/*.js file, all of which are
+ * pure and return data rather than touching the graph directly). That
+ * single-writer rule is what keeps "graph -> view" one-directional.
  *
- * STAGE 2: `renderAll()` now runs `resolveConstraints(panels)` once
- * per render — this is THE seam where raw graph (literals +
- * constraints) becomes resolved graph (concrete numbers everywhere).
- * scene.reconcile(), computeBom(), and renderPanelList() all consume
- * the RESOLVED array; only renderProperties() sees the raw node too,
- * since the inspector is the one place that needs to know a
- * constraint exists at all (to render it locked, and to offer
- * "Unlink").
+ * STAGE 2: `renderAll()` runs `resolveConstraints(panels)` once per
+ * render — this is THE seam where raw graph (literals + constraints)
+ * becomes resolved graph (concrete numbers everywhere). scene.reconcile(),
+ * computeBom(), and renderPanelList() all consume the RESOLVED array;
+ * only renderProperties() sees the raw node too, since the inspector
+ * is the one place that needs to know a constraint exists at all (to
+ * render it locked, and to offer "Unlink").
  *
- * STAGE 3: box walls (isBoxWall) no longer carry spansBetween/
- * attachedTo constraints at all. A fully cross-referential 6-panel
- * box (every wall's cross-axis fields derived from its neighbors)
- * is impossible through resolveConstraints — its cycle check is
- * per-NODE, not per-field, so "Left depends on Top for height; Top
- * depends on Left for width" gets flagged circular even though the
- * two fields don't actually conflict (this was tried and is a real,
- * tested dead end — see the old addBox() history). Box internals are
- * now plain arithmetic instead: see computeBoxLayout() in modules.js
- * and relayoutBox() below, which every box-wall drag/resize/material
- * change funnels through.
+ * STAGE 3: box walls (isBoxWall) carry no spansBetween/attachedTo
+ * constraints at all — a fully cross-referential 6-panel box is
+ * impossible through resolveConstraints' per-node cycle check (see
+ * features/box.js's own header for why). Box internals are plain
+ * arithmetic instead: computeBoxLayout() and relayoutBox() live in
+ * features/box.js, which every box-wall drag/resize/material change
+ * funnels through — see applyRelayoutResult() below.
+ *
+ * STAGE 4 (this file): box creation, shelf creation, and every
+ * pick-mode tool (shelf, collinear, attach) moved out into
+ * features/*.js and tools/*.js as pure modules. This file no longer
+ * implements any of them — it owns application state, orchestrates
+ * commits, and wires each tool to the live app via a small context
+ * object (see toolContext below) since they need a few runtime
+ * handles (the live panels array, the scene's pick-mode hooks) that
+ * don't exist as static module exports anywhere.
  */
 import {
   createPanelNode,
   computeNextBasePosition,
-  computeWorldHalfExtents,
   MM_TO_UNIT,
-  MIN_PANEL_DIM_MM,
-  FLOOR_MM,
-  DESIGN_LIMITS_MM,
-  PANEL_SIZE_LIMITS_MM,
   MATERIAL_CATALOG,
   loadMaterialCatalog,
-  nextConstraintId,
-  FACE_TO_DIM_FIELD,
-  getAlignedAxis,
-  LOCAL_FACES,
 } from './modeller/modules.js';
 import { resolveConstraints } from './modeller/snap.js';
 import { createModellerScene } from './modeller/scene.js';
 import { getSelectedId, setSelectedId, getSelectedGroupId, setSelectedGroupId } from './modeller/selection.js';
 import { computeBom } from './engine/bom.js';
-import { exportCutListPdf, exportNestingPdf } from './engine/pdfExport.js';
-import { nestCutList, summarizeNestingResult } from './engine/nesting.js';
+import { exportCutListPdf } from './engine/pdfExport.js';
 import { renderProperties } from './ui/properties.js';
 import { renderPanelList } from './ui/toolbar.js';
 import { renderRelations } from './ui/relations.js';
 import { initResizableLayout } from './ui/layout.js';
-import { addBox, relayoutBox} from './features/box.js';
-
-// TO ADD THE FOLLOWING IMPORTS
-import {isShelf} from './features/shelf.js'
-import {startShelfMode, cancelShelfMode} from './tools/shelfTool.js'
-import {startCollinearMode, cancelCollinearMode} from './tools/collinearTool.js'
-import {clampOffsetToDesignLimits,
+import { showToast, showDesignLimitError, showPanelSizeLimitError } from './ui/toast.js';
+import { openCutListWindow, openNestingPlan, renderNestingSummary, setBomRows, getLastBomRows } from './ui/cutlist.js';
+import {
+  clampOffsetToDesignLimits,
   clampGroupOffsetToDesignLimits,
   findPanelSizeViolation,
   findDesignLimitViolation,
-  collectAxisSlabs} from './shared/geometry.js'
-import {showToast, hideToast, showDesignLimitError, showPanelSizeLimitError} from './ui/toast.js'
-import {openCutListWindow, openNestingPlan, renderNestingSummary, setBomRows} from './ui/cutlist.js'
-import {openCutListWindow, openNestingPlan, renderNestingSummary} from './ui/cutlist.js'
-
+  collectAxisSlabs,
+  checkMinGap,
+  rotationsMatch,
+  VERTICAL_ROTATION,
+  HORIZONTAL_ROTATION,
+  PARALLEL_ROTATION,
+  MIN_WALL_GAP_MM,
+} from './shared/geometry.js';
+import { addBox, relayoutBox } from './features/box.js';
+import { isShelf } from './features/shelf.js';
+import { startShelfMode, cancelShelfMode, getShelfMode, setShelfToolContext } from './tools/shelfTool.js';
 import {
-  history,createStateCommand,MovePanelCommand,MoveGroupCommand,ResizePanelCommand,ChangeMaterialCommand,
-  ChangeGroupMaterialCommand,RenamePanelCommand,AddPanelCommand,DeletePanelCommand,AddBoxCommand,
-  DeleteBoxCommand,GroupPanelsCommand,UngroupPanelsCommand,AddShelfCommand,DeleteShelfCommand,
-  AddConstraintCommand,RemoveConstraintCommand,UnlinkConstraintCommand,HideBoxWallCommand,RestoreBoxWallCommand,
+  startCollinearMode,
+  cancelCollinearMode,
+  isCollinearActive,
+  getCollinearGapMm,
+  setCollinearGapMm,
+  setCollinearToolContext,
+} from './tools/collinearTool.js';
+import { setAttachToolContext } from './tools/attachTool.js';
+import {
+  history, createStateCommand, MovePanelCommand, MoveGroupCommand, ResizePanelCommand, ChangeMaterialCommand,
+  ChangeGroupMaterialCommand, RenamePanelCommand, AddPanelCommand, DeletePanelCommand, AddBoxCommand,
+  DeleteBoxCommand, GroupPanelsCommand, UngroupPanelsCommand, DeleteShelfCommand,
+  RemoveConstraintCommand, UnlinkConstraintCommand, HideBoxWallCommand, RestoreBoxWallCommand,
 } from './history/history.js';
 initResizableLayout();
 
 // ---- THE GRAPH ----
-// Initial state: one box, rather than two bare panels — see addBox()
-// below and the addBox() call at the very end of this file (after
-// every other module-level const/function this needs has been
-// defined; addBox() itself calls renderAll(), so nothing else is
-// needed here).
+// Initial state: one box — see handleAddBox() below and the
+// handleAddBox() call inside bootstrap() at the very end of this
+// file (after every other module-level const/function this needs has
+// been defined).
 let panels = [];
-let lastBomRows = []; // cached from the most recent renderAll(), so the export button reflects exactly what's on screen without recomputing
+
 function capturePanelsState() {
   return panels;
 }
@@ -91,7 +98,7 @@ function restorePanelsState(nextPanels) {
   renderAll();
 }
 
-export function recordHistoryCommand(CommandClass, before, after) {
+function recordHistoryCommand(CommandClass, before, after) {
   const command = createStateCommand({
     CommandClass,
     before,
@@ -100,22 +107,19 @@ export function recordHistoryCommand(CommandClass, before, after) {
   });
   history.record(command);
 }
-// Cached from the most recent "Nest Cut List" run — kept around so
-// the inline summary/warning banner survives ordinary re-renders
-// without recomputing nesting on every renderAll() (real packing
-// work, not a cheap aggregation like computeBom). `signature` is a
-// lightweight fingerprint of the BOM rows nesting was actually run
-// against, so a later design change can be flagged as "stale"
-// without needing to re-nest just to notice.
-let lastNestingResult = null; // { nestResults, summary, signature } | null
 
-
-
-
-
-
-
-
+// Shared commit path for every feature that ADDS new nodes to the
+// graph (box, shelf, and any future drawer/door/plinth) — appends,
+// records ONE history command covering the addition. Passed into
+// tools via toolContext below so shelfTool.js/attachTool.js don't
+// need their own copy of this, and used directly here for
+// handleAddBox().
+function commitAddedNodes(nodes, CommandClass) {
+  const before = panels;
+  panels = [...panels, ...nodes];
+  const after = panels;
+  recordHistoryCommand(CommandClass, before, after);
+}
 
 // Ctrl/Cmd-click — in the panel list OR either 2D/3D view — toggles
 // membership here; "Group selected" (see groupSelectedPanels below)
@@ -135,27 +139,15 @@ let groupDragStartOffsets = null; // Map<nodeId, {x,y,z}> | null
 let moveDragBefore = null;
 let moveDragIsGroup = false;
 
-let designLimitHideTimer = null;
-
-
-
-
-
-
-
-
-
 // ---- DOM refs ----
 const canvas = document.getElementById('canvas');
 const main = document.getElementById('main');
 const panelListMountEl = document.getElementById('panel-list-mount');
 const relationsMountEl = document.getElementById('relations-container');
 const inspectorEl = document.getElementById('properties-container');
-const bomBodyEl = document.getElementById('bom-body');
 const stageLabelEl = document.getElementById('stage-label');
 const axesCanvas = document.getElementById('axes-gizmo-canvas');
 const pipCanvas = document.getElementById('pip-canvas');
-const nestingSummaryEl = document.getElementById('nesting-summary');
 const undoBtn = document.getElementById('undo-btn');
 const redoBtn = document.getElementById('redo-btn');
 
@@ -169,8 +161,9 @@ redoBtn?.addEventListener('click', () => history.redo());
 syncHistoryButtons();
 
 document.getElementById('export-bom-pdf-btn')?.addEventListener('click', () => {
-  if (lastBomRows.length === 0) return;
-  exportCutListPdf(lastBomRows, { projectName: 'Cut List' });
+  const rows = getLastBomRows();
+  if (rows.length === 0) return;
+  exportCutListPdf(rows, { projectName: 'Cut List' });
 });
 
 // ---- Scene (view layer). Consumes RESOLVED panels only. ----
@@ -192,16 +185,17 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
     // BOX WALLS: bypass the ordinary single-node clamp entirely.
     // Moving one wall changes one of the box's three "sizes" (W/H/D)
     // and every other wall has to re-fit around it — see
-    // relayoutBox() below. The whole box is validated as ONE unit;
-    // if it fails, this wall's own drag is rejected and reverted too
-    // (a partially-updated box is worse than no update at all).
+    // relayoutBox() in features/box.js. The whole box is validated
+    // as ONE unit; if it fails, this wall's own drag is rejected and
+    // reverted too (a partially-updated box is worse than no update
+    // at all).
     // -----------------------------------------------------------
     if (node.isBoxWall) {
       const priorOffset = node.offset;
       updateNode(nodeId, { offset: transform.offset, rotation: transform.rotation });
 
-      const applied = relayoutBox(node.groupId);
-      if (!applied) {
+      const result = relayoutBox(panels, node.groupId);
+      if (!applyRelayoutResult(result)) {
         updateNode(nodeId, { offset: priorOffset });
         renderAll();
         return {
@@ -219,7 +213,7 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
 
     if (isShelf(node)) {
       const axis = rotationsMatch(node.rotation, HORIZONTAL_ROTATION) ? 'y' : 'x';
-      const spacing = checkMinGap(collectAxisSlabs(node.groupId, axis, {
+      const spacing = checkMinGap(collectAxisSlabs(panels, node.groupId, axis, {
         [node.id]: { center: clampedOffset[axis], halfThickness: node.thickness / 2, label: node.name || 'Shelf' },
       }));
       if (!spacing.ok) {
@@ -287,7 +281,6 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
     }
   },
   onDimensionChange: (nodeId, dims, offsetDeltaMm) => applyDimensionChange(nodeId, dims, offsetDeltaMm),
-
 });
 
 window.addEventListener('pointerup', () => {
@@ -300,12 +293,14 @@ window.addEventListener('pointerup', () => {
   if (before === after) return;
   recordHistoryCommand(isGroup ? MoveGroupCommand : MovePanelCommand, before, after);
 });
+
 // Shared by the gizmo/edge-drag onDimensionChange callback above AND
-// the collinear tool below (applyCollinear) — validates a proposed
-// width/height/thickness + offset delta against both per-panel size
-// caps and the overall scene bounds, and only then commits it.
-// Returns true if applied, false if rejected (a toast has already
-// been shown either way it's rejected).
+// collinearTool.js's applyCollinear (via toolContext.updateNode +
+// findPanelSizeViolation/findDesignLimitViolation imported directly
+// there) — validates a proposed width/height/thickness + offset delta
+// against both per-panel size caps and the overall scene bounds, and
+// only then commits it. Returns true if applied, false if rejected (a
+// toast has already been shown either way it's rejected).
 function applyDimensionChange(nodeId, dims, offsetDeltaMm) {
   const current = panels.find((p) => p.id === nodeId);
   if (!current) return false;
@@ -340,150 +335,76 @@ function applyDimensionChange(nodeId, dims, offsetDeltaMm) {
   const before = panels;
   updateNode(nodeId, { width: dims.width, height: dims.height, thickness: dims.thickness, offset: proposedOffset });
   const after = panels;
-  recordHistoryCommand(ResizePanelCommand,before,after);
+  recordHistoryCommand(ResizePanelCommand, before, after);
   renderAll();
   return true;
 }
 
 // -------------------------------------------------------------
-// COLLINEAR TOOL — pick a face/edge on panel A, then a PARALLEL
-// face/edge on panel B.
-//
-// Prefers MOVING panel A: adds an ordinary `attachedTo` constraint on
-// whichever positionX/Y/Z field the shared axis corresponds to (the
-// same constraint type/math the box preset's own top/bottom already
-// use internally, see snap.js's applyAttachedTo) — live and
-// persistent, so if panel B is later moved or resized, panel A's
-// picked face keeps re-resolving to stay collinear with it.
-//
-// But if panel A's position on that axis is already spoken for —
-// either an existing constraint on that field (e.g. a previous
-// collinear link), or a box panel's own structural lockedMoveAxes
-// (e.g. Top/Bottom's X/Z, Left/Right's Y/Z — see addBox) — moving it
-// would either silently override something else or fight the box's
-// own geometry, so it falls back to a PERSISTENT RESIZE constraint
-// instead: a `spansBetween` on panel A's dimension field, anchored
-// between a captured SNAPSHOT of its opposite face's position (a
-// literal `{ mm }` endpoint — see snap.js's resolveFacePointMm) and a
-// live reference to panel B's picked face. The snapshot side never
-// moves again, but because the OTHER side is live, panel A's picked
-// face keeps re-resolving to stay collinear whenever panel B moves or
-// resizes later — the same "adjusts automatically" guarantee as the
-// move case above, just via a dimension instead of a position. What
-// it does NOT track: if the SNAPSHOT side's own anchor later moves
-// too (e.g. because the box's Left/Right get resized after the fact),
-// that motion isn't followed — only continued changes to panel B are.
-// This fallback can NEVER apply to a thickness face — if the blocked
-// axis is also this panel's thickness, there is no way to satisfy the
-// request at all (moving is blocked, and thickness can't be resized),
-// and the pick is rejected outright.
-//
-// (A live constraint for the MOVE case works because it references
-// panel B, an already-resolved OTHER node. The resize-fallback's
-// snapshot anchor exists because the alternative — a live reference
-// back to panel A's own not-yet-resolved current position — is a
-// self-referential dependency; topoSort above would just flag it
-// circular. The snapshot sidesteps that by not depending on ANY
-// node's resolution at all.)
+// TOOL WIRING — shelfTool.js, collinearTool.js, and attachTool.js are
+// pure interaction-state modules; none of them can reach `panels`,
+// `renderAll`, or the scene's pick-mode hooks directly (they're not
+// static exports anywhere — panels is module state here, and the
+// scene handles above only exist once createModellerScene() has run).
+// This context object is the one bridge between them and the live
+// app, set once at startup.
 // -------------------------------------------------------------
-let collinearActive = false;
-let collinearPick1 = null; // { nodeId, faceName, axis, sign, dimField } | null
-let collinearGapMm = 0; // user-editable, see the toolbar's own gap input — read fresh at commit time, not captured per-pick, so changing it mid-pick before the second click still applies
-const AXIS_TO_POSITION_FIELD = { x: 'positionX', y: 'positionY', z: 'positionZ' };
+const toolContext = {
+  getPanels: () => panels,
+  updateNode,
+  commitAddedNodes,
+  recordHistoryCommand,
+  renderAll: () => renderAll(),
+  clearMultiSelected: () => multiSelectedIds.clear(),
+  setFaceHighlight,
+  setFacePickMode,
+  setPanelHighlight,
+};
+setShelfToolContext(toolContext);
+setCollinearToolContext(toolContext);
+setAttachToolContext(toolContext);
 
+// Maps a relayoutBox() result (see features/box.js) to the exact same
+// user-facing toast text the old inline version showed, and applies
+// the returned patches on success. Used at every box-wall
+// move/resize/material call site below so that behavior — and
+// wording — stays identical across all four.
+function applyRelayoutResult(result) {
+  if (!result.ok) {
+    if (result.hitAxis) {
+      showDesignLimitError(result.hitAxis);
+    } else if (result.reason === 'min-dim') {
+      showToast("Can't shrink the box that far — walls would overlap");
+    } else if (result.reason?.startsWith('panel-size:')) {
+      showPanelSizeLimitError(result.reason.split(':')[1]);
+    } else if (result.reason?.startsWith('min-gap:')) {
+      const [a, b] = result.reason.slice('min-gap:'.length).split('/');
+      showToast(`Can't fit — ${a} and ${b} would be closer than ${MIN_WALL_GAP_MM}mm`);
+    }
+    return false;
+  }
+  result.patches.forEach((p) => updateNode(p.id, { width: p.width, height: p.height, offset: p.offset }));
+  return true;
+}
 
-
-
-// -------------------------------------------------------------
-// SHELF TOOL — box-only. Pick two BOUNDARY panels on the same axis and
-// creates a new shelf spanning between them, joined into the SAME box
-// group, with its depth automatically spanning to the box's Back/
-// Front. A boundary panel for a HORIZONTAL shelf (spans the X axis)
-// is Left, Right, or any EXISTING Vertical-rotation shelf already in
-// that box — so e.g. picking Right + an existing vertical divider
-// creates a shelf filling just that one compartment, not the whole
-// box. Symmetrically, a VERTICAL shelf's boundary is Top, Bottom, or
-// any existing Horizontal-rotation shelf. Reuses the exact same
-// pick-mode plumbing as the collinear tool (setFacePickMode/
-// setFaceHighlight) — the two are mutually exclusive single-slot
-// tools, never active together.
-//
-// Like collinear, this is built entirely from live constraints
-// (spansBetween referencing whichever two boundary panels were
-// picked, plus the box's own Back/Front for depth), never a one-time
-// snapshot — so if either boundary is resized or moved afterward
-// (an ordinary drag, the resizeProxy redirect, collinear, or another
-// shelf being dragged), this shelf's width/height re-resolves right
-// along with it. No cycle risk: a shelf only ever depends on
-// panels that existed before it — it can be a boundary for a LATER
-// shelf, but never for one that already depends on it (the pick
-// flow can't reference a not-yet-created node), so the dependency
-// graph only ever grows forward, never back on itself.
-//
-// NOTE: this tool still attaches shelves to Left/Right/Top/Bottom via
-// live constraints, unrelated to the box-WALL relayout above — a
-// shelf isn't a box wall (isBoxWall is never set on it), so it goes
-// through the ordinary resolveConstraints() path exactly as before.
-// -------------------------------------------------------------
-
-// A panel's ROTATION, not its name, is what makes it a valid boundary
-// — this is what lets an existing shelf stand in for Left/Right/Top/
-// Bottom. Left/Right and any "Shelf (V)" all share the same rotation
-// as VERTICAL_ROTATION (declared further down, alongside
-// createAndSelectPanel — safe to reference here since this is only
-// ever read once these functions are actually CALLED, well after the
-// whole module has finished loading); Top/Bottom and any "Shelf (H)"
-// share HORIZONTAL_ROTATION.
-const SHELF_BOUNDARY_ROTATION = { horizontal: () => VERTICAL_ROTATION, vertical: () => HORIZONTAL_ROTATION };
-
-
-
-let shelfMode = null;
-let shelfPick1 = null;
-let shelfPick1ClickMm = null; // desired position along the shelf's free axis, from where the first pick was clicked — null if unavailable (e.g. 2D view), in which case addShelf falls back to auto-placement
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Escape cancels an in-progress collinear pick, same as it already
-// does for nothing else in this app (no other modal/multi-step tool
-// exists yet) — scoped narrowly so it can't interfere with anything.
+// Escape cancels an in-progress collinear or shelf pick — same as it
+// already does for nothing else in this app (no other modal/
+// multi-step tool exists yet) — scoped narrowly so it can't interfere
+// with anything. Ctrl/Cmd+Z / Ctrl/Cmd+Shift+Z (or +Y) drive undo/redo.
 window.addEventListener('keydown', (e) => {
   const modifier = e.ctrlKey || e.metaKey;
   if (!modifier) return;
 
-  if (e.key === 'Escape' && collinearActive) cancelCollinearMode();
-  if (e.key === 'Escape' && shelfMode) cancelShelfMode();
-  
+  if (e.key === 'Escape' && isCollinearActive()) cancelCollinearMode();
+  if (e.key === 'Escape' && getShelfMode()) cancelShelfMode();
+
   if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
     e.preventDefault();
     history.undo();
     return;
   }
 
-  if (e.key.toLowerCase() === 'z' && e.shiftKey ||e.key.toLowerCase() === 'y'){
+  if ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y') {
     e.preventDefault();
     history.redo();
   }
@@ -491,8 +412,8 @@ window.addEventListener('keydown', (e) => {
 
 // -------------------------------------------------------------
 // 3D / 2D view mode toggle. Purely a rendering/interaction switch —
-// nothing about the graph, resolver, BOM, or inspector changes
-// based on which view is active.
+// nothing about the graph, resolver, BOM, or inspector changes based
+// on which view is active.
 // -------------------------------------------------------------
 const view3dBtn = document.getElementById('view-3d-btn');
 const view2dBtn = document.getElementById('view-2d-btn');
@@ -530,40 +451,17 @@ document.addEventListener('keydown', (e) => {
 });
 
 // -------------------------------------------------------------
-// Single generic graph-mutation primitive (Stage 2 consolidation:
-// every function below patches `panels` through this one function
-// instead of each hand-rolling its own `.map(...)`).
+// Single generic graph-mutation primitive — every function below
+// patches `panels` through this one function instead of each
+// hand-rolling its own `.map(...)`. Also handed to tools via
+// toolContext.updateNode above, so the single-writer rule holds even
+// for edits that originate in shelfTool.js/collinearTool.js/
+// attachTool.js — this function is still the only place `panels`
+// actually changes.
 // -------------------------------------------------------------
-export function updateNode(id, patch) {
+function updateNode(id, patch) {
   panels = panels.map((p) => (p.id === id ? { ...p, ...patch } : p));
 }
-
-// -------------------------------------------------------------
-// BOX RELAYOUT (Stage 3) — replaces the old spansBetween/attachedTo
-// constraint web the box used to run its 6 walls through (see the
-// file-header comment for why that approach hits a hard wall in
-// resolveConstraints' per-node cycle check). Box walls carry NO
-// constraints anymore: each keeps its own literal offset on its one
-// free axis, and this function recomputes every OTHER field on all
-// six of them, straight from computeBoxLayout() in modules.js.
-//
-// Called after any box-wall move, typed offset edit, or material
-// (thickness) change — see the three call sites below. Validates the
-// WHOLE resulting box (every wall's size + design-limit position)
-// before committing anything; a single wall's edit can never leave
-// the box in a partially-updated, visually broken state. Returns
-// true if applied, false if rejected (a toast has already been shown
-// either way).
-// -------------------------------------------------------------
-
-
-
-
-
-
-
-
-
 
 // -------------------------------------------------------------
 // Two-level selection: a group (e.g. the box) selects as a WHOLE
@@ -659,7 +557,7 @@ function groupSelectedPanels() {
   const before = panels;
   panels = panels.map((p) => (ids.includes(p.id) ? { ...p, groupId: newGroupId } : p));
   const after = panels;
-  recordHistoryCommand(GroupPanelsCommand,before,after);
+  recordHistoryCommand(GroupPanelsCommand, before, after);
   multiSelectedIds.clear();
   setSelectedGroupId(newGroupId);
   setSelectedId(null);
@@ -677,16 +575,16 @@ function ungroupSelected() {
   const before = panels;
   panels = panels.map((p) => (p.groupId === groupId ? { ...p, groupId: null, hidden: false } : p));
   const after = panels;
-  recordHistoryCommand(UngroupPanelsCommand,before,after);
+  recordHistoryCommand(UngroupPanelsCommand, before, after);
   setSelectedGroupId(null);
   setSelectedId(formerMembers[0] || null); // land somewhere sensible rather than deselecting entirely
   renderAll();
 }
 
-export function renderAll() {
+function renderAll() {
   const selectedId = getSelectedId();
   const selectedGroupId = getSelectedGroupId();
-  const selectedBoxWallId = selectedId && panels.find(p => p.id === selectedId)?.isBoxWall ? selectedId : null;
+  const selectedBoxWallId = selectedId && panels.find((p) => p.id === selectedId)?.isBoxWall ? selectedId : null;
   const resolved = resolveConstraints(panels); // unfiltered — a hidden panel still needs to resolve correctly so any sibling constraint referencing it stays accurate, and so it's instantly right again the moment it's restored
 
   // pieceCode is assigned once, at creation, on the RAW node — same
@@ -703,14 +601,11 @@ export function renderAll() {
   const visiblePanels = resolvedWithCodes.filter((p) => !p.hidden);
   // Authoritative "is this a box wall" id set, sourced directly from
   // the raw graph (`panels`), NOT from the resolved output. Every box
-  // wall is stamped isBoxWall:true exactly once, in addBox(), and
-  // never touched again — so `panels` is always right here. The
-  // RESOLVED node isn't a safe place to read this flag from:
-  // resolveConstraints rebuilds each constrained node's fields and
-  // isn't guaranteed to carry every custom flag through untouched —
-  // which is exactly why resize dots were leaking through on some box
-  // panels (the ones that actually go through constraint resolution,
-  // e.g. Front) while others happened to still come through correctly.
+  // wall is stamped isBoxWall:true exactly once, in features/box.js's
+  // addBox(), and never touched again — so `panels` is always right
+  // here. The RESOLVED node isn't a safe place to read this flag
+  // from: resolveConstraints rebuilds each constrained node's fields
+  // and isn't guaranteed to carry every custom flag through untouched.
   const boxWallIds = new Set(panels.filter((p) => p.isBoxWall).map((p) => p.id));
 
   reconcile(visiblePanels, selectedId, selectedGroupId, multiSelectedIds, boxWallIds, selectedBoxWallId);
@@ -726,14 +621,14 @@ export function renderAll() {
     onAddVertical: addVerticalPanel,
     onAddHorizontal: addHorizontalPanel,
     onAddParallel: addParallelPanel,
-    onAddBox: addBox,
-    onCollinear: () => (collinearActive ? cancelCollinearMode() : startCollinearMode()),
-    collinearActive,
-    collinearGapMm,
-    onCollinearGapChange: (mm) => { collinearGapMm = mm; }, // deliberately no renderAll() here — see toolbar.js's own comment on why
-    onShelfHorizontal: () => (shelfMode === 'horizontal' ? cancelShelfMode() : startShelfMode('horizontal')),
-    onShelfVertical: () => (shelfMode === 'vertical' ? cancelShelfMode() : startShelfMode('vertical')),
-    shelfMode,
+    onAddBox: handleAddBox,
+    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), startCollinearMode())),
+    collinearActive: isCollinearActive(),
+    collinearGapMm: getCollinearGapMm(),
+    onCollinearGapChange: setCollinearGapMm, // deliberately no renderAll() here — see toolbar.js's own comment on why
+    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), startShelfMode('horizontal'))),
+    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), startShelfMode('vertical'))),
+    shelfMode: getShelfMode(),
     onOpenCutList: openCutListWindow,
     onNestCutList: openNestingPlan,
   });
@@ -741,7 +636,7 @@ export function renderAll() {
   renderInspectorOnly();
 
   const rows = computeBom(visiblePanels);
-  lastBomRows = rows;
+  setBomRows(rows);
   renderNestingSummary(); // re-check staleness against the freshly recomputed BOM rows, without re-nesting
   stageLabelEl.textContent = `${visiblePanels.length} node(s) · constraints active`;
 }
@@ -750,106 +645,50 @@ function renderInspectorOnly() {
   const selectedId = getSelectedId();
   const selectedGroupId = getSelectedGroupId();
 
-  const selectedPanel =
-    panels.find((p) => p.id === selectedId) || null;
+  const selectedPanel = panels.find((p) => p.id === selectedId) || null;
 
   // Recomputed here too (not threaded from renderAll) so the
-  // high-frequency onTransformChange path always reflects
-  // the current state of every field, not a stale snapshot.
-  const resolved =
-    resolveConstraints(panels);
+  // high-frequency onTransformChange path always reflects the current
+  // state of every field, not a stale snapshot.
+  const resolved = resolveConstraints(panels);
+  const resolvedPanel = resolved.find((r) => r.id === selectedId) || null;
 
-  const resolvedPanel =
-    resolved.find((r) => r.id === selectedId) || null;
-
-  const groupMembers =
-    selectedGroupId
-      ? panels.filter(
-          (p) => p.groupId === selectedGroupId
-        )
-      : [];
-
-  const visibleGroupMembers =
-    groupMembers.filter(
-      (p) => !p.hidden
-    );
-
-  const hiddenGroupMembers =
-    groupMembers.filter(
-      (p) => p.hidden
-    );
-
-  const groupMemberCount =
-    visibleGroupMembers.length;
+  const groupMembers = selectedGroupId ? panels.filter((p) => p.groupId === selectedGroupId) : [];
+  const visibleGroupMembers = groupMembers.filter((p) => !p.hidden);
+  const hiddenGroupMembers = groupMembers.filter((p) => p.hidden);
+  const groupMemberCount = visibleGroupMembers.length;
 
   // null means "Mixed materials".
   const groupMaterial =
-    groupMembers.length > 0 &&
-    groupMembers.every(
-      (p) =>
-        p.material === groupMembers[0].material
-    )
+    groupMembers.length > 0 && groupMembers.every((p) => p.material === groupMembers[0].material)
       ? groupMembers[0].material
       : null;
 
-
-  /* =========================================================
-     PROPERTIES
-     ========================================================= */
-
   if (inspectorEl) {
-    renderProperties(
-      inspectorEl,
-      {
-        selectedPanel,
-        resolvedPanel,
-        selectedGroupId,
-        groupMemberCount,
-        groupMaterial,
-        hiddenGroupMembers,
-
-        onFieldChange:
-          updateSelectedField,
-
-        onTransformFieldChange:
-          updateSelectedTransformField,
-
-        onUnlinkConstraint:
-          unlinkOrRemoveConstraint,
-
-        onRename:
-          renameSelected,
-
-        onRemove:
-          removeSelected,
-
-        onUngroup:
-          ungroupSelected,
-
-        onRestoreFace:
-          restoreFace,
-
-        onGroupMaterialChange:
-          updateGroupMaterial,
-      }
-    );
+    renderProperties(inspectorEl, {
+      selectedPanel,
+      resolvedPanel,
+      selectedGroupId,
+      groupMemberCount,
+      groupMaterial,
+      hiddenGroupMembers,
+      onFieldChange: updateSelectedField,
+      onTransformFieldChange: updateSelectedTransformField,
+      onUnlinkConstraint: unlinkOrRemoveConstraint,
+      onRename: renameSelected,
+      onRemove: removeSelected,
+      onUngroup: ungroupSelected,
+      onRestoreFace: restoreFace,
+      onGroupMaterialChange: updateGroupMaterial,
+    });
   }
 
-
-  /* =========================================================
-     RELATIONS
-     ========================================================= */
-
   if (relationsMountEl) {
-    renderRelations(
-      relationsMountEl,
-      {
-        selectedPanel,
-        allPanels: panels,
-        onUnlinkConstraint:
-          unlinkOrRemoveConstraint,
-      }
-    );
+    renderRelations(relationsMountEl, {
+      selectedPanel,
+      allPanels: panels,
+      onUnlinkConstraint: unlinkOrRemoveConstraint,
+    });
   }
 }
 
@@ -863,9 +702,9 @@ function renameSelected(newName) {
   if (node.name === nextName) return;
 
   const before = panels;
-  updateNode(selectedId, {name: nextName,});
+  updateNode(selectedId, { name: nextName });
   const after = panels;
-  recordHistoryCommand(RenamePanelCommand,before,after);
+  recordHistoryCommand(RenamePanelCommand, before, after);
   renderAll();
 }
 
@@ -897,18 +736,18 @@ function updateSelectedField(field, value) {
       // validate-then-commit path as a drag, not the single-node
       // design-limit check below.
       const before = panels;
-      updateNode(selectedId, {material: catalogEntry.name,thickness: catalogEntry.thicknessMm});
-      const applied = relayoutBox(node.groupId);
+      updateNode(selectedId, { material: catalogEntry.name, thickness: catalogEntry.thicknessMm });
+      const result = relayoutBox(panels, node.groupId);
 
-      if (!applied) {
+      if (!applyRelayoutResult(result)) {
         panels = before;
         renderAll();
         return;
       }
       const after = panels;
-      recordHistoryCommand(ChangeMaterialCommand,before,after);
+      recordHistoryCommand(ChangeMaterialCommand, before, after);
       renderAll();
-    return;
+      return;
     }
 
     const proposedDims = { width: node.width, height: node.height, thickness: catalogEntry.thicknessMm };
@@ -926,7 +765,7 @@ function updateSelectedField(field, value) {
     const before = panels;
     updateNode(selectedId, { material: catalogEntry.name, thickness: catalogEntry.thicknessMm });
     const after = panels;
-    recordHistoryCommand(ChangeMaterialCommand,before,after);
+    recordHistoryCommand(ChangeMaterialCommand, before, after);
     renderAll();
     return;
   }
@@ -970,7 +809,6 @@ function updateGroupMaterial(materialName) {
 
   // Box groups: every member's thickness feeds computeBoxLayout(), so
   // a whole-group material swap has to be validated as ONE relayout,
-
   // not per-member — a change that's fine for Left in isolation could
   // still push Top/Bottom/Back/Front out of bounds once every wall's
   // thickness moves together.
@@ -980,17 +818,18 @@ function updateGroupMaterial(materialName) {
     panels = panels.map((p) =>
       p.groupId === groupId ? { ...p, material: catalogEntry.name, thickness: catalogEntry.thicknessMm } : p
     );
-    const applied = relayoutBox(groupId);
-    if (!applied) {
+    const result = relayoutBox(panels, groupId);
+    if (!applyRelayoutResult(result)) {
       panels = panels.map((p) => {
         const prior = priorMaterials.get(p.id);
         return prior ? { ...p, material: prior.material, thickness: prior.thickness } : p;
       });
-    renderAll();
-    return;
+      renderAll();
+      return;
     }
     const after = panels;
-    recordHistoryCommand(ChangeGroupMaterialCommand,before,after);
+    recordHistoryCommand(ChangeGroupMaterialCommand, before, after);
+    renderAll(); // NOTE: the original inline version of this branch never called renderAll() on success — fixed here, since every other commit path in this file does.
     return;
   }
 
@@ -1020,7 +859,7 @@ function updateGroupMaterial(materialName) {
     p.groupId === groupId ? { ...p, material: catalogEntry.name, thickness: catalogEntry.thicknessMm } : p
   );
   const after = panels;
-  recordHistoryCommand(ChangeGroupMaterialCommand,before,after)
+  recordHistoryCommand(ChangeGroupMaterialCommand, before, after);
   renderAll();
 }
 
@@ -1030,23 +869,23 @@ function updateSelectedTransformField(group, axis, value) {
   if (!node) return;
 
   // Box walls: a typed offset edit is exactly the same kind of change
-  // as a drag on that same axis (the other two axes are locked
-  // out already, via lockedFields/lockedMoveAxes upstream in the
+  // as a drag on that same axis (the other two axes are locked out
+  // already, via lockedFields/lockedMoveAxes upstream in the
   // inspector) — route it through relayoutBox rather than the plain
   // single-node clamp below, so the rest of the box re-fits too.
   if (node.isBoxWall && group === 'offset') {
     const before = panels;
-    updateNode(selectedId, {offset: {...node.offset,[axis]: value,},});
-    const applied = relayoutBox(node.groupId);
+    updateNode(selectedId, { offset: { ...node.offset, [axis]: value } });
+    const result = relayoutBox(panels, node.groupId);
 
-    if (!applied) {
+    if (!applyRelayoutResult(result)) {
       panels = before;
       renderAll();
       return;
     }
 
     const after = panels;
-    recordHistoryCommand(MovePanelCommand,before,after);
+    recordHistoryCommand(MovePanelCommand, before, after);
     renderAll();
     return;
   }
@@ -1063,20 +902,26 @@ function updateSelectedTransformField(group, axis, value) {
   const before = panels;
   updateNode(selectedId, { [group]: { ...node[group], [axis]: value } });
   const after = panels;
-  recordHistoryCommand(MovePanelCommand,before,after);
+  recordHistoryCommand(MovePanelCommand, before, after);
   renderAll();
 }
 
-
+// Orientation is decided at creation time now, not via a post-creation
+// toggle — see the Vertical/Horizontal/Parallel buttons in the panel
+// list. VERTICAL matches createPanelNode's own default rotation (a
+// standing divider in the YZ plane); HORIZONTAL matches what the old
+// Vertical/Horizontal inspector toggle produced for a flat shelf;
+// PARALLEL is identity rotation — face lies in the XY plane, thickness
+// along Z, same orientation the box preset uses for its 'back' panel.
 function createAndSelectPanel(rotation) {
-  const before = capturePanelsState(); // to aliment history (undo/redo) before the new panel is added
+  const before = capturePanelsState();
 
   const node = createPanelNode({ rotation });
   node.basePosition = computeNextBasePosition(resolveConstraints(panels), node);
   panels = [...panels, node];
 
-  const after = capturePanelsState(); // to aliment history (undo/redo) after the new panel is added
-  recordHistoryCommand(AddPanelCommand,before,after);
+  const after = capturePanelsState();
+  recordHistoryCommand(AddPanelCommand, before, after);
   setSelectedId(node.id);
   renderAll();
 }
@@ -1093,19 +938,32 @@ function addParallelPanel() {
   createAndSelectPanel(PARALLEL_ROTATION);
 }
 
+// Box preset — addBox() (features/box.js) is pure: it builds the six
+// wall nodes (with Front already marked hidden — "open-front box")
+// and returns { nodes, groupId } without touching this file's state.
+// This is the one place that commits it: append via the shared
+// commitAddedNodes() path, then select the new box as a whole.
+function handleAddBox() {
+  const { nodes, groupId } = addBox(panels); // ← must pass panels here
+  commitAddedNodes(nodes, AddBoxCommand);
+  setSelectedGroupId(groupId);
+  setSelectedId(null);
+  renderAll();
+}
+
 function removeSelected() {
   const groupId = getSelectedGroupId();
   const selectedId = getSelectedId();
 
   if (groupId && !selectedId) {
     // group-level selection (nothing drilled into) — permanent delete
-    // of the whole group, unchanged.
+    // of the whole group.
     const before = panels;
     panels = panels.filter((p) => p.groupId !== groupId);
     const after = panels;
     setSelectedGroupId(null);
     setSelectedId(panels.length > 0 ? panels[0].id : null);
-    recordHistoryCommand(DeleteBoxCommand,before,after);
+    recordHistoryCommand(DeleteBoxCommand, before, after);
     renderAll();
     return;
   }
@@ -1117,14 +975,13 @@ function removeSelected() {
     // Shelves have no "restore" concept — a shelf's position is a
     // user choice, not part of the box's structure, so removing one
     // erases it from the graph completely and immediately frees the
-    // space it occupied (collectAxisSlabs never has to know about a
-    // gone-but-still-blocking shelf, because there's no such state).
+    // space it occupied.
     const before = panels;
     panels = panels.filter((p) => p.id !== selectedId);
     const after = panels;
     setSelectedGroupId(node.groupId);
     setSelectedId(null);
-    recordHistoryCommand(DeleteShelfCommand,before,after);
+    recordHistoryCommand(DeleteShelfCommand, before, after);
     renderAll();
     return;
   }
@@ -1132,23 +989,23 @@ function removeSelected() {
   if (node.groupId) {
     // panel-level selection WITHIN a group — a box WALL face. HIDE it
     // rather than removing it from the graph (restorable via the
-    // group inspector) — unchanged from before.
+    // group inspector).
     const before = panels;
     panels = panels.map((p) => (p.id === selectedId ? { ...p, hidden: true } : p));
     const after = panels;
     setSelectedGroupId(node.groupId);
     setSelectedId(null);
-    recordHistoryCommand(HideBoxWallCommand,before,after);
+    recordHistoryCommand(HideBoxWallCommand, before, after);
     renderAll();
     return;
   }
 
-  // plain standalone panel — permanent removal, unchanged.
+  // plain standalone panel — permanent removal.
   const before = panels;
   panels = panels.filter((p) => p.id !== selectedId);
   const after = panels;
   setSelectedId(panels.length > 0 ? panels[0].id : null);
-  recordHistoryCommand(DeletePanelCommand,before,after);
+  recordHistoryCommand(DeletePanelCommand, before, after);
   renderAll();
 }
 
@@ -1159,24 +1016,20 @@ function restoreFace(nodeId) {
   const before = panels;
   panels = panels.map((p) => (p.id === nodeId ? { ...p, hidden: false } : p));
   const after = panels;
-  recordHistoryCommand(RestoreBoxWallCommand,before,after);
+  recordHistoryCommand(RestoreBoxWallCommand, before, after);
   renderAll();
 }
 
-
 // -------------------------------------------------------------
 // Relation (constraint) CRUD — manual spansBetween/attachedTo
-// creation used to live here (via a dropdown form in relations.js),
-// but that's now fully superseded by the collinear tool (and the
-// shelf tool, built on the same live-constraint approach) as the way
-// to create these relations — see startCollinearMode/addShelf above.
-// unlinkOrRemoveConstraint below is the one piece that's still
-// needed: both the properties panel's "Unlink" control and the
-// relations list's own remove (×) button use it to detach/delete an
-// EXISTING relation, which is a distinct concern from authoring a new
-// one by hand. Box walls never have entries here (they carry no
-// constraints — see relayoutBox above), so this never has to
-// special-case isBoxWall.
+// creation now happens via the collinear tool and the shelf tool,
+// both built on the same live-constraint approach.
+// unlinkOrRemoveConstraint below is the one piece still needed here:
+// both the properties panel's "Unlink" control and the relations
+// list's own remove (×) button use it to detach/delete an EXISTING
+// relation. Box walls never have entries here (they carry no
+// constraints — see relayoutBox), so this never has to special-case
+// isBoxWall.
 // -------------------------------------------------------------
 
 // identifier is either a FIELD NAME (soft "Unlink" — mark the active
@@ -1222,66 +1075,19 @@ function unlinkOrRemoveConstraint(identifier, opts = {}) {
   const before = panels;
   updateNode(selectedId, patch);
   const after = panels;
-  recordHistoryCommand(UnlinkConstraintCommand,before,after);
+  recordHistoryCommand(UnlinkConstraintCommand, before, after);
   renderAll();
 }
 
-/**
- * Box preset: replaces the selected panel with 6 real panel nodes —
- * left, right, top, bottom, back, front — forming an open-front box.
- *
- * STAGE 3 REWRITE: top/bottom/back/front's width/height/position used
- * to be governed by spansBetween/attachedTo constraints resolved by
- * snap.js. That's gone now — see relayoutBox() above and
- * computeBoxLayout() in modules.js. Every wall is created as a plain
- * literal panel (constraints: [] via createPanelNode's own default),
- * with a starting width/height/offset that's already numerically
- * correct for the requested W/H/D — and then relayoutBox() is called
- * once immediately after, purely to run every field through the
- * exact same math a later drag will use, so the box starts out
- * indistinguishable from "just been dragged into this shape".
- */
-
-// const DEFAULT_BOX_DEPTH_MM = 400;
-// const DEFAULT_BOX_WIDTH_MM = 500;
-// const DEFAULT_BOX_HEIGHT_MM = 700;
-
-// const BOX_GIZMO_LOCKS = {
-//   leftRight: {
-//     lockedMoveAxes: ['y', 'z'],
-//     lockedResizeAxes: ['x', 'y', 'z'],
-//     lockedFields: {
-//       positionY: true,
-//       positionZ: true,
-//     },
-//   },
-
-//   topBottom: {
-//     lockedMoveAxes: ['x', 'z'],
-//     lockedResizeAxes: ['x', 'y', 'z'],
-//     lockedFields: {
-//       positionX: true,
-//       positionZ: true,
-//     },
-//   },
-
-//   frontBack: {
-//     lockedMoveAxes: ['x', 'y'],
-//     lockedResizeAxes: ['x', 'y', 'z'],
-//     lockedFields: {
-//       positionX: true,
-//       positionY: true,
-//     },
-//   },
-// };
-
-function isBoxWall(mesh) {
-  return mesh?.userData?.isBoxWall === true;
-}
-
+// Initial state: a full box. addBox() (features/box.js) reads
+// MATERIAL_CATALOG[0], which is only populated once
+// loadMaterialCatalog() resolves — everything ABOVE this point (DOM
+// refs, scene/gizmo wiring, every function declaration) has no
+// dependency on the catalog and already ran synchronously at module
+// load; only this first box needs to wait.
 async function bootstrap() {
   await loadMaterialCatalog();
-  addBox();
+  handleAddBox();
   history.clear();
 }
 bootstrap();

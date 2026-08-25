@@ -1,251 +1,277 @@
 /**
  * features/box.js
  *
- * Everything that defines what a BOX is: creation, the carcass layout
- * math, and relayout after a wall drag/resize/material change.
+ * Everything that defines what a BOX is: creation and the carcass
+ * layout math. PURE MODULE — nothing here touches the global `panels`
+ * array or calls history/render; every function takes the data it
+ * needs as arguments and returns data. modeller-main.js remains the
+ * single writer — it applies whatever this module returns.
  *
- * PURE MODULE — nothing here touches the global `panels` array or
- * calls history/render. Every function takes the data it needs as
- * arguments and returns data. modeller-main.js remains the single
- * writer (per its own file-header rule) — it applies whatever this
- * module returns.
+ * Box wall convention (verified against the real construction, not
+ * inferred): Left/Right run full height+depth; Top/Bottom run the
+ * full outer width; Back covers the whole outer footprint
+ * (W × H+2T — like a real cabinet's back sheet nailed across the
+ * carcass, not let into it); Front is inset only in width (W-2T × H)
+ * and created hidden — "open-front box" means the panel exists,
+ * restorable via the group inspector, not that it's absent.
  *
- * Box wall convention (STAGE 3 — no constraints on box walls, see
- * modeller-main.js's own header comment for why):
- *   - Left/Right:   VERTICAL_ROTATION,   free axis X, full height + depth
- *   - Top/Bottom:   HORIZONTAL_ROTATION, free axis Y, inset between Left/Right
- *   - Back/Front:   PARALLEL_ROTATION,   free axis Z, inset within all four
- *   - Front starts hidden:true — "open-front box" means the panel
- *     exists (restorable via the group inspector) but isn't shown.
- *
- * Each wall's ONE free axis is where a drag/typed-offset edit is
- * allowed to move it (see LOCKS below); relayoutBox() recomputes
- * every other wall's width/height/offset to match once that one
- * value has changed.
+ * STAGE 3: box walls carry NO spansBetween/attachedTo constraints —
+ * a fully cross-referential 6-panel box is impossible through
+ * resolveConstraints' per-node cycle check ("Left depends on Top for
+ * height; Top depends on Left for width" gets flagged circular even
+ * though the two fields don't conflict — tested, real dead end). Box
+ * internals are plain arithmetic instead: computeBoxLayout() below,
+ * which addBox() and relayoutBox() both funnel through.
  */
-import {resolveConstraints} from '../modeller/snap.js'
-import {createPanelNode,
-    computeWorldHalfExtents,
-    MM_TO_UNIT,
-    DESIGN_LIMITS_MM,
-    PANEL_SIZE_LIMITS_MM,
-    MATERIAL_CATALOG,
-    LOCAL_FACES} from '../modeller/modules.js'
-import {checkMinGap,
-    collectAxisSlabs,
-    findPanelSizeViolation,
-    findDesignLimitViolation,
-    VERTICAL_ROTATION,
-    HORIZONTAL_ROTATION,
-    PARALLEL_ROTATION} from '../shared/geometry.js'
+import { createPanelNode, computeNextBasePosition, MATERIAL_CATALOG, MIN_PANEL_DIM_MM } from '../modeller/modules.js';
+import { resolveConstraints } from '../modeller/snap.js';
+import {
+  VERTICAL_ROTATION,
+  HORIZONTAL_ROTATION,
+  PARALLEL_ROTATION,
+  collectAxisSlabs,
+  checkMinGap,
+  findPanelSizeViolation,
+  findDesignLimitViolation,
+} from '../shared/geometry.js';
 
 export const DEFAULT_BOX_WIDTH_MM = 500;
 export const DEFAULT_BOX_HEIGHT_MM = 700;
 export const DEFAULT_BOX_DEPTH_MM = 400;
 
-// Which axes are locked (i.e. NOT the wall's free axis) per role pair.
-// lockedResizeAxes is always all three — no box wall's width/height is
-// ever user-resizable directly; only relayoutBox() (driven by a drag
-// on the free axis, or a material/thickness change) is allowed to
-// change those fields. See updateSelectedField's isBoxWall guard in
-// modeller-main.js.
-const WALL_LOCKS = {
-  Left:   { lockedMoveAxes: ['y', 'z'], lockedResizeAxes: ['x', 'y', 'z'], lockedFields: { positionY: true, positionZ: true } },
-  Right:  { lockedMoveAxes: ['y', 'z'], lockedResizeAxes: ['x', 'y', 'z'], lockedFields: { positionY: true, positionZ: true } },
-  Top:    { lockedMoveAxes: ['x', 'z'], lockedResizeAxes: ['x', 'y', 'z'], lockedFields: { positionX: true, positionZ: true } },
-  Bottom: { lockedMoveAxes: ['x', 'z'], lockedResizeAxes: ['x', 'y', 'z'], lockedFields: { positionX: true, positionZ: true } },
-  Back:   { lockedMoveAxes: ['x', 'y'], lockedResizeAxes: ['x', 'y', 'z'], lockedFields: { positionX: true, positionY: true } },
-  Front:  { lockedMoveAxes: ['x', 'y'], lockedResizeAxes: ['x', 'y', 'z'], lockedFields: { positionX: true, positionY: true } },
-};
-
-const ROLE_ROTATION = {
-  Left: VERTICAL_ROTATION, Right: VERTICAL_ROTATION,
-  Top: HORIZONTAL_ROTATION, Bottom: HORIZONTAL_ROTATION,
-  Back: PARALLEL_ROTATION, Front: PARALLEL_ROTATION,
+const BOX_GIZMO_LOCKS = {
+  leftRight: {
+    lockedMoveAxes: ['y', 'z'],
+    lockedResizeAxes: ['x', 'y', 'z'],
+    lockedFields: { positionY: true, positionZ: true },
+  },
+  topBottom: {
+    lockedMoveAxes: ['x', 'z'],
+    lockedResizeAxes: ['x', 'y', 'z'],
+    lockedFields: { positionX: true, positionZ: true },
+  },
+  frontBack: {
+    lockedMoveAxes: ['x', 'y'],
+    lockedResizeAxes: ['x', 'y', 'z'],
+    lockedFields: { positionX: true, positionY: true },
+  },
 };
 
 /**
- * Pure carcass math: given outer box dimensions and each wall's
- * thickness, returns the width/height/offset every one of the 6
- * walls should have. offsets are relative to the box's own
- * basePosition (its center), same space every other offset in the
- * app already lives in.
- *
- * NOTE: this is the piece I had to infer — your actual inset/overlay
- * convention may differ. If it does, only this function needs to
- * change; createBox/relayoutBox below don't care about the specific
- * math, only that it returns { width, height, offset } per role.
+ * Pure carcass math: given the box's 6 wall nodes (each just needs
+ * .thickness and .offset), returns each wall's new width/height/
+ * offset so the assembly stays airtight no matter which wall(s) were
+ * dragged. Only left.offset.x / right.offset.x / top.offset.y /
+ * bottom.offset.y / back.offset.z / front.offset.z are ever treated
+ * as "driving" values — everything else here is derived. All
+ * measurements are in OFFSET space (relative to the box's shared
+ * basePosition anchor) — it cancels out of every difference used
+ * here, so the anchor itself is never read.
  */
-export function computeBoxLayout({ width, height, depth, thickness }) {
-  const t = thickness; // { Left, Right, Top, Bottom, Back, Front }
-  const innerWidth = width - t.Left - t.Right;
-  const innerHeight = height - t.Top - t.Bottom;
+export function computeBoxLayout({ left, right, top, bottom, back, front }) {
+  const lx = left.offset.x, rx = right.offset.x;
+  const ty = top.offset.y, by = bottom.offset.y;
+  const bz = back.offset.z, fz = front.offset.z;
+
+  const xOuterMin = lx - left.thickness / 2, xOuterMax = rx + right.thickness / 2;
+  const xInnerMin = lx + left.thickness / 2, xInnerMax = rx - right.thickness / 2;
+  const yOuterMin = by - bottom.thickness / 2, yOuterMax = ty + top.thickness / 2;
+  const yInnerMin = by + bottom.thickness / 2, yInnerMax = ty - top.thickness / 2;
+  const zInnerMin = bz - back.thickness / 2, zInnerMax = fz + front.thickness / 2;
+
+  const outerWidth = xOuterMax - xOuterMin;
+  const innerWidth = xInnerMax - xInnerMin;
+  const innerHeight = yInnerMax - yInnerMin;
+  const innerDepth = zInnerMax - zInnerMin;
+
+  const outerWidthCenterX = (xOuterMin + xOuterMax) / 2;
+  const innerWidthCenterX = (xInnerMin + xInnerMax) / 2;
+  const outerHeightCenterY = (yOuterMin + yOuterMax) / 2;
+  const innerHeightCenterY = (yInnerMin + yInnerMax) / 2;
+  const innerDepthCenterZ = (zInnerMin + zInnerMax) / 2;
 
   return {
-    Left: {
-      width: depth, height, thickness: t.Left,
-      offset: { x: -(width / 2 - t.Left / 2), y: 0, z: 0 },
-    },
-    Right: {
-      width: depth, height, thickness: t.Right,
-      offset: { x: (width / 2 - t.Right / 2), y: 0, z: 0 },
-    },
-    Bottom: {
-      width: innerWidth, height: depth, thickness: t.Bottom,
-      offset: { x: 0, y: -(height / 2 - t.Bottom / 2), z: 0 },
-    },
-    Top: {
-      width: innerWidth, height: depth, thickness: t.Top,
-      offset: { x: 0, y: (height / 2 - t.Top / 2), z: 0 },
-    },
-    // Back/Front are inset within all four other walls (captured
-    // construction) — width/height shrink by the LEFT/RIGHT and
-    // TOP/BOTTOM thicknesses on top of the box's own inner span.
-    Back: {
-      width: innerWidth, height: innerHeight, thickness: t.Back,
-      offset: { x: 0, y: 0, z: -(depth / 2 - t.Back / 2) },
-    },
-    Front: {
-      width: innerWidth, height: innerHeight, thickness: t.Front,
-      offset: { x: 0, y: 0, z: (depth / 2 - t.Front / 2) },
-    },
+    left:   { width: innerDepth, height: innerHeight, offset: { x: lx, y: innerHeightCenterY, z: innerDepthCenterZ } },
+    right:  { width: innerDepth, height: innerHeight, offset: { x: rx, y: innerHeightCenterY, z: innerDepthCenterZ } },
+    top:    { width: outerWidth, height: innerDepth,  offset: { x: outerWidthCenterX, y: ty, z: innerDepthCenterZ } },
+    bottom: { width: outerWidth, height: innerDepth,  offset: { x: outerWidthCenterX, y: by, z: innerDepthCenterZ } },
+    back:   { width: innerWidth, height: innerHeight, offset: { x: innerWidthCenterX, y: outerHeightCenterY, z: bz } },
+    front:  { width: innerWidth, height: innerHeight, offset: { x: innerWidthCenterX, y: innerHeightCenterY, z: fz } },
   };
 }
 
 /**
- * Creates a new box: 6 panel nodes (left, right, top, bottom, back,
- * front), grouped, with Front hidden by default. Pure — returns the
- * nodes and the groupId; does not touch global panels, history, or
- * rendering. Caller (modeller-main.js) is responsible for committing
- * via its single commit path.
+ * Creates a new box: 6 panel nodes, grouped, with Front hidden by
+ * default. Needs `panels` (read-only) to place the new box's anchor
+ * where computeNextBasePosition finds room, without overlapping
+ * anything already on the floor — this is the one place addBox()
+ * isn't fully closure-free, but it never mutates `panels`.
+ *
+ * Returns { nodes, groupId }; caller (modeller-main.js's
+ * handleAddBox()) is responsible for committing.
  */
-export function addBox({
-  width = DEFAULT_BOX_WIDTH_MM,
-  height = DEFAULT_BOX_HEIGHT_MM,
-  depth = DEFAULT_BOX_DEPTH_MM,
-  material,
-  basePosition = { x: 0, y: 0, z: 0 },
-} = {}) {
-  const materialName = material ?? MATERIAL_CATALOG[0]?.name;
-  const catalogEntry = MATERIAL_CATALOG.find((m) => m.name === materialName);
-  const thicknessMm = catalogEntry?.thicknessMm ?? 18;
+export function addBox(panels) {
+  const W = DEFAULT_BOX_WIDTH_MM;
+  const H = DEFAULT_BOX_HEIGHT_MM;
+  const D = DEFAULT_BOX_DEPTH_MM;
+  const material = MATERIAL_CATALOG[0].name;
+  const T = MATERIAL_CATALOG[0].thicknessMm;
 
-  const thickness = { Left: thicknessMm, Right: thicknessMm, Top: thicknessMm, Bottom: thicknessMm, Back: thicknessMm, Front: thicknessMm };
-  const layout = computeBoxLayout({ width, height, depth, thickness });
-
-  const roles = ['Left', 'Right', 'Top', 'Bottom', 'Back', 'Front'];
-  const wallsByRole = {};
-
-  roles.forEach((role) => {
-    const l = layout[role];
-    const node = createPanelNode({
-      name: role,
-      width: l.width,
-      height: l.height,
-      thickness: l.thickness,
-      material: materialName,
-      rotation: ROLE_ROTATION[role],
-      isBoxWall: true,
-      hidden: role === 'Front', // open-front box — panel exists, restorable
-      constraints: [], // Stage 3: box walls carry no constraints
-      ...WALL_LOCKS[role],
-    });
-    node.basePosition = basePosition;
-    node.offset = l.offset;
-    wallsByRole[role] = node;
+  const left = createPanelNode({
+    name: 'Left', width: D, height: H, thickness: T, material,
+    rotation: VERTICAL_ROTATION, isBoxPanel: true, isBoxWall: true,
+    lockedMoveAxes: BOX_GIZMO_LOCKS.leftRight.lockedMoveAxes,
+    lockedResizeAxes: BOX_GIZMO_LOCKS.leftRight.lockedResizeAxes,
+    lockedFields: { ...BOX_GIZMO_LOCKS.leftRight.lockedFields },
+  });
+  const right = createPanelNode({
+    name: 'Right', width: D, height: H, thickness: T, material,
+    rotation: VERTICAL_ROTATION, isBoxPanel: true, isBoxWall: true,
+    lockedMoveAxes: BOX_GIZMO_LOCKS.leftRight.lockedMoveAxes,
+    lockedResizeAxes: BOX_GIZMO_LOCKS.leftRight.lockedResizeAxes,
+    lockedFields: { ...BOX_GIZMO_LOCKS.leftRight.lockedFields },
+  });
+  const top = createPanelNode({
+    name: 'Top', width: W, height: D, thickness: T, material,
+    rotation: HORIZONTAL_ROTATION, isBoxPanel: true, isBoxWall: true,
+    lockedMoveAxes: BOX_GIZMO_LOCKS.topBottom.lockedMoveAxes,
+    lockedResizeAxes: BOX_GIZMO_LOCKS.topBottom.lockedResizeAxes,
+    lockedFields: { ...BOX_GIZMO_LOCKS.topBottom.lockedFields },
+  });
+  const bottom = createPanelNode({
+    name: 'Bottom', width: W, height: D, thickness: T, material,
+    rotation: HORIZONTAL_ROTATION, isBoxPanel: true, isBoxWall: true,
+    lockedMoveAxes: BOX_GIZMO_LOCKS.topBottom.lockedMoveAxes,
+    lockedResizeAxes: BOX_GIZMO_LOCKS.topBottom.lockedResizeAxes,
+    lockedFields: { ...BOX_GIZMO_LOCKS.topBottom.lockedFields },
+  });
+  const back = createPanelNode({
+    name: 'Back',
+    // Covers all 4 outer edges of the assembly (H+2T) — like a real
+    // cabinet's solid back sheet, nailed across the whole carcass
+    // rather than let into it. Just a starting value — relayoutBox
+    // (via computeBoxLayout below) recomputes it exactly.
+    width: W, height: H + 2 * T, thickness: T, material,
+    rotation: PARALLEL_ROTATION, isBoxPanel: true, isBoxWall: true,
+    lockedMoveAxes: BOX_GIZMO_LOCKS.frontBack.lockedMoveAxes,
+    lockedResizeAxes: BOX_GIZMO_LOCKS.frontBack.lockedResizeAxes,
+    lockedFields: { ...BOX_GIZMO_LOCKS.frontBack.lockedFields },
+  });
+  const front = createPanelNode({
+    name: 'Front',
+    // Inner-fitted footprint — inset between the sides only, W-2T.
+    width: W - 2 * T, height: H, thickness: T, material,
+    rotation: PARALLEL_ROTATION, isBoxPanel: true, isBoxWall: true,
+    lockedMoveAxes: BOX_GIZMO_LOCKS.frontBack.lockedMoveAxes,
+    lockedResizeAxes: BOX_GIZMO_LOCKS.frontBack.lockedResizeAxes,
+    lockedFields: { ...BOX_GIZMO_LOCKS.frontBack.lockedFields },
   });
 
-  // groupId = one member's own id — same trick used elsewhere for
-  // ad-hoc groups (see groupSelectedPanels in modeller-main.js).
-  const groupId = wallsByRole.Left.id;
-  roles.forEach((role) => { wallsByRole[role].groupId = groupId; });
+  const boxPanels = [left, right, top, bottom, back, front];
+  boxPanels.forEach((p) => { p.groupId = left.id; }); // left's own id doubles as the group's identifier
 
-  return { nodes: roles.map((role) => wallsByRole[role]), groupId };
+  // All 6 box panels share ONE basePosition — the box's own single
+  // placement slot (treating its WxH front footprint like one panel
+  // for that purpose) — rather than each independently claiming its
+  // own row slot the way plain "add panel" does. computeBoxLayout()
+  // (and later relayoutBox()) works entirely in offset-space relative
+  // to this shared anchor, so the anchor itself is never touched
+  // again after this.
+  const anchor = computeNextBasePosition(resolveConstraints(panels), { width: W, height: H, thickness: T, rotation: PARALLEL_ROTATION });
+  anchor.y = H / 2 + T; // sits on the floor
+  boxPanels.forEach((p) => { p.basePosition = anchor; });
+
+  // Starting offsets — each wall's own driving axis. Every other
+  // offset/dimension field gets overwritten by computeBoxLayout below
+  // regardless of what's set here.
+  left.offset = { x: -(W / 2 - T / 2), y: 0, z: 0 };
+  right.offset = { x: +(W / 2 - T / 2), y: 0, z: 0 };
+  bottom.offset = { x: 0, y: -H / 2 - T / 2, z: 0 };
+  top.offset = { x: 0, y: +H / 2 + T / 2, z: 0 };
+  back.offset = { x: 0, y: 0, z: -D / 2 - T / 2 };
+  front.offset = { x: 0, y: 0, z: +D / 2 + T / 2 };
+
+  // Run the SAME layout math relayoutBox() will use on every later
+  // edit, directly against these local node references — no need to
+  // round-trip through the graph via findBoxSibling since we already
+  // hold every node. This makes a fresh box indistinguishable from
+  // "just been dragged into this shape".
+  const layout = computeBoxLayout({ left, right, top, bottom, back, front });
+  for (const [role, node] of Object.entries({ left, right, top, bottom, back, front })) {
+    node.width = layout[role].width;
+    node.height = layout[role].height;
+    node.offset = layout[role].offset;
+  }
+
+  front.hidden = true; // "open-front box" — a real, restorable panel, just not shown
+
+  return { nodes: boxPanels, groupId: left.id };
 }
 
 /** Find a specific wall of a box by its role name ('Back', 'Front', etc). */
-export function findBoxSibling(panels, groupId, role) {
-  return panels.find((p) => p.groupId === groupId && p.isBoxWall && p.name === role) || null;
+export function findBoxSibling(panels, groupId, name) {
+  return panels.find((p) => p.groupId === groupId && p.name === name) || null;
 }
 
 /**
  * Recomputes every wall of a box after one wall's free-axis offset
- * has already changed in the CALLER's proposed state (relayoutBox
- * doesn't itself decide which wall moved or by how much — it derives
- * the box's current W/H/D from whatever offsets are already on the 6
- * walls in `panels`, then recomputes every wall to match).
+ * has already changed in `panels` (relayoutBox doesn't decide which
+ * wall moved or by how much — it derives the box's current layout
+ * from whatever offsets are already on the 6 walls, then recomputes
+ * every wall to match).
  *
  * Pure: returns either
  *   { ok: true, patches: [{ id, width, height, offset }, ...] }
  * or
- *   { ok: false, hitAxis } | { ok: false, reason }
- * and mutates nothing. modeller-main.js applies the patches via
- * updateNode() and decides history/render — same single-writer rule
- * as everywhere else in this app.
- *
- * Validates against PANEL_SIZE_LIMITS_MM, DESIGN_LIMITS_MM, and
- * MIN_WALL_GAP_MM against any shelves already inside the box, for
- * every wall — a single wall's edit can never leave the box partially
- * updated or overlapping its own contents.
+ *   { ok: false, hitAxis }
+ *   { ok: false, reason: 'min-dim' | 'panel-size:<field>' | 'min-gap:<a>/<b>' }
+ * and mutates nothing — modeller-main.js's applyRelayoutResult()
+ * applies the patches (or shows the matching toast) and owns
+ * history/render, per the single-writer rule.
  */
 export function relayoutBox(panels, groupId) {
-  const roles = ['Left', 'Right', 'Top', 'Bottom', 'Back', 'Front'];
-  const walls = {};
-  for (const role of roles) {
-    const w = findBoxSibling(panels, groupId, role);
-    if (!w) return { ok: false, reason: `missing wall: ${role}` };
-    walls[role] = w;
+  const roles = {
+    left: findBoxSibling(panels, groupId, 'Left'), right: findBoxSibling(panels, groupId, 'Right'),
+    top: findBoxSibling(panels, groupId, 'Top'), bottom: findBoxSibling(panels, groupId, 'Bottom'),
+    back: findBoxSibling(panels, groupId, 'Back'), front: findBoxSibling(panels, groupId, 'Front'),
+  };
+  if (Object.values(roles).some((n) => !n)) return { ok: true, patches: [] }; // defensive no-op — a box mid-construction/deletion has nothing to relayout yet
+
+  const layout = computeBoxLayout(roles);
+
+  for (const [role, node] of Object.entries(roles)) {
+    const dims = { width: layout[role].width, height: layout[role].height, thickness: node.thickness };
+    if (dims.width < MIN_PANEL_DIM_MM || dims.height < MIN_PANEL_DIM_MM) {
+      return { ok: false, reason: 'min-dim' };
+    }
+    const sizeViolation = findPanelSizeViolation(dims);
+    if (sizeViolation) return { ok: false, reason: `panel-size:${sizeViolation}` };
+    const positionMm = {
+      x: node.basePosition.x + layout[role].offset.x,
+      y: node.basePosition.y + layout[role].offset.y,
+      z: node.basePosition.z + layout[role].offset.z,
+    };
+    const hitAxis = findDesignLimitViolation(node.rotation, positionMm, dims);
+    if (hitAxis) return { ok: false, hitAxis };
   }
 
-  // Derive current outer W/H/D from the walls' own offsets + thickness.
-  const width = (walls.Right.offset.x + walls.Right.thickness / 2) - (walls.Left.offset.x - walls.Left.thickness / 2);
-  const height = (walls.Top.offset.y + walls.Top.thickness / 2) - (walls.Bottom.offset.y - walls.Bottom.thickness / 2);
-  const depth = (walls.Front.offset.z + walls.Front.thickness / 2) - (walls.Back.offset.z - walls.Back.thickness / 2);
+  const yCheck = checkMinGap(collectAxisSlabs(panels, groupId, 'y', {
+    [roles.bottom.id]: { center: layout.bottom.offset.y, halfThickness: roles.bottom.thickness / 2, label: 'Bottom' },
+    [roles.top.id]:    { center: layout.top.offset.y,    halfThickness: roles.top.thickness / 2,    label: 'Top' },
+  }));
+  if (!yCheck.ok) return { ok: false, reason: `min-gap:${yCheck.a}/${yCheck.b}` };
 
-  const thickness = Object.fromEntries(roles.map((r) => [r, walls[r].thickness]));
-  const layout = computeBoxLayout({ width, height, depth, thickness });
+  const xCheck = checkMinGap(collectAxisSlabs(panels, groupId, 'x', {
+    [roles.left.id]:  { center: layout.left.offset.x,  halfThickness: roles.left.thickness / 2,  label: 'Left' },
+    [roles.right.id]: { center: layout.right.offset.x, halfThickness: roles.right.thickness / 2, label: 'Right' },
+  }));
+  if (!xCheck.ok) return { ok: false, reason: `min-gap:${xCheck.a}/${xCheck.b}` };
 
-  const patches = roles.map((role) => ({
-    id: walls[role].id,
+  const patches = Object.entries(roles).map(([role, node]) => ({
+    id: node.id,
     width: layout[role].width,
     height: layout[role].height,
     offset: layout[role].offset,
   }));
-
-  // Validate every wall: panel size cap, design limits, and clearance
-  // against any shelves sharing its axis.
-  for (const role of roles) {
-    const patch = patches.find((p) => p.id === walls[role].id);
-    const dims = { width: patch.width, height: patch.height, thickness: walls[role].thickness };
-
-    const sizeViolation = findPanelSizeViolation(dims);
-    if (sizeViolation) return { ok: false, reason: `panel-size:${sizeViolation}` };
-
-    const positionMm = {
-      x: walls[role].basePosition.x + patch.offset.x,
-      y: walls[role].basePosition.y + patch.offset.y,
-      z: walls[role].basePosition.z + patch.offset.z,
-    };
-    const hitAxis = findDesignLimitViolation(ROLE_ROTATION[role], positionMm, dims);
-    if (hitAxis) return { ok: false, hitAxis };
-  }
-
-  // Clearance check: Top/Bottom moving must not collide with any
-  // horizontal shelf inside; Left/Right moving must not collide with
-  // any vertical shelf. Only these two axes have interior shelves to
-  // worry about — Back/Front's free axis (depth) has no shelves
-  // spanning it.
-  for (const [axis, lowRole, highRole] of [['y', 'Bottom', 'Top'], ['x', 'Left', 'Right']]) {
-    const lowPatch = patches.find((p) => p.id === walls[lowRole].id);
-    const highPatch = patches.find((p) => p.id === walls[highRole].id);
-    const overrides = {
-      [walls[lowRole].id]: { center: lowPatch.offset[axis], halfThickness: walls[lowRole].thickness / 2, label: lowRole },
-      [walls[highRole].id]: { center: highPatch.offset[axis], halfThickness: walls[highRole].thickness / 2, label: highRole },
-    };
-    const slabs = collectAxisSlabs(panels, groupId, axis, overrides);
-    const gapCheck = checkMinGap(slabs);
-    if (!gapCheck.ok) return { ok: false, reason: `min-gap:${gapCheck.a}/${gapCheck.b}` };
-  }
-
   return { ok: true, patches };
 }

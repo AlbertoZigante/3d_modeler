@@ -1,41 +1,38 @@
 /**
- * 
-Generic geometry/validation helpers shared by box, shelf,
-and collinear — none of this should know what a "box" or "shelf" is.
-*/
-import {computeWorldHalfExtents, DESIGN_LIMITS_MM, PANEL_SIZE_LIMITS_MM} from '../modeller/modules.js'
+ * shared/geometry.js
+ *
+ * Generic geometry/validation helpers shared by box, shelf, and
+ * collinear — none of this should know what a "box" or "shelf" is.
+ */
+import { computeWorldHalfExtents, DESIGN_LIMITS_MM, PANEL_SIZE_LIMITS_MM } from '../modeller/modules.js';
 
-
-// Orientation is decided at creation time now, not via a post-creation
+// Orientation is decided at creation time, not via a post-creation
 // toggle — see the Vertical/Horizontal/Parallel buttons in the panel
 // list. VERTICAL matches createPanelNode's own default rotation (a
 // standing divider in the YZ plane); HORIZONTAL matches what the old
 // Vertical/Horizontal inspector toggle produced for a flat shelf;
 // PARALLEL is identity rotation — face lies in the XY plane,
-// thickness along Z, same orientation the box preset already uses
-// for its 'back' panel. Unlike the other two, a Parallel panel shows
-// its full face (not an edge-on sliver) in the 2D front view, and
-// both its width and height are 2D-edge-draggable there — see
-// view2d.js, which derives this from rotation directly via
-// getAlignedAxis rather than a hardcoded Vertical/Horizontal check.
+// thickness along Z, same orientation the box preset uses for its
+// 'back' panel. Unlike the other two, a Parallel panel shows its full
+// face (not an edge-on sliver) in the 2D front view, and both its
+// width and height are 2D-edge-draggable there — see view2d.js, which
+// derives this from rotation directly via getAlignedAxis rather than
+// a hardcoded Vertical/Horizontal check.
 export const VERTICAL_ROTATION = { x: 0, y: 90, z: 0 };
 export const HORIZONTAL_ROTATION = { x: 90, y: 0, z: 0 };
 export const PARALLEL_ROTATION = { x: 0, y: 0, z: 0 };
 
 export const MIN_WALL_GAP_MM = 15;
 
-
 export function rotationsMatch(a, b) {
   return a.x === b.x && a.y === b.y && a.z === b.z;
 }
 
-// Checks a set of axis-aligned slabs (each { center, halfThickness,
-// label }, all offsets in the SAME axis) for at least MIN_WALL_GAP_MM
-// between every pair of neighbors once sorted along that axis. Walls
-// and shelves are indistinguishable here — a wall is just a slab that
-// happens to also be getting relaid-out this call.
-// Sorts a set of same-axis slabs and checks every neighbor pair keeps
-// at least MIN_WALL_GAP_MM of clear space between them.
+// Sorts a set of same-axis slabs (each { center, halfThickness,
+// label }) and checks every neighbor pair keeps at least
+// MIN_WALL_GAP_MM of clear space between them. Walls and shelves are
+// indistinguishable here — a wall is just a slab that happens to also
+// be getting relaid-out this call.
 export function checkMinGap(elements) {
   const sorted = [...elements].sort((a, b) => a.center - b.center);
   for (let i = 0; i < sorted.length - 1; i++) {
@@ -57,7 +54,11 @@ export function checkMinGap(elements) {
 // addShelf's pre-creation check, where there's no id yet). This is
 // the one place that knows "what counts as a slab on this axis" —
 // wall drags, shelf drags, and shelf creation all go through it.
-export function collectAxisSlabs(groupId, axis, overrides = {}) {
+//
+// Takes `panels` explicitly — this module has no access to any live
+// graph state of its own, callers (box.js, shelf.js, modeller-main.js)
+// always pass their current panels array.
+export function collectAxisSlabs(panels, groupId, axis, overrides = {}) {
   const relevantRotation = axis === 'y' ? HORIZONTAL_ROTATION : VERTICAL_ROTATION;
   const wallRoleLow = axis === 'y' ? 'Bottom' : 'Left';
   const wallRoleHigh = axis === 'y' ? 'Top' : 'Right';

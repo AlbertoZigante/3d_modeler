@@ -1,49 +1,71 @@
-import {createPanelNode, nextConstraintId, MM_TO_UNIT, getAlignedAxis, LOCAL_FACES} from '../modeller/modules.js' 
-import {resolveConstraints} from '../modeller/snap.js'
-import {findBoxSibling} from './box.js'
-import {collectAxisSlabs, checkMinGap, VERTICAL_ROTATION, HORIZONTAL_ROTATION, rotationsMatch} from '../shared/geometry.js' 
+/**
+ * features/shelf.js
+ *
+ * SHELF feature — pure creation math. Reuses the exact same live-
+ * constraint approach as box walls: a shelf's width/height are
+ * spansBetween constraints against whichever two boundary panels
+ * were picked (plus the box's own Back/Front for depth), so if
+ * either boundary is later resized or moved, this shelf's dimensions
+ * re-resolve right along with it. No cycle risk: a shelf only ever
+ * depends on panels that existed before it.
+ *
+ * PURE — addShelf() never touches history, selection, or rendering.
+ * See tools/shelfTool.js (the only caller) for the commit path and
+ * the pick-mode interaction that supplies pick1/pick2/mode/clickMm.
+ */
+import { createPanelNode, nextConstraintId, getAlignedAxis, LOCAL_FACES } from '../modeller/modules.js';
+import { resolveConstraints } from '../modeller/snap.js';
+import { findBoxSibling, DEFAULT_BOX_DEPTH_MM } from './box.js';
+import { collectAxisSlabs, VERTICAL_ROTATION, HORIZONTAL_ROTATION, rotationsMatch, MIN_WALL_GAP_MM } from '../shared/geometry.js';
 
-export function addShelf(pick1, pick2) {
+/**
+ * @param {Array} panels - current graph
+ * @param {Object} pick1 - first boundary panel node (a box wall or an existing shelf of the matching rotation)
+ * @param {Object} pick2 - second boundary panel node, same box as pick1
+ * @param {{ mode: 'horizontal'|'vertical', clickMm: number|null }} options
+ *   clickMm is the desired position along the shelf's free axis, from
+ *   where the first pick was clicked — null if unavailable (e.g. 2D
+ *   view), in which case this falls back to auto-placement in the
+ *   largest available gap.
+ * @returns {{ ok: true, node: Object, groupId: string }
+ *         | { ok: false, reason: 'no-space-at-click' | 'no-space' | 'invalid' }}
+ */
+export function addShelf(panels, pick1, pick2, { mode, clickMm }) {
   const groupId = pick1.groupId;
-  const back = findBoxSibling(groupId, 'Back');
-  const front = findBoxSibling(groupId, 'Front');
-  if (!back || !front) return;
+  const back = findBoxSibling(panels, groupId, 'Back');
+  const front = findBoxSibling(panels, groupId, 'Front');
+  if (!back || !front) return { ok: false, reason: 'invalid' };
 
   const resolved = resolveConstraints(panels);
   const r1 = resolved.find((r) => r.id === pick1.id);
   const r2 = resolved.find((r) => r.id === pick2.id);
-  if (!r1 || !r2) return;
+  if (!r1 || !r2) return { ok: false, reason: 'invalid' };
 
-  const spanAxis = shelfMode === 'horizontal' ? 'x' : 'y';
+  const spanAxis = mode === 'horizontal' ? 'x' : 'y';
   const face1 = facingFace(r1, spanAxis, r2);
   const face2 = facingFace(r2, spanAxis, r1);
-  if (!face1 || !face2) return;
+  if (!face1 || !face2) return { ok: false, reason: 'invalid' };
 
-  const freeAxis = shelfMode === 'horizontal' ? 'y' : 'x';
+  const freeAxis = mode === 'horizontal' ? 'y' : 'x';
   const anchor = pick1.basePosition;
   const thickness = pick1.thickness;
-  const existingSlabs = collectAxisSlabs(groupId, freeAxis).sort((a, b) => a.center - b.center);
+  const existingSlabs = collectAxisSlabs(panels, groupId, freeAxis).sort((a, b) => a.center - b.center);
 
   let proposedFreeOffset;
-  if (shelfPick1ClickMm != null) {
-    const picked = pickGapForPosition(existingSlabs, shelfPick1ClickMm, thickness);
-    if (!picked.fits) {
-      showToast('Not enough space for a shelf there');
-      return;
-    }
+  if (clickMm != null) {
+    const picked = pickGapForPosition(existingSlabs, clickMm, thickness);
+    if (!picked.fits) return { ok: false, reason: 'no-space-at-click' };
     proposedFreeOffset = picked.center;
   } else {
     const slot = findBestShelfSlot(existingSlabs, thickness);
     const requiredSpan = thickness + 2 * MIN_WALL_GAP_MM;
-    if (!slot || slot.clearSpan < requiredSpan) {
-      showToast('Not enough space for another shelf here');
-      return;
-    }
+    if (!slot || slot.clearSpan < requiredSpan) return { ok: false, reason: 'no-space' };
     proposedFreeOffset = slot.center;
   }
-  const spanFieldForBoundary = shelfMode === 'horizontal' ? 'width' : 'height';
+
+  const spanFieldForBoundary = mode === 'horizontal' ? 'width' : 'height';
   const startWidthOrHeight = Math.abs(r2.position[spanAxis] - r1.position[spanAxis]);
-  const rotation = shelfMode === 'horizontal' ? HORIZONTAL_ROTATION : VERTICAL_ROTATION;
+  const rotation = mode === 'horizontal' ? HORIZONTAL_ROTATION : VERTICAL_ROTATION;
   const material = pick1.material;
 
   const spanToBoundaries = {
@@ -52,19 +74,19 @@ export function addShelf(pick1, pick2) {
     to: { node: pick2.id, face: face2, offset: 0 },
     id: nextConstraintId(),
   };
-  const spanToDepth = shelfMode === 'horizontal'
+  const spanToDepth = mode === 'horizontal'
     ? { field: 'height', type: 'spansBetween', overridden: false,
         from: { node: back.id, face: 'front', offset: 0 }, to: { node: front.id, face: 'back', offset: 0 }, id: nextConstraintId() }
     : { field: 'width', type: 'spansBetween', overridden: false,
         from: { node: back.id, face: 'front', offset: 0 }, to: { node: front.id, face: 'back', offset: 0 }, id: nextConstraintId() };
 
   const shelf = createPanelNode({
-    name: shelfMode === 'horizontal' ? 'Shelf (H)' : 'Shelf (V)',
-    width: shelfMode === 'horizontal' ? startWidthOrHeight : DEFAULT_BOX_DEPTH_MM,
-    height: shelfMode === 'horizontal' ? DEFAULT_BOX_DEPTH_MM : startWidthOrHeight,
+    name: mode === 'horizontal' ? 'Shelf (H)' : 'Shelf (V)',
+    width: mode === 'horizontal' ? startWidthOrHeight : DEFAULT_BOX_DEPTH_MM,
+    height: mode === 'horizontal' ? DEFAULT_BOX_DEPTH_MM : startWidthOrHeight,
     thickness, material, rotation,
     groupId,
-    lockedMoveAxes: shelfMode === 'horizontal' ? ['x', 'z'] : ['y', 'z'],
+    lockedMoveAxes: mode === 'horizontal' ? ['x', 'z'] : ['y', 'z'],
     lockedResizeAxes: ['x', 'y', 'z'], // both dimension fields are constraint-derived (spanToBoundaries/spanToDepth) — same reasoning as box walls, dragging a dot wouldn't stick
     constraints: [spanToBoundaries, spanToDepth],
   });
@@ -73,13 +95,7 @@ export function addShelf(pick1, pick2) {
   shelf.offset = { x: 0, y: 0, z: 0 };
   shelf.offset[freeAxis] = proposedFreeOffset;
 
-  const before = panels;
-  panels = [...panels, shelf];
-  const after = panels;
-  recordHistoryCommand(AddShelfCommand,before,after);
-  setSelectedGroupId(groupId);
-  setSelectedId(shelf.id);
-  renderAll();
+  return { ok: true, node: shelf, groupId };
 }
 
 // Given same-axis slabs (already sorted ascending by center) and a
@@ -146,14 +162,6 @@ function facingFace(resolved, axis, otherResolved) {
     if (aligned && aligned.axis === axis && aligned.sign === towardSign) return faceName;
   }
   return null; // defensive — every panel in this app is axis-aligned, so one of the two candidate faces always matches
-}
-
-// Converts a raycast hit point (world units) into an offset-space mm
-// value along one axis, relative to the box's shared basePosition —
-// same space every shelf/wall offset already lives in.
-function computeClickOffsetMm(node, worldPoint, axis) {
-  const worldMm = { x: worldPoint.x / MM_TO_UNIT, y: worldPoint.y / MM_TO_UNIT, z: worldPoint.z / MM_TO_UNIT };
-  return worldMm[axis] - node.basePosition[axis];
 }
 
 export function isShelf(node) {
