@@ -37,6 +37,7 @@ export function renderProperties(
     groupMemberCount,
     groupMaterial,
     hiddenGroupMembers,
+    restoreError,
     onFieldChange,
     onTransformFieldChange,
     onUnlinkConstraint,
@@ -45,6 +46,9 @@ export function renderProperties(
     onUngroup,
     onGroupMaterialChange,
     onRestoreFace,
+    onEdgeFitChange,
+    onToggleDoorOpen,
+    onDoorHingeChange,
   }
 ) {
   if (selectedGroupId && !selectedPanel) {
@@ -73,6 +77,7 @@ export function renderProperties(
         <div class="restore-face-list">
           ${hiddenList.map((p) => `<button class="add-btn restore-face-btn" data-restore-id="${p.id}">↺ Restore ${escapeHtml(getDisplayName(p))}</button>`).join('')}
         </div>
+        ${restoreError ? `<div class="properties-error">${escapeHtml(restoreError)}</div>` : ''}
       ` : ''}
       <div class="empty-state">Click a member panel — in the list, or in the 3D/2D view — to select and edit it individually.</div>
       <button class="remove-btn" id="ungroup-btn">Ungroup (keep all ${groupMemberCount} panels)</button>
@@ -93,6 +98,13 @@ export function renderProperties(
   }
 
   const locked = resolvedPanel.lockedFields || {};
+  // Unlike width/height (dimFieldHTML, gated per-field via `locked`),
+  // position has no per-axis UI distinction worth making here — a
+  // panel whose position is fully derived (currently just a door; see
+  // features/door.js#createDoorNode's own lockedFields) has ALL 3
+  // locked together, so this section is either fully editable or
+  // fully read-only, never a mix.
+  const transformLocked = !!(locked.positionX && locked.positionY && locked.positionZ);
   const displayName = getDisplayName(selectedPanel);
 
   container.innerHTML = `
@@ -109,7 +121,7 @@ export function renderProperties(
       </div>` : ''}
 
     <div class="dims-row">
-      ${DIM_FIELDS.map((f) => dimFieldHTML(f, selectedPanel, resolvedPanel, locked[f])).join('')}
+      ${DIM_FIELDS.map((f) => dimFieldHTML(f, selectedPanel, resolvedPanel, locked[f], selectedPanel.isDoor)).join('')}
     </div>
     <div class="field-row">
       <label>Thickness 🔒</label>
@@ -127,14 +139,17 @@ export function renderProperties(
     ${numberFieldHTML('Quantity', 'quantity', selectedPanel.quantity, 'pc', { min: 1 })}
     <button class="remove-btn" id="remove-btn">Remove panel</button>
 
+    ${selectedPanel.edgeFit ? edgeFitSectionHTML(selectedPanel.edgeFit) : ''}
+    ${selectedPanel.isDoor ? doorSectionHTML(selectedPanel) : ''}
+
     <div class="divider"></div>
-    <div class="section-title">Transform (from gizmo)</div>
+    <div class="section-title">Transform (from gizmo)${transformLocked ? ' 🔒' : ''}</div>
     <div class="transform-grid">
-      ${axisFieldHTML('offset', 'x', selectedPanel.offset.x)}
-      ${axisFieldHTML('offset', 'y', selectedPanel.offset.y)}
-      ${axisFieldHTML('offset', 'z', selectedPanel.offset.z)}
+      ${axisFieldHTML('offset', 'x', selectedPanel.offset.x, transformLocked)}
+      ${axisFieldHTML('offset', 'y', selectedPanel.offset.y, transformLocked)}
+      ${axisFieldHTML('offset', 'z', selectedPanel.offset.z, transformLocked)}
     </div>
-    <div class="transform-label">Position offset (mm)</div>
+    <div class="transform-label">Position offset (mm)${transformLocked ? ' — derived from its boundary panels, not directly editable' : ''}</div>
   `;
 
   // ---- rename (pencil icon) ----
@@ -192,10 +207,105 @@ export function renderProperties(
 
   // ---- presets ----
   container.querySelector('#remove-btn').addEventListener('click', onRemove);
+
+  // ---- edge fit (only present for a box's Front/Back wall — see the
+  // `selectedPanel.edgeFit` check above) ----
+  const applyEdgeFitBtn = container.querySelector('#apply-edge-fit-btn');
+  if (applyEdgeFitBtn) {
+    applyEdgeFitBtn.addEventListener('click', () => {
+      const edgeFit = {};
+      container.querySelectorAll('.edge-fit-field').forEach((select) => {
+        edgeFit[select.dataset.edge] = select.value;
+      });
+      onEdgeFitChange(edgeFit);
+    });
+  }
+
+  // ---- door (hinge + open/close — only present for a door, see the
+  // `selectedPanel.isDoor` check above) ----
+  container.querySelector('#door-hinge-field')?.addEventListener('change', (event) => {
+    onDoorHingeChange(event.target.value);
+  });
+  container.querySelector('#toggle-door-open-btn')?.addEventListener('click', () => {
+    onToggleDoorOpen();
+  });
 }
 
-function dimFieldHTML(field, selectedPanel, resolvedPanel, isLocked) {
+// A box's Front/Back wall keeps the box's own outer size fixed and
+// only ever changes ITS OWN width/height/position by choosing, per
+// edge, whether that edge sits flush INSIDE the neighboring wall
+// ('in' — an inset door/front, the long-standing default) or flush
+// OUTSIDE it, covering that wall's edge ('out' — an overlay
+// door/front). The 4 selects don't apply live — Apply commits all 4
+// at once as ONE history entry (see modeller-main.js#updateSelectedEdgeFit),
+// so switching a couple of edges mid-thought doesn't spam undo.
+const EDGE_FIT_ROWS = [
+  ['left', 'Left edge (vs Left wall)'],
+  ['right', 'Right edge (vs Right wall)'],
+  ['bottom', 'Bottom edge (vs Bottom wall)'],
+  ['top', 'Top edge (vs Top wall)'],
+];
+
+function edgeFitSectionHTML(edgeFit) {
+  return `
+    <div class="divider"></div>
+    <div class="section-title">Edge fit</div>
+    ${EDGE_FIT_ROWS.map(([edge, label]) => `
+      <div class="field-row">
+        <label>${label}</label>
+        <select class="field-input edge-fit-field" data-edge="${edge}">
+          <option value="in" ${edgeFit[edge] !== 'out' ? 'selected' : ''}>In (inset)</option>
+          <option value="out" ${edgeFit[edge] === 'out' ? 'selected' : ''}>Out (overlay)</option>
+        </select>
+      </div>
+    `).join('')}
+    <button class="add-btn" id="apply-edge-fit-btn">Apply edge fit</button>
+  `;
+}
+
+// Hinge is a design choice (which side the actual hardware goes on),
+// so changing it here goes straight through — one field, no need for
+// edgeFit's own batched Apply pattern. Open/Close is the opposite: a
+// purely visual toggle (see features/door.js#computeDoorOpenTransform
+// and modeller-main.js#toggleSelectedDoorOpen), swinging the door 90°
+// about its hinge edge in the 3D view without changing anything
+// BOM/cut-list reads — normalAxis === 'y' (a door replacing a
+// Top/Bottom wall, lying flat like a lid) has no vertical edge to
+// hinge on, so that case hides the Open/Close button entirely rather
+// than showing a button that would silently do nothing.
+function doorSectionHTML(door) {
+  const canOpen = door.normalAxis !== 'y';
+  return `
+    <div class="divider"></div>
+    <div class="section-title">Door</div>
+    <div class="field-row">
+      <label>Hinge side</label>
+      <select class="field-input" id="door-hinge-field">
+        <option value="left" ${door.hinge !== 'right' ? 'selected' : ''}>Left</option>
+        <option value="right" ${door.hinge === 'right' ? 'selected' : ''}>Right</option>
+      </select>
+    </div>
+    ${canOpen ? `<button class="add-btn" id="toggle-door-open-btn">${door.doorOpen ? 'Close door' : 'Open door'}</button>` : ''}
+  `;
+}
+
+function dimFieldHTML(field, selectedPanel, resolvedPanel, isLocked, isStructuralLock = false) {
   const label = field[0].toUpperCase() + field.slice(1);
+  if (isLocked && isStructuralLock) {
+    // A door's width/height come from its boundary panels, not a
+    // removable relation (see features/door.js#createDoorNode) — same
+    // visual treatment as the Thickness field just below, not the
+    // constraint-style 🔗/Unlink variant, since there's nothing to
+    // unlink.
+    return `
+      <div class="field-row">
+        <label>${label} 🔒</label>
+        <div class="field-input-wrap locked">
+          <input type="text" value="${resolvedPanel[field].toFixed(1)}" disabled class="field-input" title="Derived from its boundary panels — not directly editable" />
+          <span class="field-unit">mm</span>
+        </div>
+      </div>`;
+  }
   if (isLocked) {
     return `
       <div class="field-row">
@@ -221,12 +331,13 @@ function numberFieldHTML(label, field, value, unit = 'mm', { min } = {}, extraCl
     </div>`;
 }
 
-function axisFieldHTML(group, axis, value) {
+function axisFieldHTML(group, axis, value, locked = false) {
   return `
     <div class="transform-field-wrap">
       <span class="axis-label axis-${axis}">${axis.toUpperCase()}</span>
       <input type="number" step="any" value="${Number(value).toFixed(1)}"
         data-group="${group}" data-axis="${axis}"
+        ${locked ? 'disabled' : ''}
         class="field-input transform-field" />
     </div>`;
 }

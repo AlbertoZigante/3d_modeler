@@ -330,6 +330,16 @@ const FACE_RESIZE_INFO = {
     return !!mesh?.userData?.isBoxWall ===true;
   }
 
+  // A door: no move, no resize, full stop — unlike isBoxWall (which
+  // still allows a single constrained drag axis and hides only the
+  // resize handles), a door gets NEITHER. This is the one mechanism
+  // that actually works for locking resize — see
+  // features/door.js#createDoorNode's own comment on why
+  // lockedFields.width/height can't do this on their own.
+  function isDoor(mesh) {
+    return !!mesh?.userData?.isDoor;
+  }
+
   const FACE_NAMES = ['right', 'left', 'top', 'bottom', 'front', 'back'];
   const handleGeometry = new THREE.SphereGeometry(HANDLE_RADIUS_UNITS, 10, 10);
   const resizeHandles = {}; // faceName -> mesh
@@ -363,7 +373,7 @@ const FACE_RESIZE_INFO = {
     // Do not use resizeProxy here. A resizeProxy describes how some
     // dependent box dimension is resolved; it is not the permission
     // to resize the wall itself.
-    if (!mesh || isBoxWall(mesh)) {
+    if (!mesh || isBoxWall(mesh) || isDoor(mesh)) {
       return;
     }
 
@@ -466,7 +476,7 @@ const FACE_RESIZE_INFO = {
   function handleFacePointerDown(e) {
     const mesh = transformMove.object;
 
-    if (!mesh || isBoxWall(mesh) || !getMeshEntry || !resizeHandleGroup.visible) {
+    if (!mesh || isBoxWall(mesh) || isDoor(mesh) || !getMeshEntry || !resizeHandleGroup.visible) {
       return;
     }
 
@@ -696,6 +706,18 @@ const FACE_RESIZE_INFO = {
   function attachTo(mesh, lockedFields = {}) {
     if (transformMove.object !== mesh) {
       transformMove.attach(mesh);
+    }
+
+    if (isDoor(mesh)) {
+      // No move, no resize — see isDoor's own comment above. Checked
+      // FIRST and unconditionally (not folded into the lockedFields
+      // checks below) because this must hold regardless of whatever
+      // lockedFields happens to contain.
+      transformMove.showX = false;
+      transformMove.showY = false;
+      transformMove.showZ = false;
+      resizeHandleGroup.visible = false;
+      return;
     }
 
     const lockedMoveAxes = mesh.userData.lockedMoveAxes || [];

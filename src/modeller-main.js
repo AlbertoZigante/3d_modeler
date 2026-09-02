@@ -37,6 +37,7 @@ import {
   MM_TO_UNIT,
   MATERIAL_CATALOG,
   loadMaterialCatalog,
+  getDisplayName,
 } from './modeller/modules.js';
 import { resolveConstraints } from './modeller/snap.js';
 import { createModellerScene } from './modeller/scene.js';
@@ -64,7 +65,21 @@ import {
 } from './shared/geometry.js';
 import { addBox, relayoutBox } from './features/box.js';
 import { isShelf } from './features/shelf.js';
+import { createDoorNode, computeDoorOpenTransform, applyDoorAdjustmentsForGroup, applyPanelPatch } from './features/door.js';
 import { startShelfMode, cancelShelfMode, getShelfMode, setShelfToolContext } from './tools/shelfTool.js';
+import { setBoundaryRectToolContext } from './tools/boundaryRectTool.js';
+import {
+  startDoorMode,
+  cancelDoorMode,
+  confirmDoorMode,
+  setDoorEdgeFitField,
+  setDoorHinge,
+  isDoorPickActive,
+  isDoorConfirmActive,
+  getDoorEdgeFit,
+  getDoorHinge,
+  setDoorToolContext,
+} from './tools/doorTool.js';
 import {
   startCollinearMode,
   cancelCollinearMode,
@@ -79,6 +94,7 @@ import {
   ChangeGroupMaterialCommand, RenamePanelCommand, AddPanelCommand, DeletePanelCommand, AddBoxCommand,
   DeleteBoxCommand, GroupPanelsCommand, UngroupPanelsCommand, DeleteShelfCommand,
   RemoveConstraintCommand, UnlinkConstraintCommand, HideBoxWallCommand, RestoreBoxWallCommand,
+  ChangeEdgeFitCommand, AddDoorCommand, SetDoorHingeCommand, DeleteDoorCommand,
 } from './history/history.js';
 initResizableLayout();
 
@@ -167,7 +183,7 @@ document.getElementById('export-bom-pdf-btn')?.addEventListener('click', () => {
 });
 
 // ---- Scene (view layer). Consumes RESOLVED panels only. ----
-const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight } = createModellerScene(canvas, main, {
+const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight, setPanelHighlightSet } = createModellerScene(canvas, main, {
   axesCanvas,
   pipCanvas,
   onPipModeClick: (mode) => switchView(mode),
@@ -359,10 +375,40 @@ const toolContext = {
   setFaceHighlight,
   setFacePickMode,
   setPanelHighlight,
+  setPanelHighlightSet,
 };
 setShelfToolContext(toolContext);
 setCollinearToolContext(toolContext);
 setAttachToolContext(toolContext);
+setBoundaryRectToolContext(toolContext);
+setDoorToolContext({ getPanels: () => panels, renderAll: () => renderAll() });
+
+// The 4 boundary panels adapt to the confirmed door exactly the way
+// features/box.js's Left/Right/Top/Bottom already adapt to Front's/
+// Back's edgeFit — computeDoorPlacement() (called by doorTool.js) is
+// the pure math for both the new door node and each boundary panel's
+// new dimension/offset; this is just the single write + one history
+// entry, same shape every other feature's commit already follows.
+function handleDoorConfirmed(placement) {
+  const before = panels;
+
+  placement.panelPatches.forEach((patch) => {
+    panels = applyPanelPatch(panels, patch, placement.normalAxis);
+  });
+
+  const doorNode = createDoorNode(panels, placement);
+  panels = [...panels, doorNode];
+
+  const after = panels;
+  recordHistoryCommand(AddDoorCommand, before, after);
+  setSelectedId(doorNode.id);
+  renderAll();
+}
+
+function confirmSelectedDoor() {
+  const catalogEntry = MATERIAL_CATALOG[0];
+  confirmDoorMode({ material: catalogEntry?.name, thicknessMm: catalogEntry?.thicknessMm ?? 18 }, handleDoorConfirmed);
+}
 
 // Maps a relayoutBox() result (see features/box.js) to the exact same
 // user-facing toast text the old inline version showed, and applies
@@ -384,6 +430,17 @@ function applyRelayoutResult(result) {
     return false;
   }
   result.patches.forEach((p) => updateNode(p.id, { width: p.width, height: p.height, offset: p.offset }));
+
+  // relayoutBox just unconditionally recomputed all 6 box walls from
+  // scratch (see its own comment) — it has no idea a door previously
+  // required some of them to be shorter. Re-apply every door in this
+  // same group now, against the walls' brand-new geometry, so a door
+  // never has to be manually re-fixed after any other box edit — see
+  // features/door.js#applyDoorAdjustmentsForGroup's own doc comment.
+  const groupId = panels.find((p) => p.id === result.patches[0]?.id)?.groupId;
+  if (groupId) {
+    panels = applyDoorAdjustmentsForGroup(panels, groupId);
+  }
   return true;
 }
 
@@ -397,6 +454,7 @@ window.addEventListener('keydown', (e) => {
 
   if (e.key === 'Escape' && isCollinearActive()) cancelCollinearMode();
   if (e.key === 'Escape' && getShelfMode()) cancelShelfMode();
+  if (e.key === 'Escape' && (isDoorPickActive() || isDoorConfirmActive())) cancelDoorMode();
 
   if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
     e.preventDefault();
@@ -593,9 +651,16 @@ function renderAll() {
   // custom field through untouched, so this reads it back from
   // `panels` (authoritative) rather than trusting the resolved copy.
   const pieceCodeById = new Map(panels.map((p) => [p.id, p.pieceCode]));
+  // Same reasoning, for a door's own hinge/open-state/normal-axis
+  // fields — the 3D scene needs these (see sceneVisiblePanels below)
+  // but resolveConstraints has no reason to know about them.
+  const doorFieldsById = new Map(
+    panels.filter((p) => p.isDoor).map((p) => [p.id, { isDoor: true, hinge: p.hinge, doorOpen: !!p.doorOpen, normalAxis: p.normalAxis, doorSign: p.doorSign }])
+  );
   const resolvedWithCodes = resolved.map((r) => ({
     ...r,
     pieceCode: r.pieceCode ?? pieceCodeById.get(r.id),
+    ...doorFieldsById.get(r.id),
   }));
 
   const visiblePanels = resolvedWithCodes.filter((p) => !p.hidden);
@@ -608,7 +673,20 @@ function renderAll() {
   // and isn't guaranteed to carry every custom flag through untouched.
   const boxWallIds = new Set(panels.filter((p) => p.isBoxWall).map((p) => p.id));
 
-  reconcile(visiblePanels, selectedId, selectedGroupId, multiSelectedIds, boxWallIds, selectedBoxWallId);
+  // The 3D view's OWN copy — a door with doorOpen:true renders swung
+  // open (features/door.js#computeDoorOpenTransform). Deliberately a
+  // SEPARATE array from `visiblePanels`: BOM/cut-list (below) and the
+  // panel list both keep reading `visiblePanels` itself, which stays
+  // at the door's real CLOSED position/rotation — doorOpen is a purely
+  // visual toggle (see toggleSelectedDoorOpen), not a design change,
+  // and must never affect what gets measured or cut.
+  const sceneVisiblePanels = visiblePanels.map((p) => {
+    if (!p.isDoor || !p.doorOpen) return p;
+    const open = computeDoorOpenTransform(p);
+    return open ? { ...p, position: open.position, rotation: open.rotation } : p;
+  });
+
+  reconcile(sceneVisiblePanels, selectedId, selectedGroupId, multiSelectedIds, boxWallIds, selectedBoxWallId);
 
   renderPanelList(panelListMountEl, {
     panels: visiblePanels,
@@ -622,13 +700,22 @@ function renderAll() {
     onAddHorizontal: addHorizontalPanel,
     onAddParallel: addParallelPanel,
     onAddBox: handleAddBox,
-    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), startCollinearMode())),
+    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), startCollinearMode())),
     collinearActive: isCollinearActive(),
     collinearGapMm: getCollinearGapMm(),
     onCollinearGapChange: setCollinearGapMm, // deliberately no renderAll() here — see toolbar.js's own comment on why
-    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), startShelfMode('horizontal'))),
-    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), startShelfMode('vertical'))),
+    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), startShelfMode('horizontal'))),
+    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), startShelfMode('vertical'))),
     shelfMode: getShelfMode(),
+    onAddDoor: () => ((isDoorPickActive() || isDoorConfirmActive()) ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), startDoorMode())),
+    doorToolActive: isDoorPickActive() || isDoorConfirmActive(),
+    doorConfirmActive: isDoorConfirmActive(),
+    doorEdgeFit: getDoorEdgeFit(),
+    onDoorEdgeFitChange: setDoorEdgeFitField,
+    doorHinge: getDoorHinge(),
+    onDoorHingeSelect: setDoorHinge,
+    onDoorConfirm: confirmSelectedDoor,
+    onDoorCancel: cancelDoorMode,
     onOpenCutList: openCutListWindow,
     onNestCutList: openNestingPlan,
   });
@@ -655,7 +742,16 @@ function renderInspectorOnly() {
 
   const groupMembers = selectedGroupId ? panels.filter((p) => p.groupId === selectedGroupId) : [];
   const visibleGroupMembers = groupMembers.filter((p) => !p.hidden);
-  const hiddenGroupMembers = groupMembers.filter((p) => p.hidden);
+  // Restorable = a hidden BOX WALL only — never a door or shelf.
+  // Shelves are never hidden at all (removing one deletes it outright
+  // — see removeSelected), and doors must not be either (same
+  // function, same reasoning: a door that lingered as hidden-not-
+  // deleted would sit here looking "restorable" while also
+  // permanently blocking Left/Right/Top/Bottom/Back/Front's own real
+  // restore via restoreFace's door check). isBoxWall is the exact
+  // same authoritative flag renderAll() already trusts over anything
+  // resolveConstraints might produce — see that call site's comment.
+  const hiddenGroupMembers = groupMembers.filter((p) => p.hidden && p.isBoxWall);
   const groupMemberCount = visibleGroupMembers.length;
 
   // null means "Mixed materials".
@@ -672,6 +768,7 @@ function renderInspectorOnly() {
       groupMemberCount,
       groupMaterial,
       hiddenGroupMembers,
+      restoreError: restoreBlockedMessage,
       onFieldChange: updateSelectedField,
       onTransformFieldChange: updateSelectedTransformField,
       onUnlinkConstraint: unlinkOrRemoveConstraint,
@@ -680,6 +777,9 @@ function renderInspectorOnly() {
       onUngroup: ungroupSelected,
       onRestoreFace: restoreFace,
       onGroupMaterialChange: updateGroupMaterial,
+      onEdgeFitChange: updateSelectedEdgeFit,
+      onToggleDoorOpen: toggleSelectedDoorOpen,
+      onDoorHingeChange: updateSelectedDoorHinge,
     });
   }
 
@@ -705,6 +805,33 @@ function renameSelected(newName) {
   updateNode(selectedId, { name: nextName });
   const after = panels;
   recordHistoryCommand(RenamePanelCommand, before, after);
+  renderAll();
+}
+
+// Only ever called for a box's Front or Back wall (that's the only
+// case ui/properties.js shows the Edge Fit control for — see its
+// `node.edgeFit != null` check) — routes through relayoutBox exactly
+// like the material-swap branch of updateSelectedField below does,
+// because edgeFit feeds into computeBoxLayout()'s own per-wall math
+// (see features/box.js#resolvePanelFit) the same way thickness does.
+// Left/Right/Top/Bottom/the box's own outer footprint are untouched —
+// only the one edited wall's width/height/offset can change.
+function updateSelectedEdgeFit(edgeFit) {
+  const selectedId = getSelectedId();
+  const node = panels.find((p) => p.id === selectedId);
+  if (!node || !node.groupId || !node.edgeFit) return; // defensive — the control only renders for a node that already has one
+
+  const before = panels;
+  updateNode(selectedId, { edgeFit });
+  const result = relayoutBox(panels, node.groupId);
+
+  if (!applyRelayoutResult(result)) {
+    panels = before;
+    renderAll();
+    return;
+  }
+  const after = panels;
+  recordHistoryCommand(ChangeEdgeFitCommand, before, after);
   renderAll();
 }
 
@@ -951,6 +1078,35 @@ function handleAddBox() {
   renderAll();
 }
 
+// A door's geometry depends on ALL 4 of its original boundary panels
+// still existing (see features/door.js#applyDoorAdjustmentsForGroup,
+// which looks every one of them back up by id on every relayout) —
+// if one is gone, the door can never be correctly recomputed again.
+// Called from BOTH removeSelected()'s branches: a shelf/door being
+// truly deleted, and a box wall being hidden (restorable, but the
+// person clearly no longer wants it there right now) — either way,
+// `affectedNode`'s id stops meaning "a wall I can build a door
+// against" the moment this runs, so any door depending on it is
+// removed along with it rather than left frozen at stale geometry
+// forever with no way to fix it. The person is told why via the same
+// general-notice toast other operational side-effects already use
+// (e.g. the design-limit/min-gap rejections just above) — unlike
+// restoreFace()'s rejection, there's no longer a specific
+// still-visible control this is "about": the affected panel's own
+// inspector view is gone (deleted) or has moved on (hidden) by the
+// time this runs.
+function cascadeDeleteOrphanedDoors(panelsAfterChange, affectedNode) {
+  const orphaned = panelsAfterChange.filter(
+    (p) => p.isDoor && Object.values(p.boundaryIds || {}).includes(affectedNode.id)
+  );
+  if (orphaned.length === 0) return panelsAfterChange;
+
+  showToast(
+    `${getDisplayName(affectedNode)} was a boundary panel for ${orphaned.length === 1 ? 'a door' : `${orphaned.length} doors`} — removed automatically`
+  );
+  return panelsAfterChange.filter((p) => !orphaned.some((d) => d.id === p.id));
+}
+
 function removeSelected() {
   const groupId = getSelectedGroupId();
   const selectedId = getSelectedId();
@@ -971,17 +1127,23 @@ function removeSelected() {
   const node = panels.find((p) => p.id === selectedId);
   if (!node) return;
 
-  if (node.groupId && isShelf(node)) {
-    // Shelves have no "restore" concept — a shelf's position is a
-    // user choice, not part of the box's structure, so removing one
+  if (node.groupId && (isShelf(node) || node.isDoor)) {
+    // Shelves and doors have no "restore" concept — a shelf's
+    // position, and a door's whole existence, are user choices, not
+    // part of the box's own 6-wall structure — so removing either
     // erases it from the graph completely and immediately frees the
-    // space it occupied.
+    // space it occupied. Critically, a door must NOT fall through to
+    // the generic "hide it" branch below: a hidden-but-still-present
+    // door would keep satisfying restoreFace()'s "a door exists in
+    // this box" check forever, permanently blocking Front/Back/etc.
+    // from ever being restorable again.
     const before = panels;
-    panels = panels.filter((p) => p.id !== selectedId);
-    const after = panels;
+    let after = panels.filter((p) => p.id !== selectedId);
+    after = cascadeDeleteOrphanedDoors(after, node);
+    panels = after;
     setSelectedGroupId(node.groupId);
     setSelectedId(null);
-    recordHistoryCommand(DeleteShelfCommand, before, after);
+    recordHistoryCommand(node.isDoor ? DeleteDoorCommand : DeleteShelfCommand, before, after);
     renderAll();
     return;
   }
@@ -989,10 +1151,16 @@ function removeSelected() {
   if (node.groupId) {
     // panel-level selection WITHIN a group — a box WALL face. HIDE it
     // rather than removing it from the graph (restorable via the
-    // group inspector).
+    // group inspector). Same cascade as the shelf/door branch above:
+    // a door built using this exact wall as one of its 4 boundary
+    // panels can no longer be trusted once that wall disappears from
+    // view — hidden or truly deleted amounts to the same thing from
+    // the door's perspective, so it's removed here too rather than
+    // left referencing a wall the person just chose to hide.
     const before = panels;
-    panels = panels.map((p) => (p.id === selectedId ? { ...p, hidden: true } : p));
-    const after = panels;
+    let after = panels.map((p) => (p.id === selectedId ? { ...p, hidden: true } : p));
+    after = cascadeDeleteOrphanedDoors(after, node);
+    panels = after;
     setSelectedGroupId(node.groupId);
     setSelectedId(null);
     recordHistoryCommand(HideBoxWallCommand, before, after);
@@ -1009,14 +1177,76 @@ function removeSelected() {
   renderAll();
 }
 
+// restoreFace()'s "a door exists" rejection needs to appear right
+// next to the Restore button the person actually clicked — that
+// button lives in ui/properties.js's #properties-container (the
+// right-side inspector), a completely different part of the page
+// from #toolbar-properties-toast (showToast's target, inside the
+// LEFT-side #panel-list-mount toolbar). A showToast() call here would
+// fire but render somewhere the person isn't looking — hence this
+// separate bit of state, threaded through renderInspectorOnly() as
+// `restoreError` instead, and rendered inline by properties.js itself.
+let restoreBlockedMessage = null;
+let restoreBlockedTimer = null;
+
 function restoreFace(nodeId) {
   const node = panels.find((p) => p.id === nodeId);
   if (!node || !node.hidden) return;
 
+  // A door was placed using this box's CURRENT walls as its boundary
+  // (see features/door.js#computeDoorPlacement) — restoring a hidden
+  // wall while any door still exists would put it right back into the
+  // space the door's own placement already claimed, overlapping it.
+  // Remove every door in the group first, then the wall can come back.
+  const hasDoor = panels.some((p) => p.groupId === node.groupId && p.isDoor);
+  if (hasDoor) {
+    restoreBlockedMessage = `Can't restore ${getDisplayName(node)} while a door exists in this box — remove the door(s) first`;
+    clearTimeout(restoreBlockedTimer);
+    restoreBlockedTimer = setTimeout(() => {
+      restoreBlockedMessage = null;
+      renderAll();
+    }, 4000);
+    renderAll();
+    return;
+  }
+
+  restoreBlockedMessage = null;
+  clearTimeout(restoreBlockedTimer);
   const before = panels;
   panels = panels.map((p) => (p.id === nodeId ? { ...p, hidden: false } : p));
   const after = panels;
   recordHistoryCommand(RestoreBoxWallCommand, before, after);
+  renderAll();
+}
+
+// Ephemeral VISUAL state, not a design edit — deliberately NOT pushed
+// through history. Undo/redo shouldn't have to "undo" opening a door
+// to eyeball clearance, any more than it undoes rotating the camera;
+// the door's actual stored width/height/thickness/position never
+// change (see features/door.js#computeDoorOpenTransform's own doc
+// comment) — only how renderAll()'s scene-only copy of the panel list
+// momentarily represents it.
+function toggleSelectedDoorOpen() {
+  const selectedId = getSelectedId();
+  const node = panels.find((p) => p.id === selectedId);
+  if (!node || !node.isDoor) return;
+
+  panels = panels.map((p) => (p.id === selectedId ? { ...p, doorOpen: !p.doorOpen } : p));
+  renderAll();
+}
+
+// Unlike doorOpen above, which side a door hinges on IS a design
+// decision (affects assembly/hardware later), so this goes through
+// history like any other field edit.
+function updateSelectedDoorHinge(hinge) {
+  const selectedId = getSelectedId();
+  const node = panels.find((p) => p.id === selectedId);
+  if (!node || !node.isDoor || node.hinge === hinge) return;
+
+  const before = panels;
+  updateNode(selectedId, { hinge });
+  const after = panels;
+  recordHistoryCommand(SetDoorHingeCommand, before, after);
   renderAll();
 }
 

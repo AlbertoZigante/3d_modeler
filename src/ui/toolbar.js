@@ -128,6 +128,15 @@ const COMPONENT_ICONS = {
       <path d="M13 9.2 L15.2 12 L13 14.8" />
     </svg>
   `,
+  // A rectangle with all 4 edges marked (small tick marks on each
+  // side) — reads as "the 4 boundary panels define this opening",
+  // distinct from collinear's two-bar/arrow icon.
+  door: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="6" y="3" width="12" height="18" rx="0.5" />
+      <circle cx="14.5" cy="12" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  `,
   // A sheet with a corner folded/cut and a printer-style horizontal
   // line — reads as "printable list", distinct from the more
   // geometric building-tool icons above.
@@ -215,6 +224,21 @@ function ensureComponentIconStyles() {
       line-height: 1.4;
     }
 
+    /* Inline rejection messages inside ui/properties.js's own
+       right-side inspector panel (e.g. restoreFace()'s "a door
+       exists" block) — deliberately NOT #toolbar-properties-toast
+       below, which lives in the separate left-side toolbar and is
+       invisible from way over there. */
+    .properties-error {
+      font-size: 12.5px;
+      line-height: 1.4;
+      color: #a0362a;
+      background: #fbe9e7;
+      border: 1px solid #e3b3ac;
+      border-radius: 5px;
+      padding: 7px 8px;
+    }
+
     /* Toast messages displayed inside the Properties panel */
     #toolbar-properties-toast {
       margin-top: 8px;
@@ -300,6 +324,16 @@ export function renderPanelList(
     onShelfVertical,
     shelfMode,
 
+    onAddDoor,
+    doorToolActive,
+    doorConfirmActive,
+    doorEdgeFit,
+    doorHinge,
+    onDoorHingeSelect,
+    onDoorEdgeFitChange,
+    onDoorConfirm,
+    onDoorCancel,
+
     onOpenCutList,
     onNestCutList,
   }
@@ -334,7 +368,7 @@ export function renderPanelList(
    * collapses back to the three sections above it.
    */
   const anyToolActive =
-    !!(collinearActive || shelfMode);
+    !!(collinearActive || shelfMode || doorToolActive);
 
   const propertiesSectionMarkup = `
     <div
@@ -366,6 +400,10 @@ export function renderPanelList(
             collinearActive,
             collinearGapMm,
             shelfMode,
+            doorToolActive,
+            doorConfirmActive,
+            doorEdgeFit,
+            doorHinge,
           })}
         </div>
 
@@ -580,6 +618,16 @@ export function renderPanelList(
             >
               ${COMPONENT_ICONS.collinear}
               <span class="icon-label">${collinearActive ? 'Cancel' : 'Collinear'}</span>
+            </button>
+
+            <button
+              type="button"
+              class="component-icon-btn ${doorToolActive ? 'active' : ''}"
+              id="add-door-btn"
+              title="${doorToolActive ? 'Cancel Add Door (Esc)' : 'Add Door — pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or shelves), then set in/out per edge to place a new door/front'}"
+            >
+              ${COMPONENT_ICONS.door}
+              <span class="icon-label">${doorToolActive ? 'Cancel' : 'Add Door'}</span>
             </button>
 
           </div>
@@ -873,6 +921,58 @@ export function renderPanelList(
     );
 
 
+  /* ==========================================================
+     ADD DOOR (pick 4 boundary panels, set in/out, place a door)
+     ========================================================== */
+
+  container
+    .querySelector(
+      '#add-door-btn'
+    )
+    ?.addEventListener(
+      'click',
+      (event) => {
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        onAddDoor?.();
+      }
+    );
+
+  // The 4 edge-fit selects + hinge select + Confirm/Cancel only exist
+  // in the DOM while doorConfirmActive is true (see
+  // renderPropertiesContent above) — querySelectorAll/querySelector
+  // harmlessly find nothing otherwise.
+  container.querySelectorAll('.door-edge-fit-field').forEach((select) => {
+    select.addEventListener('change', () => {
+      onDoorEdgeFitChange?.(select.dataset.edge, select.value);
+    });
+  });
+
+  container
+    .querySelector('#door-hinge-select')
+    ?.addEventListener('change', (event) => {
+      onDoorHingeSelect?.(event.target.value);
+    });
+
+  container
+    .querySelector('#door-confirm-btn')
+    ?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onDoorConfirm?.();
+    });
+
+  container
+    .querySelector('#door-confirm-cancel-btn')
+    ?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onDoorCancel?.();
+    });
+
+
   const gapInput =
     container.querySelector(
       '#collinear-gap-input'
@@ -920,6 +1020,10 @@ function renderPropertiesContent({
   collinearActive,
   collinearGapMm,
   shelfMode,
+  doorToolActive,
+  doorConfirmActive,
+  doorEdgeFit,
+  doorHinge,
 }) {
 
   if (collinearActive) {
@@ -975,8 +1079,61 @@ function renderPropertiesContent({
     `;
   }
 
+  if (doorConfirmActive) {
+    return `
+      <div class="properties-section-content">
+        <div class="properties-hint">
+          Set in/out per edge and pick a hinge side, then Confirm to place the door — the 4 boundary panels adjust automatically to avoid penetrating it.
+        </div>
+        ${EDGE_FIT_ROWS.map(([edge, label]) => `
+          <div class="field-row">
+            <label>${label}</label>
+            <select class="field-input door-edge-fit-field" data-edge="${edge}">
+              <option value="in" ${(doorEdgeFit || {})[edge] !== 'out' ? 'selected' : ''}>In (inset)</option>
+              <option value="out" ${(doorEdgeFit || {})[edge] === 'out' ? 'selected' : ''}>Out (overlay)</option>
+            </select>
+          </div>
+        `).join('')}
+        <div class="field-row">
+          <label>Hinge side</label>
+          <select class="field-input" id="door-hinge-select">
+            <option value="left" ${doorHinge !== 'right' ? 'selected' : ''}>Left</option>
+            <option value="right" ${doorHinge === 'right' ? 'selected' : ''}>Right</option>
+          </select>
+        </div>
+        <div class="properties-gap-row">
+          <button type="button" class="add-btn" id="door-confirm-btn">Confirm</button>
+          <button type="button" class="remove-btn" id="door-confirm-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    `;
+  }
+
+  if (doorToolActive) {
+    return `
+      <div class="properties-section-content">
+        <div class="properties-hint">
+          Pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or shelves) to place a door into.
+          Two of one boundary type + two of another; whichever axis is left over becomes the door's facing direction.
+        </div>
+      </div>
+    `;
+  }
+
   return '';
 }
+
+// Same left/right/bottom/top labels features/box.js's own edgeFit
+// uses (ui/properties.js#EDGE_FIT_ROWS) — kept as a second literal
+// here rather than importing across the toolbar/properties module
+// boundary, since both are small, static, and unlikely to diverge;
+// if they ever need to, that's the sign to actually share a module.
+const EDGE_FIT_ROWS = [
+  ['left', 'Left edge'],
+  ['right', 'Right edge'],
+  ['bottom', 'Bottom edge'],
+  ['top', 'Top edge'],
+];
 
 
 /* ============================================================

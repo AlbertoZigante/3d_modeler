@@ -164,6 +164,30 @@ export class ChangeGroupMaterialCommand extends ModelCommand {
   }
 }
 
+export class ChangeEdgeFitCommand extends ModelCommand {
+  constructor(options) {
+    super({ ...options, label: 'Change panel edge fit' });
+  }
+}
+
+export class AddDoorCommand extends ModelCommand {
+  constructor(options) {
+    super({ ...options, label: 'Add door' });
+  }
+}
+
+export class SetDoorHingeCommand extends ModelCommand {
+  constructor(options) {
+    super({ ...options, label: 'Change door hinge side' });
+  }
+}
+
+export class DeleteDoorCommand extends ModelCommand {
+  constructor(options) {
+    super({ ...options, label: 'Delete door' });
+  }
+}
+
 export class RenamePanelCommand extends ModelCommand {
   constructor(options) {
     super({ ...options, label: 'Rename panel' });

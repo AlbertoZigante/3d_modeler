@@ -13,10 +13,10 @@
  * See tools/shelfTool.js (the only caller) for the commit path and
  * the pick-mode interaction that supplies pick1/pick2/mode/clickMm.
  */
-import { createPanelNode, nextConstraintId, getAlignedAxis, LOCAL_FACES } from '../modeller/modules.js';
+import { createPanelNode, nextConstraintId } from '../modeller/modules.js';
 import { resolveConstraints } from '../modeller/snap.js';
 import { findBoxSibling, DEFAULT_BOX_DEPTH_MM } from './box.js';
-import { collectAxisSlabs, VERTICAL_ROTATION, HORIZONTAL_ROTATION, rotationsMatch, MIN_WALL_GAP_MM } from '../shared/geometry.js';
+import { collectAxisSlabs, VERTICAL_ROTATION, HORIZONTAL_ROTATION, rotationsMatch, MIN_WALL_GAP_MM, facingFace } from '../shared/geometry.js';
 
 /**
  * @param {Array} panels - current graph
@@ -146,22 +146,6 @@ function pickGapForPosition(sortedSlabs, desiredMm, thickness) {
   }
 
   return best ? { fits: true, center: best.center } : { fits: false };
-}
-
-// Which of a resolved node's LOCAL faces both (a) aligns with `axis`
-// and (b) points TOWARD `otherResolved` — i.e. the one face of the
-// two possible (+/-) candidates that actually faces the other picked
-// boundary, determined from their real current positions rather than
-// assumed from role/name. This is what makes picking an existing
-// shelf as a boundary work exactly like picking Left/Right/Top/Bottom
-// — it doesn't matter which literal side of the box either one is on.
-function facingFace(resolved, axis, otherResolved) {
-  const towardSign = Math.sign(otherResolved.position[axis] - resolved.position[axis]) || 1;
-  for (const faceName of Object.keys(LOCAL_FACES)) {
-    const aligned = getAlignedAxis(resolved.rotation, faceName);
-    if (aligned && aligned.axis === axis && aligned.sign === towardSign) return faceName;
-  }
-  return null; // defensive — every panel in this app is axis-aligned, so one of the two candidate faces always matches
 }
 
 export function isShelf(node) {

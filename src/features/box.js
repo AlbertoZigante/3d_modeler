@@ -8,12 +8,18 @@
  * single writer — it applies whatever this module returns.
  *
  * Box wall convention (verified against the real construction, not
- * inferred): Left/Right run full height+depth; Top/Bottom run the
- * full outer width; Back covers the whole outer footprint
- * (W × H+2T — like a real cabinet's back sheet nailed across the
- * carcass, not let into it); Front is inset only in width (W-2T × H)
- * and created hidden — "open-front box" means the panel exists,
- * restorable via the group inspector, not that it's absent.
+ * inferred): Top/Bottom always run the full outer width. Left/Right/
+ * Top/Bottom's own DEPTH extent (Z axis), and Back/Front's own WIDTH/
+ * HEIGHT footprint (X/Y), are both driven by Back's and Front's
+ * per-edge `edgeFit` (see DEFAULT_EDGE_FIT below) — by default, Back
+ * covers the whole outer footprint (edgeFit 'out' on all 4 edges,
+ * like a real cabinet's back sheet nailed across the carcass) while
+ * Front covers every edge except the top (edgeFit 'out' on
+ * left/right/bottom, 'in' on top — Left/Right/Bottom get shortened at
+ * the front end to make room for it, Top runs its full depth flush to
+ * Front's face). Front is also created hidden — "open-front box"
+ * means the panel exists, restorable via the group inspector, not
+ * that it's absent.
  *
  * STAGE 3: box walls carry NO spansBetween/attachedTo constraints —
  * a fully cross-referential 6-panel box is impossible through
@@ -57,6 +63,79 @@ const BOX_GIZMO_LOCKS = {
   },
 };
 
+// A Front or Back wall's own 4 in-plane edges (left/right against
+// Left/Right, bottom/top against Top/Bottom) can each independently
+// sit flush INSIDE the adjoining wall ('in') or flush OUTSIDE,
+// covering that wall's edge ('out'). This is the SAME edgeFit value
+// that also governs the adjoining wall's own DEPTH extent (see
+// depthRangeFor below) — an 'out' edge means this Back/Front panel
+// now covers that wall's end in Z too, so the wall must be shortened
+// by this panel's own thickness there to avoid interpenetrating it;
+// 'in' means the wall stays flush with this panel's outer face
+// (unshortened). Either way the box's own overall footprint — driven
+// solely by Left/Right/Top/Bottom's offsets and Back's/Front's own Z
+// offsets — never changes; edgeFit only ever redistributes exactly
+// how much of that fixed footprint the wall it's set on, and the
+// wall(s) touching each of its edges, actually occupy. Lives directly
+// on the node (like `hidden`/`isBoxWall`) — box internals are plain
+// arithmetic (see this file's own doc comment above), not the
+// spansBetween constraint graph, so there's nothing to wire into
+// resolveConstraints for this.
+export const DEFAULT_EDGE_FIT = { left: 'in', right: 'in', bottom: 'in', top: 'in' };
+
+// addBox()'s actual starting values (see this file's top doc comment
+// for why) — kept distinct from DEFAULT_EDGE_FIT above, which stays
+// the internal fallback for missing/legacy data so pre-existing boxes
+// keep rendering exactly as they always did.
+const BACK_START_EDGE_FIT = { left: 'out', right: 'out', bottom: 'out', top: 'out' };
+const FRONT_START_EDGE_FIT = { left: 'out', right: 'out', bottom: 'out', top: 'in' };
+
+// Resolves a Front/Back wall's actual width/height/offset from its
+// own edgeFit (defaulting missing/undefined to DEFAULT_EDGE_FIT,
+// which reproduces the exact original hardcoded inner/inner/inner/
+// inner numbers 1:1 — a node with no edgeFit field at all renders
+// identically to before this feature existed). `bounds` are the box's
+// already-computed inner/outer extents on X and Y — see
+// computeBoxLayout below, the only caller.
+function resolvePanelFit(edgeFit, bounds) {
+  const fit = { ...DEFAULT_EDGE_FIT, ...(edgeFit || {}) };
+  const xMin = fit.left === 'out' ? bounds.xOuterMin : bounds.xInnerMin;
+  const xMax = fit.right === 'out' ? bounds.xOuterMax : bounds.xInnerMax;
+  const yMin = fit.bottom === 'out' ? bounds.yOuterMin : bounds.yInnerMin;
+  const yMax = fit.top === 'out' ? bounds.yOuterMax : bounds.yInnerMax;
+  return {
+    width: xMax - xMin,
+    height: yMax - yMin,
+    offsetX: (xMin + xMax) / 2,
+    offsetY: (yMin + yMax) / 2,
+  };
+}
+
+// The flip side of resolvePanelFit above: for ONE of Left/Right/Top/
+// Bottom (`role` is 'left'/'right'/'top'/'bottom' — the exact same
+// key Back's and Front's own edgeFit objects use for "the edge facing
+// this wall"), works out where that wall's two Z-ends actually land.
+// `zBackOuter`/`zFrontOuter` are Back's/Front's own outer faces — the
+// box's true, fixed front/back boundary, never touched by anyone's
+// edgeFit. Each end independently pulls in by that panel's own
+// thickness when its edgeFit for this role is 'out' (that panel now
+// covers this wall's end — the wall must be shorter there so the two
+// don't interpenetrate), or stays flush with that panel's outer face
+// when 'in' (today's original, unshortened behavior). Because both
+// ends are resolved independently, a wall can be shortened at one end
+// only, both ends, or neither — whatever the current Back/Front
+// edgeFit says — and re-flipping either one later (e.g. Front's
+// `left` edge going 'out' back to 'in') recovers the exact original
+// length automatically, since nothing here is additive/stateful, it's
+// recomputed from scratch every time.
+function depthRangeFor(role, zBackOuter, zFrontOuter, back, front) {
+  const backEdge = (back.edgeFit || DEFAULT_EDGE_FIT)[role] ?? DEFAULT_EDGE_FIT[role];
+  const frontEdge = (front.edgeFit || DEFAULT_EDGE_FIT)[role] ?? DEFAULT_EDGE_FIT[role];
+  const zMin = backEdge === 'out' ? zBackOuter + back.thickness : zBackOuter;
+  const zMax = frontEdge === 'out' ? zFrontOuter - front.thickness : zFrontOuter;
+  return { depth: zMax - zMin, centerZ: (zMin + zMax) / 2 };
+}
+
 /**
  * Pure carcass math: given the box's 6 wall nodes (each just needs
  * .thickness and .offset), returns each wall's new width/height/
@@ -77,26 +156,34 @@ export function computeBoxLayout({ left, right, top, bottom, back, front }) {
   const xInnerMin = lx + left.thickness / 2, xInnerMax = rx - right.thickness / 2;
   const yOuterMin = by - bottom.thickness / 2, yOuterMax = ty + top.thickness / 2;
   const yInnerMin = by + bottom.thickness / 2, yInnerMax = ty - top.thickness / 2;
-  const zInnerMin = bz - back.thickness / 2, zInnerMax = fz + front.thickness / 2;
 
   const outerWidth = xOuterMax - xOuterMin;
-  const innerWidth = xInnerMax - xInnerMin;
-  const innerHeight = yInnerMax - yInnerMin;
-  const innerDepth = zInnerMax - zInnerMin;
-
   const outerWidthCenterX = (xOuterMin + xOuterMax) / 2;
-  const innerWidthCenterX = (xInnerMin + xInnerMax) / 2;
-  const outerHeightCenterY = (yOuterMin + yOuterMax) / 2;
-  const innerHeightCenterY = (yInnerMin + yInnerMax) / 2;
-  const innerDepthCenterZ = (zInnerMin + zInnerMax) / 2;
+
+  const bounds = { xOuterMin, xOuterMax, xInnerMin, xInnerMax, yOuterMin, yOuterMax, yInnerMin, yInnerMax };
+  const frontFit = resolvePanelFit(front.edgeFit, bounds);
+  const backFit = resolvePanelFit(back.edgeFit, bounds);
+  const innerHeight = bounds.yInnerMax - bounds.yInnerMin; // Left/Right's own height still always spans fully inset, regardless of Front/Back's edgeFit
+
+  // Back's/Front's own outer Z faces — the box's true front/back
+  // boundary. NEVER touched by anyone's edgeFit — this, together with
+  // Left/Right/Top/Bottom's own X/Y offsets, is what keeps the box's
+  // overall size fixed no matter how any wall's edgeFit is set.
+  const zBackOuter = bz - back.thickness / 2;
+  const zFrontOuter = fz + front.thickness / 2;
+
+  const leftDepth = depthRangeFor('left', zBackOuter, zFrontOuter, back, front);
+  const rightDepth = depthRangeFor('right', zBackOuter, zFrontOuter, back, front);
+  const topDepth = depthRangeFor('top', zBackOuter, zFrontOuter, back, front);
+  const bottomDepth = depthRangeFor('bottom', zBackOuter, zFrontOuter, back, front);
 
   return {
-    left:   { width: innerDepth, height: innerHeight, offset: { x: lx, y: innerHeightCenterY, z: innerDepthCenterZ } },
-    right:  { width: innerDepth, height: innerHeight, offset: { x: rx, y: innerHeightCenterY, z: innerDepthCenterZ } },
-    top:    { width: outerWidth, height: innerDepth,  offset: { x: outerWidthCenterX, y: ty, z: innerDepthCenterZ } },
-    bottom: { width: outerWidth, height: innerDepth,  offset: { x: outerWidthCenterX, y: by, z: innerDepthCenterZ } },
-    back:   { width: innerWidth, height: innerHeight, offset: { x: innerWidthCenterX, y: outerHeightCenterY, z: bz } },
-    front:  { width: innerWidth, height: innerHeight, offset: { x: innerWidthCenterX, y: innerHeightCenterY, z: fz } },
+    left:   { width: leftDepth.depth,   height: innerHeight, offset: { x: lx, y: (bounds.yInnerMin + bounds.yInnerMax) / 2, z: leftDepth.centerZ } },
+    right:  { width: rightDepth.depth,  height: innerHeight, offset: { x: rx, y: (bounds.yInnerMin + bounds.yInnerMax) / 2, z: rightDepth.centerZ } },
+    top:    { width: outerWidth, height: topDepth.depth,    offset: { x: outerWidthCenterX, y: ty, z: topDepth.centerZ } },
+    bottom: { width: outerWidth, height: bottomDepth.depth, offset: { x: outerWidthCenterX, y: by, z: bottomDepth.centerZ } },
+    back:   { width: backFit.width,  height: backFit.height,  offset: { x: backFit.offsetX,  y: backFit.offsetY,  z: bz } },
+    front:  { width: frontFit.width, height: frontFit.height, offset: { x: frontFit.offsetX, y: frontFit.offsetY, z: fz } },
   };
 }
 
@@ -147,25 +234,26 @@ export function addBox(panels) {
   });
   const back = createPanelNode({
     name: 'Back',
-    // Covers all 4 outer edges of the assembly (H+2T) — like a real
-    // cabinet's solid back sheet, nailed across the whole carcass
-    // rather than let into it. Just a starting value — relayoutBox
-    // (via computeBoxLayout below) recomputes it exactly.
+    // Starting numbers only — relayoutBox (via computeBoxLayout below)
+    // recomputes this exactly from back.edgeFit, set right after.
     width: W, height: H + 2 * T, thickness: T, material,
     rotation: PARALLEL_ROTATION, isBoxPanel: true, isBoxWall: true,
     lockedMoveAxes: BOX_GIZMO_LOCKS.frontBack.lockedMoveAxes,
     lockedResizeAxes: BOX_GIZMO_LOCKS.frontBack.lockedResizeAxes,
     lockedFields: { ...BOX_GIZMO_LOCKS.frontBack.lockedFields },
   });
+  back.edgeFit = { ...BACK_START_EDGE_FIT }; // covers the full outer footprint — see this file's top doc comment
   const front = createPanelNode({
     name: 'Front',
-    // Inner-fitted footprint — inset between the sides only, W-2T.
+    // Starting numbers only — relayoutBox (via computeBoxLayout below)
+    // recomputes this exactly from front.edgeFit, set right after.
     width: W - 2 * T, height: H, thickness: T, material,
     rotation: PARALLEL_ROTATION, isBoxPanel: true, isBoxWall: true,
     lockedMoveAxes: BOX_GIZMO_LOCKS.frontBack.lockedMoveAxes,
     lockedResizeAxes: BOX_GIZMO_LOCKS.frontBack.lockedResizeAxes,
     lockedFields: { ...BOX_GIZMO_LOCKS.frontBack.lockedFields },
   });
+  front.edgeFit = { ...FRONT_START_EDGE_FIT }; // covers every edge but the top — see this file's top doc comment
 
   const boxPanels = [left, right, top, bottom, back, front];
   boxPanels.forEach((p) => { p.groupId = left.id; }); // left's own id doubles as the group's identifier

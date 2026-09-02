@@ -171,6 +171,61 @@ export function createModellerScene(
 
   let panelHighlightTarget = null; // { nodeId, faceName } | null
 
+  // ---- MULTI-panel highlight SET ----
+  // panelHighlightMesh above is a single reusable mesh — fine for
+  // shelfTool.js, which only ever has ONE pick "pending" at a time.
+  // Tools that accumulate several picks before committing (e.g.
+  // boundaryRectTool.js's 4-panel pick) need every already-picked
+  // panel to stay highlighted at once, so this keeps a small pool of
+  // highlight meshes keyed by nodeId instead of one shared mesh. Same
+  // visual language (color/opacity) as panelHighlightMesh — this is
+  // "the shelf-tool highlight, just N of them at once" rather than a
+  // new visual meaning.
+  const highlightSetMeshes = new Map(); // nodeId -> THREE.Mesh
+  let highlightSetIds = new Set();
+
+  function setPanelHighlightSet(nodeIds) {
+    highlightSetIds = new Set(nodeIds || []);
+  }
+
+  function updatePanelHighlightSet(resolvedPanels) {
+    for (const [id, mesh] of highlightSetMeshes.entries()) {
+      if (!highlightSetIds.has(id)) {
+        scene.remove(mesh);
+        mesh.geometry.dispose();
+        mesh.material.dispose();
+        highlightSetMeshes.delete(id);
+      }
+    }
+
+    highlightSetIds.forEach((id) => {
+      const node = resolvedPanels.find((p) => p.id === id);
+      if (!node) return;
+
+      let mesh = highlightSetMeshes.get(id);
+      if (!mesh) {
+        const geo = new THREE.BoxGeometry(1, 1, 1);
+        const mat = new THREE.MeshBasicMaterial({
+          color: CONST_Face_Panel_Color_Highlight, transparent: true, opacity: CONST_Face_Panel_Color_Highlight_Opacity, side: THREE.DoubleSide, depthTest: true,
+        });
+        mesh = new THREE.Mesh(geo, mat);
+        mesh.renderOrder = 9;
+        scene.add(mesh);
+        highlightSetMeshes.set(id, mesh);
+      }
+
+      const padding = 0.002;
+      mesh.position.set(node.position.x * MM_TO_UNIT, node.position.y * MM_TO_UNIT, node.position.z * MM_TO_UNIT);
+      mesh.rotation.set(
+        THREE.MathUtils.degToRad(node.rotation?.x || 0),
+        THREE.MathUtils.degToRad(node.rotation?.y || 0),
+        THREE.MathUtils.degToRad(node.rotation?.z || 0)
+      );
+      mesh.scale.set(node.width * MM_TO_UNIT + padding, node.height * MM_TO_UNIT + padding, node.thickness * MM_TO_UNIT + padding);
+      mesh.visible = true;
+    });
+  }
+
   function setFaceHighlight(nodeId, faceName) {
     faceHighlightTarget = nodeId && faceName ? { nodeId, faceName } : null;
     faceHighlightMesh.visible = false; // reconcile() below turns it back on once it finds the matching resolved node — avoids a stale-position flash if the target node doesn't (yet) exist
@@ -364,6 +419,7 @@ export function createModellerScene(
     if (!active) {
       setFaceHighlight(null, null); // leaving pick mode always clears any lingering highlight from that session
       setPanelHighlight(null, null);
+      setPanelHighlightSet([]);
     }
   }
 
@@ -520,6 +576,7 @@ export function createModellerScene(
 
     updateFaceHighlight(resolvedPanels);
     updatePanelHighlight(resolvedPanels);
+    updatePanelHighlightSet(resolvedPanels);
 
     const liveIds = new Set(resolvedPanels.map((p) => p.id));
 
@@ -601,6 +658,16 @@ export function createModellerScene(
       // only if no set was passed in, so this stays backward
       // compatible with any other caller of reconcile().
       entry.mesh.userData.isBoxWall = boxWallIds ? boxWallIds.has(node.id) : node.isBoxWall === true;
+      // A door is never resizable or movable via the gizmo — see
+      // modeller/gizmos.js's own isDoor(mesh) check, which fully
+      // short-circuits both interactions the same way isBoxWall does,
+      // rather than relying on lockedFields/lockedResizeAxes (which
+      // only ever get set for a field that has an actual
+      // spansBetween/attachedTo constraint on it — a door has none;
+      // its geometry is baked as literal numbers, recomputed whole by
+      // features/door.js#applyDoorAdjustmentsForGroup, not derived
+      // through the constraint graph at all).
+      entry.mesh.userData.isDoor = !!node.isDoor;
       entry.mesh.userData.thicknessAxis = node.thicknessAxis || null;
       entry.mesh.userData.resizeProxy = node.resizeProxy || null;
 
@@ -762,8 +829,13 @@ export function createModellerScene(
     faceHighlightMat.dispose();
     panelHighlightGeo.dispose();
     panelHighlightMat.dispose();
+    for (const mesh of highlightSetMeshes.values()) {
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+    }
+    highlightSetMeshes.clear();
     renderer.dispose();
   }
 
-  return { reconcile, dispose, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight};
+  return { reconcile, dispose, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight, setPanelHighlightSet };
 }
