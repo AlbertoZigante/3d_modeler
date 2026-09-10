@@ -340,6 +340,22 @@ const FACE_RESIZE_INFO = {
     return !!mesh?.userData?.isDoor;
   }
 
+  // Same reasoning as isDoor above, drawer-front counterpart — a
+  // drawer front's geometry is likewise recomputed whole by
+  // features/drawer.js#applyDrawerAdjustmentsForGroup, never something
+  // to drag or resize by hand. Checked everywhere isDoor is, not
+  // merged into one combined function, so each call site's own reason
+  // for the check stays legible on its own.
+  function isDrawerFront(mesh) {
+    return !!mesh?.userData?.isDrawerFront;
+  }
+
+  // Same reasoning as isDrawerFront above, drawer BOX panel
+  // counterpart (left/right/bottom/back).
+  function isDrawerBoxPanel(mesh) {
+    return !!mesh?.userData?.isDrawerBoxPanel;
+  }
+
   const FACE_NAMES = ['right', 'left', 'top', 'bottom', 'front', 'back'];
   const handleGeometry = new THREE.SphereGeometry(HANDLE_RADIUS_UNITS, 10, 10);
   const resizeHandles = {}; // faceName -> mesh
@@ -373,7 +389,7 @@ const FACE_RESIZE_INFO = {
     // Do not use resizeProxy here. A resizeProxy describes how some
     // dependent box dimension is resolved; it is not the permission
     // to resize the wall itself.
-    if (!mesh || isBoxWall(mesh) || isDoor(mesh)) {
+    if (!mesh || isBoxWall(mesh) || isDoor(mesh) || isDrawerFront(mesh) || isDrawerBoxPanel(mesh)) {
       return;
     }
 
@@ -476,7 +492,7 @@ const FACE_RESIZE_INFO = {
   function handleFacePointerDown(e) {
     const mesh = transformMove.object;
 
-    if (!mesh || isBoxWall(mesh) || isDoor(mesh) || !getMeshEntry || !resizeHandleGroup.visible) {
+    if (!mesh || isBoxWall(mesh) || isDoor(mesh) || isDrawerFront(mesh) || isDrawerBoxPanel(mesh) || !getMeshEntry || !resizeHandleGroup.visible) {
       return;
     }
 
@@ -708,10 +724,11 @@ const FACE_RESIZE_INFO = {
       transformMove.attach(mesh);
     }
 
-    if (isDoor(mesh)) {
-      // No move, no resize — see isDoor's own comment above. Checked
-      // FIRST and unconditionally (not folded into the lockedFields
-      // checks below) because this must hold regardless of whatever
+    if (isDoor(mesh) || isDrawerFront(mesh) || isDrawerBoxPanel(mesh)) {
+      // No move, no resize — see isDoor's own comment above (same
+      // reasoning for a drawer front). Checked FIRST and
+      // unconditionally (not folded into the lockedFields checks
+      // below) because this must hold regardless of whatever
       // lockedFields happens to contain.
       transformMove.showX = false;
       transformMove.showY = false;

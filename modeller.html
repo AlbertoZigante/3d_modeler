@@ -327,6 +327,14 @@
 
       border-left:
         1px solid #e6dcc9;
+
+      /* Content here is variable-height and can outgrow the sidebar
+         (e.g. a door's Hinge side + Open/Close + Restore Face all
+         stacked below the usual dims/material fields) — scroll it
+         instead of clipping, same overflow-y/overflow-x split already
+         used by .toolbar-section-content above. */
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
 
@@ -1820,6 +1828,17 @@
         disabled
       >
         ↷
+      </button>
+
+
+      <button
+        type="button"
+        class="history-btn"
+        id="print-history-btn"
+        title="Print History — opens a PDF listing every action taken this session"
+        aria-label="Print History"
+      >
+        🖨
       </button>
 
     </div>

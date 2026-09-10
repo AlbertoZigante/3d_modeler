@@ -188,6 +188,18 @@ export class DeleteDoorCommand extends ModelCommand {
   }
 }
 
+export class AddDrawerCommand extends ModelCommand {
+  constructor(options) {
+    super({ ...options, label: 'Add drawer' });
+  }
+}
+
+export class DeleteDrawerCommand extends ModelCommand {
+  constructor(options) {
+    super({ ...options, label: 'Delete drawer' });
+  }
+}
+
 export class RenamePanelCommand extends ModelCommand {
   constructor(options) {
     super({ ...options, label: 'Rename panel' });
@@ -330,6 +342,18 @@ export class HistoryManager {
     this.undoStack = [];
     this.redoStack = [];
 
+    // A COMPLETE, append-only record of every user action this
+    // session — deliberately separate from undoStack/redoStack above,
+    // which are STATE (trimmed at maxHistory, and undo()/redo() MOVE
+    // commands between them rather than keeping a stable list; "a new
+    // command after an undo clears the redo stack" per this file's own
+    // header comment, which would silently erase those actions from
+    // any log built off the stacks themselves). This one only ever
+    // grows, and records undo/redo as their OWN activity lines too —
+    // "the user undid X" is itself something that happened, not an
+    // erasure of X having been recorded at all.
+    this.activityLog = [];
+
     this._onChange = onChange;
     this._transaction = null;   
   }
@@ -356,6 +380,7 @@ export class HistoryManager {
 
     this.undoStack.push(command);
     this.redoStack.length = 0;
+    this._logActivity('do', command.label);
 
     this._trimUndoStack();
     this._notify();
@@ -372,6 +397,7 @@ export class HistoryManager {
     const command = this.undoStack.pop();
 
     command.undo();
+    this._logActivity('undo', command.label);
 
     this.redoStack.push(command);
 
@@ -389,6 +415,7 @@ export class HistoryManager {
     const command = this.redoStack.pop();
 
     command.redo();
+    this._logActivity('redo', command.label);
 
     this.undoStack.push(command);
 
@@ -443,6 +470,10 @@ export class HistoryManager {
    *
    * Useful when loading an existing furniture file. You generally do not
    * want the user to undo into a model that existed before the load.
+   *
+   * Deliberately does NOT touch activityLog — clear() erases what can
+   * be UNDONE, not the record of what already happened, which stays
+   * true regardless of a later file load.
    */
   clear() {
     this.undoStack.length = 0;
@@ -496,6 +527,7 @@ export class HistoryManager {
 
     this.undoStack.push(transaction);
     this.redoStack.length = 0;
+    this._logActivity('do', transaction.label);
 
     this._trimUndoStack();
     this._notify();
@@ -517,6 +549,7 @@ export class HistoryManager {
     this._transaction = null;
 
     transaction.undo();
+    this._logActivity('cancel', transaction.label);
 
     this._notify();
 
@@ -543,6 +576,62 @@ export class HistoryManager {
     };
   }
 
+  /**
+   * The full session activity log, oldest first — one entry per
+   * user-visible action (a plain command, or a whole transaction as
+   * ONE entry, matching what the person actually perceives as one
+   * action), plus one entry per undo/redo/cancelled-transaction.
+   * Returns plain copies, not live references — the caller (e.g. a
+   * PDF export) shouldn't be able to mutate this log by touching what
+   * it gets back.
+   *
+   * @returns {{ timestamp: Date, type: 'do'|'undo'|'redo'|'cancel', label: string }[]}
+   */
+  getActivityLog() {
+    return this.activityLog.map((entry) => ({ ...entry }));
+  }
+
+  /**
+   * The same log, pre-formatted as plain text lines — one per entry,
+   * oldest first, in the exact shape engine/pdfExport.js#exportHistoryPdf
+   * expects. Kept here (not in the PDF module) so anything else that
+   * ever wants a plain-text activity log — a debug console, a support
+   * bug report — can reuse the exact same formatting.
+   */
+  getActivityLogText() {
+    const TYPE_PREFIX = { do: '', undo: 'Undo: ', redo: 'Redo: ', cancel: 'Cancelled: ', warning: 'Warning shown to user: ' };
+    return this.activityLog
+      .map((entry) => `${entry.timestamp.toLocaleString()} — ${TYPE_PREFIX[entry.type] ?? ''}${entry.label}`)
+      .join('\n');
+  }
+
+  /**
+   * Records that the app displayed a warning/rejection message to the
+   * person — see ui/toast.js's own showToast(text, autoHide): every
+   * self-clearing error/rejection flash (design-limit hits, panel-size
+   * hits, "can't fit" spacing rejections, invalid picks, etc.) calls
+   * this; the persistent step-by-step tool guidance messages
+   * (showToast(text, false) — "pick a boundary panel...", "now pick
+   * the other side...") deliberately do NOT, since those aren't
+   * warnings about anything the person did wrong.
+   *
+   * De-duplicates identical CONSECUTIVE warnings (e.g. the same "too
+   * close" rejection re-firing every frame while a shelf is held in an
+   * invalid spot mid-drag) — logging a fresh timestamped line per
+   * animation frame would flood the record with noise instead of a
+   * clean list of distinct things the person was actually told.
+   */
+  logWarning(message) {
+    const last = this.activityLog[this.activityLog.length - 1];
+    if (last && last.type === 'warning' && last.label === message) return; // same warning still showing — not a new event
+    this._logActivity('warning', message);
+    // No _notify() here deliberately — that callback (currently just
+    // syncHistoryButtons in modeller-main.js) exists for undo/redo
+    // STATE changes; a warning doesn't affect canUndo()/canRedo(), so
+    // firing it would just be a wasted call for every future listener
+    // too, not only today's.
+  }
+
   _assertCommand(command) {
     if (
       !command ||
@@ -559,6 +648,16 @@ export class HistoryManager {
     while (this.undoStack.length > this.maxHistory) {
       this.undoStack.shift();
     }
+  }
+
+  // No cap here on purpose — activityLog is the literal "record ALL
+  // user activity" ask, unlike undoStack's intentionally-bounded
+  // maxHistory just above. jsPDF already paginates an arbitrarily long
+  // row list fine (see engine/pdfExport.js#exportCutListPdf's own
+  // page-break logic, reused as-is by exportHistoryPdf), so there's no
+  // practical reason to throw anything away here.
+  _logActivity(type, label) {
+    this.activityLog.push({ timestamp: new Date(), type, label });
   }
 
   _notify() {

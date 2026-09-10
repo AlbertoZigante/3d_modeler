@@ -19,6 +19,7 @@
 
 import * as THREE from 'three';
 import { MM_TO_UNIT, LOCAL_FACES, FACE_TO_DIM_FIELD } from './modules.js';
+import { computeHandlePlacement } from '../shared/handle.js';
 import { createOrbitControls } from './orbitControls.js';
 import { createGizmos } from './gizmos.js';
 import { create2DControls } from './view2d.js';
@@ -587,10 +588,15 @@ export function createModellerScene(
             if (tc.object === entry.mesh) tc.detach();
           }
         }
-        scene.remove(entry.mesh);
+        scene.remove(entry.mesh); // removes the whole subtree, including entry.handleMesh (a child) — but geometry/material still need explicit disposal below, THREE.js doesn't do that on removal
         entry.mesh.geometry.dispose();
         entry.mesh.material.dispose();
         entry.edges.geometry.dispose();
+        if (entry.handleMesh) {
+          entry.handleMesh.geometry.dispose();
+          entry.handleMesh.material.dispose();
+          entry.handleEdges.geometry.dispose();
+        }
         meshRegistry.delete(id);
       }
     }
@@ -668,8 +674,58 @@ export function createModellerScene(
       // features/door.js#applyDoorAdjustmentsForGroup, not derived
       // through the constraint graph at all).
       entry.mesh.userData.isDoor = !!node.isDoor;
+      // Same reasoning, drawer-front counterpart — a drawer front's
+      // geometry is likewise baked as literal numbers, recomputed
+      // whole by features/drawer.js#applyDrawerAdjustmentsForGroup,
+      // not something to drag or resize by hand.
+      entry.mesh.userData.isDrawerFront = !!node.isDrawerFront;
+      // Same reasoning, drawer BOX panel counterpart (left/right/
+      // bottom/back — see features/drawer.js#createDrawerBoxNodes):
+      // also derived, also never resized/moved by hand.
+      entry.mesh.userData.isDrawerBoxPanel = !!node.isDrawerBoxPanel;
       entry.mesh.userData.thicknessAxis = node.thicknessAxis || null;
       entry.mesh.userData.resizeProxy = node.resizeProxy || null;
+
+      // Handle (door/drawer front only) — see shared/handle.js's own
+      // header comment for why this is a plain CHILD mesh rather than
+      // a graph panel: it's bought hardware, not cut from material,
+      // and being a child means it automatically inherits the parent
+      // panel's position/rotation (including a door's own open-swing
+      // animation below) for free — nothing extra to keep in sync here.
+      const handlePlacement = computeHandlePlacement(node);
+      if (handlePlacement) {
+        const dims = handlePlacement.axis === 'x'
+          ? [handlePlacement.dims.length * MM_TO_UNIT, handlePlacement.dims.crossSection * MM_TO_UNIT, handlePlacement.dims.protrusion * MM_TO_UNIT]
+          : [handlePlacement.dims.crossSection * MM_TO_UNIT, handlePlacement.dims.length * MM_TO_UNIT, handlePlacement.dims.protrusion * MM_TO_UNIT];
+
+        if (!entry.handleMesh) {
+          const handleMat = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.35, metalness: 0.65 });
+          entry.handleMesh = new THREE.Mesh(new THREE.BoxGeometry(...dims), handleMat);
+          entry.handleMesh.castShadow = true;
+          const handleEdges = new THREE.LineSegments(
+            new THREE.EdgesGeometry(entry.handleMesh.geometry),
+            new THREE.LineBasicMaterial({ color: 0x000000 })
+          );
+          entry.handleMesh.add(handleEdges);
+          entry.handleEdges = handleEdges;
+          entry.mesh.add(entry.handleMesh); // CHILD — local position/rotation below are relative to the panel mesh, not world space
+          entry.lastHandleDims = dims;
+        } else if (dims.some((d, i) => Math.abs(d - entry.lastHandleDims[i]) > 1e-6)) {
+          entry.handleMesh.geometry.dispose();
+          entry.handleMesh.geometry = new THREE.BoxGeometry(...dims);
+          entry.handleEdges.geometry.dispose();
+          entry.handleEdges.geometry = new THREE.EdgesGeometry(entry.handleMesh.geometry);
+          entry.lastHandleDims = dims;
+        }
+        entry.handleMesh.position.set(
+          handlePlacement.localOffset.x * MM_TO_UNIT,
+          handlePlacement.localOffset.y * MM_TO_UNIT,
+          handlePlacement.localOffset.z * MM_TO_UNIT
+        );
+        entry.handleMesh.visible = true;
+      } else if (entry.handleMesh) {
+        entry.handleMesh.visible = false; // no longer a door/drawer front — shouldn't normally happen, but stay safe rather than leave a stray handle floating
+      }
 
       const resolvedPosUnits = {
         x: node.position.x * MM_TO_UNIT,
@@ -823,6 +879,11 @@ export function createModellerScene(
       entry.mesh.geometry.dispose();
       entry.mesh.material.dispose();
       entry.edges.geometry.dispose();
+      if (entry.handleMesh) {
+        entry.handleMesh.geometry.dispose();
+        entry.handleMesh.material.dispose();
+        entry.handleEdges.geometry.dispose();
+      }
     }
     meshRegistry.clear();
     faceHighlightGeo.dispose();

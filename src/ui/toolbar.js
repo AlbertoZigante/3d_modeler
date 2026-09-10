@@ -137,6 +137,21 @@ const COMPONENT_ICONS = {
       <circle cx="14.5" cy="12" r="0.9" fill="currentColor" stroke="none" />
     </svg>
   `,
+  // Same outer rectangle as `door` (same "4 boundary panels define an
+  // opening" idea), but split into horizontal bands with small pull
+  // notches instead of a knob — reads as "stacked drawer fronts", kept
+  // visually close to `door` since it's the exact same front-fitting
+  // feature, just N panels instead of 1 (see shared/frontFit.js).
+  drawer: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="3" width="16" height="18" rx="0.5" />
+      <line x1="4" y1="9" x2="20" y2="9" />
+      <line x1="4" y1="15" x2="20" y2="15" />
+      <line x1="10" y1="6" x2="14" y2="6" />
+      <line x1="10" y1="12" x2="14" y2="12" />
+      <line x1="10" y1="18" x2="14" y2="18" />
+    </svg>
+  `,
   // A sheet with a corner folded/cut and a printer-style horizontal
   // line — reads as "printable list", distinct from the more
   // geometric building-tool icons above.
@@ -334,6 +349,16 @@ export function renderPanelList(
     onDoorConfirm,
     onDoorCancel,
 
+    onAddDrawer,
+    drawerToolActive,
+    drawerConfirmActive,
+    drawerEdgeFit,
+    drawerCount,
+    onDrawerEdgeFitChange,
+    onDrawerCountChange,
+    onDrawerConfirm,
+    onDrawerCancel,
+
     onOpenCutList,
     onNestCutList,
   }
@@ -368,7 +393,7 @@ export function renderPanelList(
    * collapses back to the three sections above it.
    */
   const anyToolActive =
-    !!(collinearActive || shelfMode || doorToolActive);
+    !!(collinearActive || shelfMode || doorToolActive || drawerToolActive);
 
   const propertiesSectionMarkup = `
     <div
@@ -404,6 +429,10 @@ export function renderPanelList(
             doorConfirmActive,
             doorEdgeFit,
             doorHinge,
+            drawerToolActive,
+            drawerConfirmActive,
+            drawerEdgeFit,
+            drawerCount,
           })}
         </div>
 
@@ -628,6 +657,16 @@ export function renderPanelList(
             >
               ${COMPONENT_ICONS.door}
               <span class="icon-label">${doorToolActive ? 'Cancel' : 'Add Door'}</span>
+            </button>
+
+            <button
+              type="button"
+              class="component-icon-btn ${drawerToolActive ? 'active' : ''}"
+              id="add-drawer-btn"
+              title="${drawerToolActive ? 'Cancel Add Drawer (Esc)' : 'Add Drawer — pick 4 boundary panels, set in/out per edge and how many drawers, to place stacked drawer front panels (see the drawer feature — front panels only for now)'}"
+            >
+              ${COMPONENT_ICONS.drawer}
+              <span class="icon-label">${drawerToolActive ? 'Cancel' : 'Add Drawer'}</span>
             </button>
 
           </div>
@@ -973,6 +1012,67 @@ export function renderPanelList(
     });
 
 
+  /* ==========================================================
+     ADD DRAWER (pick 4 boundary panels, set in/out + count, place N stacked fronts)
+     ========================================================== */
+
+  container
+    .querySelector(
+      '#add-drawer-btn'
+    )
+    ?.addEventListener(
+      'click',
+      (event) => {
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        onAddDrawer?.();
+      }
+    );
+
+  // Same "only exists while confirming" reasoning as the door block
+  // above — querySelectorAll/querySelector harmlessly find nothing
+  // otherwise.
+  container.querySelectorAll('.drawer-edge-fit-field').forEach((select) => {
+    select.addEventListener('change', () => {
+      onDrawerEdgeFitChange?.(select.dataset.edge, select.value);
+    });
+  });
+
+  // 'change' (fires on blur/Enter), not 'input' (fires per keystroke)
+  // — this field re-renders the WHOLE toolbar on every call (same as
+  // the edge-fit selects above), which overwrites the input's own
+  // value attribute from the just-clamped state. On 'input' that fight
+  // happens on every keystroke: clearing the field to type a fresh
+  // "10" hits an empty string first, which parses to 0, clamps to 1,
+  // and re-renders the field back to "1" before the second digit can
+  // ever be typed. 'change' only commits once the person is done
+  // typing (leaves the field or presses Enter), so mid-typing states
+  // are never fought.
+  container
+    .querySelector('#drawer-count-input')
+    ?.addEventListener('change', (event) => {
+      onDrawerCountChange?.(event.target.value);
+    });
+
+  container
+    .querySelector('#drawer-confirm-btn')
+    ?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onDrawerConfirm?.();
+    });
+
+  container
+    .querySelector('#drawer-confirm-cancel-btn')
+    ?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onDrawerCancel?.();
+    });
+
+
   const gapInput =
     container.querySelector(
       '#collinear-gap-input'
@@ -1024,6 +1124,10 @@ function renderPropertiesContent({
   doorConfirmActive,
   doorEdgeFit,
   doorHinge,
+  drawerToolActive,
+  drawerConfirmActive,
+  drawerEdgeFit,
+  drawerCount,
 }) {
 
   if (collinearActive) {
@@ -1115,6 +1219,44 @@ function renderPropertiesContent({
         <div class="properties-hint">
           Pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or shelves) to place a door into.
           Two of one boundary type + two of another; whichever axis is left over becomes the door's facing direction.
+        </div>
+      </div>
+    `;
+  }
+
+  if (drawerConfirmActive) {
+    return `
+      <div class="properties-section-content">
+        <div class="properties-hint">
+          Set in/out per edge and how many drawers, then Confirm to place the front panels — the 4 boundary panels adjust automatically to avoid penetrating them, same as a door.
+        </div>
+        ${EDGE_FIT_ROWS.map(([edge, label]) => `
+          <div class="field-row">
+            <label>${label}</label>
+            <select class="field-input drawer-edge-fit-field" data-edge="${edge}">
+              <option value="in" ${(drawerEdgeFit || {})[edge] !== 'out' ? 'selected' : ''}>In (inset)</option>
+              <option value="out" ${(drawerEdgeFit || {})[edge] === 'out' ? 'selected' : ''}>Out (overlay)</option>
+            </select>
+          </div>
+        `).join('')}
+        <div class="field-row">
+          <label>Number of drawers</label>
+          <input type="number" class="field-input" id="drawer-count-input" min="1" max="10" step="1" value="${escapeAttribute(Number(drawerCount ?? 1))}" />
+        </div>
+        <div class="properties-gap-row">
+          <button type="button" class="add-btn" id="drawer-confirm-btn">Confirm</button>
+          <button type="button" class="remove-btn" id="drawer-confirm-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    `;
+  }
+
+  if (drawerToolActive) {
+    return `
+      <div class="properties-section-content">
+        <div class="properties-hint">
+          Pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or shelves) to place drawer front(s) into.
+          Two of one boundary type + two of another; whichever axis is left over becomes the front's facing direction.
         </div>
       </div>
     `;

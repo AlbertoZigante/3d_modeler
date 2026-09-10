@@ -46,6 +46,7 @@ export function renderProperties(
     onUngroup,
     onGroupMaterialChange,
     onRestoreFace,
+    onEdgeFitFieldChange,
     onEdgeFitChange,
     onToggleDoorOpen,
     onDoorHingeChange,
@@ -72,20 +73,12 @@ export function renderProperties(
           ${MATERIAL_CATALOG.map((m) => `<option value="${escapeHtml(m.name)}" ${m.name === groupMaterial ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
         </select>
       </div>
-      ${hiddenList.length > 0 ? `
-        <div class="section-title">Deleted faces — ${hiddenList.length}</div>
-        <div class="restore-face-list">
-          ${hiddenList.map((p) => `<button class="add-btn restore-face-btn" data-restore-id="${p.id}">↺ Restore ${escapeHtml(getDisplayName(p))}</button>`).join('')}
-        </div>
-        ${restoreError ? `<div class="properties-error">${escapeHtml(restoreError)}</div>` : ''}
-      ` : ''}
+      ${restoreFaceListHTML(hiddenList, restoreError)}
       <div class="empty-state">Click a member panel — in the list, or in the 3D/2D view — to select and edit it individually.</div>
       <button class="remove-btn" id="ungroup-btn">Ungroup (keep all ${groupMemberCount} panels)</button>
       <button class="remove-btn" id="delete-group-btn">Delete whole group (${groupMemberCount} panels)</button>
     `;
-    container.querySelectorAll('.restore-face-btn').forEach((btn) => {
-      btn.addEventListener('click', () => onRestoreFace(btn.dataset.restoreId));
-    });
+    wireRestoreFaceButtons(container, onRestoreFace);
     container.querySelector('#group-material-field').addEventListener('change', (e) => onGroupMaterialChange(e.target.value));
     container.querySelector('#ungroup-btn').addEventListener('click', onUngroup);
     container.querySelector('#delete-group-btn').addEventListener('click', onRemove);
@@ -98,12 +91,16 @@ export function renderProperties(
   }
 
   const locked = resolvedPanel.lockedFields || {};
-  // Unlike width/height (dimFieldHTML, gated per-field via `locked`),
-  // position has no per-axis UI distinction worth making here — a
-  // panel whose position is fully derived (currently just a door; see
-  // features/door.js#createDoorNode's own lockedFields) has ALL 3
-  // locked together, so this section is either fully editable or
-  // fully read-only, never a mix.
+  // A panel whose position is fully derived (a door or drawer front —
+  // see features/door.js#createDoorNode's/features/drawer.js#createDrawerFrontNodes's
+  // own lockedMoveAxes) has ALL 3 position axes locked together, never
+  // a mix — nothing else currently locks all 3 at once, which is what
+  // makes this a safe stand-in for "is this a door or drawer front"
+  // without importing either feature's own flag here. The whole
+  // Transform section below is skipped entirely in that case (not
+  // just disabled) — a gizmo/gizmo-driven section is meaningless for a
+  // position nothing ever drags, so showing it read-only was just
+  // noise pushing everything else down.
   const transformLocked = !!(locked.positionX && locked.positionY && locked.positionZ);
   const displayName = getDisplayName(selectedPanel);
 
@@ -140,16 +137,18 @@ export function renderProperties(
     <button class="remove-btn" id="remove-btn">Remove panel</button>
 
     ${selectedPanel.edgeFit ? edgeFitSectionHTML(selectedPanel.edgeFit) : ''}
-    ${selectedPanel.isDoor ? doorSectionHTML(selectedPanel) : ''}
+    ${selectedPanel.isDoor ? doorSectionHTML(selectedPanel, hiddenGroupMembers || [], restoreError) : ''}
 
-    <div class="divider"></div>
-    <div class="section-title">Transform (from gizmo)${transformLocked ? ' 🔒' : ''}</div>
-    <div class="transform-grid">
-      ${axisFieldHTML('offset', 'x', selectedPanel.offset.x, transformLocked)}
-      ${axisFieldHTML('offset', 'y', selectedPanel.offset.y, transformLocked)}
-      ${axisFieldHTML('offset', 'z', selectedPanel.offset.z, transformLocked)}
-    </div>
-    <div class="transform-label">Position offset (mm)${transformLocked ? ' — derived from its boundary panels, not directly editable' : ''}</div>
+    ${transformLocked ? '' : `
+      <div class="divider"></div>
+      <div class="section-title">Transform (from gizmo)</div>
+      <div class="transform-grid">
+        ${axisFieldHTML('offset', 'x', selectedPanel.offset.x, false)}
+        ${axisFieldHTML('offset', 'y', selectedPanel.offset.y, false)}
+        ${axisFieldHTML('offset', 'z', selectedPanel.offset.z, false)}
+      </div>
+      <div class="transform-label">Position offset (mm)</div>
+    `}
   `;
 
   // ---- rename (pencil icon) ----
@@ -210,16 +209,23 @@ export function renderProperties(
 
   // ---- edge fit (only present for a box's Front/Back wall — see the
   // `selectedPanel.edgeFit` check above) ----
-  const applyEdgeFitBtn = container.querySelector('#apply-edge-fit-btn');
-  if (applyEdgeFitBtn) {
-    applyEdgeFitBtn.addEventListener('click', () => {
-      const edgeFit = {};
-      container.querySelectorAll('.edge-fit-field').forEach((select) => {
-        edgeFit[select.dataset.edge] = select.value;
-      });
-      onEdgeFitChange(edgeFit);
+  // Each select commits its own pick immediately via
+  // onEdgeFitFieldChange (modeller-main.js's own `pendingEdgeFit` —
+  // see that file's comment on why this can't just be read fresh off
+  // these <select> elements at Apply time anymore: a re-render
+  // triggered by anything else — most commonly resizing a DIFFERENT
+  // box wall mid-edit — recreates this whole section from the node's
+  // actual committed edgeFit, wiping whatever was picked-but-not-yet-
+  // applied here). Apply itself now takes no arguments; the value it
+  // commits was already tracked the moment each select changed.
+  container.querySelectorAll('.edge-fit-field').forEach((select) => {
+    select.addEventListener('change', () => {
+      onEdgeFitFieldChange(select.dataset.edge, select.value);
     });
-  }
+  });
+  container.querySelector('#apply-edge-fit-btn')?.addEventListener('click', () => {
+    onEdgeFitChange();
+  });
 
   // ---- door (hinge + open/close — only present for a door, see the
   // `selectedPanel.isDoor` check above) ----
@@ -229,6 +235,7 @@ export function renderProperties(
   container.querySelector('#toggle-door-open-btn')?.addEventListener('click', () => {
     onToggleDoorOpen();
   });
+  wireRestoreFaceButtons(container, onRestoreFace);
 }
 
 // A box's Front/Back wall keeps the box's own outer size fixed and
@@ -263,6 +270,27 @@ function edgeFitSectionHTML(edgeFit) {
   `;
 }
 
+// Shared by both the group-level view (a hidden face's own natural
+// home) and doorSectionHTML below (see that function's own comment
+// for why a door needs this too) — one hidden-face list, one set of
+// click handlers, no duplicated markup to drift out of sync.
+function restoreFaceListHTML(hiddenList, restoreError) {
+  if (!hiddenList || hiddenList.length === 0) return '';
+  return `
+    <div class="section-title">Deleted faces — ${hiddenList.length}</div>
+    <div class="restore-face-list">
+      ${hiddenList.map((p) => `<button class="add-btn restore-face-btn" data-restore-id="${p.id}">↺ Restore ${escapeHtml(getDisplayName(p))}</button>`).join('')}
+    </div>
+    ${restoreError ? `<div class="properties-error">${escapeHtml(restoreError)}</div>` : ''}
+  `;
+}
+
+function wireRestoreFaceButtons(container, onRestoreFace) {
+  container.querySelectorAll('.restore-face-btn').forEach((btn) => {
+    btn.addEventListener('click', () => onRestoreFace(btn.dataset.restoreId));
+  });
+}
+
 // Hinge is a design choice (which side the actual hardware goes on),
 // so changing it here goes straight through — one field, no need for
 // edgeFit's own batched Apply pattern. Open/Close is the opposite: a
@@ -273,7 +301,17 @@ function edgeFitSectionHTML(edgeFit) {
 // Top/Bottom wall, lying flat like a lid) has no vertical edge to
 // hinge on, so that case hides the Open/Close button entirely rather
 // than showing a button that would silently do nothing.
-function doorSectionHTML(door) {
+//
+// The hidden-face Restore list is repeated here (see
+// restoreFaceListHTML above) right next to Open/Close: drilling into
+// an individual door panel switches the WHOLE inspector away from the
+// group-level view where Restore normally lives (see the
+// `selectedGroupId && !selectedPanel` branch up top), so without this
+// a door's own group would be unreachable from the group-level
+// Restore button the moment the door itself is selected instead —
+// exactly the case someone undoing a door back to its original hidden
+// wall would hit.
+function doorSectionHTML(door, hiddenGroupMembers, restoreError) {
   const canOpen = door.normalAxis !== 'y';
   return `
     <div class="divider"></div>
@@ -286,6 +324,7 @@ function doorSectionHTML(door) {
       </select>
     </div>
     ${canOpen ? `<button class="add-btn" id="toggle-door-open-btn">${door.doorOpen ? 'Close door' : 'Open door'}</button>` : ''}
+    ${restoreFaceListHTML(hiddenGroupMembers, restoreError)}
   `;
 }
 

@@ -10,6 +10,7 @@
  * pick is still in progress).
  */
 import { PANEL_SIZE_LIMITS_MM } from '../modeller/modules.js';
+import { history } from '../history/history.js';
 
 // Design limits (DESIGN_LIMITS_MM, in modules.js): the overall space
 // a design may occupy, checked at every edit entry point in
@@ -36,6 +37,17 @@ export function showToast(text, autoHide = true) {
   clearTimeout(designLimitHideTimer);
 
   if (autoHide) {
+    // autoHide=true is this app's own existing signal for "a self-
+    // clearing error/rejection flash" (see this file's header comment)
+    // as opposed to persistent step-by-step tool guidance
+    // (autoHide=false — "pick a boundary panel...", etc, which isn't a
+    // warning about anything the person did wrong) — reused as-is here
+    // rather than inventing a second classification, so every design-
+    // limit hit, panel-size hit, spacing rejection, and invalid pick
+    // across the whole app gets recorded in history/history.js's
+    // activityLog with no call site anywhere needing to know this
+    // happens.
+    history.logWarning(text);
     designLimitHideTimer = setTimeout(() => {
       hideToast();
     }, 2200);

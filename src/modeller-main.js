@@ -43,7 +43,7 @@ import { resolveConstraints } from './modeller/snap.js';
 import { createModellerScene } from './modeller/scene.js';
 import { getSelectedId, setSelectedId, getSelectedGroupId, setSelectedGroupId } from './modeller/selection.js';
 import { computeBom } from './engine/bom.js';
-import { exportCutListPdf } from './engine/pdfExport.js';
+import { exportCutListPdf, exportHistoryPdf } from './engine/pdfExport.js';
 import { renderProperties } from './ui/properties.js';
 import { renderPanelList } from './ui/toolbar.js';
 import { renderRelations } from './ui/relations.js';
@@ -66,6 +66,7 @@ import {
 import { addBox, relayoutBox } from './features/box.js';
 import { isShelf } from './features/shelf.js';
 import { createDoorNode, computeDoorOpenTransform, applyDoorAdjustmentsForGroup, applyPanelPatch } from './features/door.js';
+import { createDrawerFrontNodes, createDrawerBoxNodes, computeDrawerBoxPlacement, applyDrawerAdjustmentsForGroup } from './features/drawer.js';
 import { startShelfMode, cancelShelfMode, getShelfMode, setShelfToolContext } from './tools/shelfTool.js';
 import { setBoundaryRectToolContext } from './tools/boundaryRectTool.js';
 import {
@@ -81,6 +82,18 @@ import {
   setDoorToolContext,
 } from './tools/doorTool.js';
 import {
+  startDrawerMode,
+  cancelDrawerMode,
+  confirmDrawerMode,
+  setDrawerEdgeFitField,
+  setDrawerCount,
+  isDrawerPickActive,
+  isDrawerConfirmActive,
+  getDrawerEdgeFit,
+  getDrawerCount,
+  setDrawerToolContext,
+} from './tools/drawerTool.js';
+import {
   startCollinearMode,
   cancelCollinearMode,
   isCollinearActive,
@@ -95,6 +108,7 @@ import {
   DeleteBoxCommand, GroupPanelsCommand, UngroupPanelsCommand, DeleteShelfCommand,
   RemoveConstraintCommand, UnlinkConstraintCommand, HideBoxWallCommand, RestoreBoxWallCommand,
   ChangeEdgeFitCommand, AddDoorCommand, SetDoorHingeCommand, DeleteDoorCommand,
+  AddDrawerCommand, DeleteDrawerCommand,
 } from './history/history.js';
 initResizableLayout();
 
@@ -153,6 +167,12 @@ const multiSelectedIds = new Set();
 // is already stored, or it would compound every single frame.
 let groupDragStartOffsets = null; // Map<nodeId, {x,y,z}> | null
 let moveDragBefore = null;
+// { nodeId, edgeFit } | null — a Front/Back wall's edge-fit selects,
+// picked but not yet committed via Apply (see
+// renderInspectorOnly's own comment on why this can't just live in
+// the DOM). Cleared implicitly whenever pendingEdgeFit.nodeId no
+// longer matches the current selection — see the two functions below.
+let pendingEdgeFit = null;
 let moveDragIsGroup = false;
 
 // ---- DOM refs ----
@@ -166,6 +186,7 @@ const axesCanvas = document.getElementById('axes-gizmo-canvas');
 const pipCanvas = document.getElementById('pip-canvas');
 const undoBtn = document.getElementById('undo-btn');
 const redoBtn = document.getElementById('redo-btn');
+const printHistoryBtn = document.getElementById('print-history-btn');
 
 function syncHistoryButtons() {
   if (undoBtn) undoBtn.disabled = !history.canUndo();
@@ -174,6 +195,16 @@ function syncHistoryButtons() {
 history.setOnChange(syncHistoryButtons);
 undoBtn?.addEventListener('click', () => history.undo());
 redoBtn?.addEventListener('click', () => history.redo());
+// mode:'open' (not the default 'save') — same convention as
+// #open-cutlist-btn below: opens straight in a new tab so the person
+// sees it immediately, no download prompt. Deliberately synchronous
+// within this click handler (no await before window.open) — see
+// engine/pdfExport.js's own doc comment on why an async gap here
+// would get the popup silently blocked by most browsers.
+printHistoryBtn?.addEventListener('click', () => {
+  const lines = history.getActivityLogText().split('\n').filter(Boolean);
+  exportHistoryPdf(lines, { projectName: 'Activity History', mode: 'open' });
+});
 syncHistoryButtons();
 
 document.getElementById('export-bom-pdf-btn')?.addEventListener('click', () => {
@@ -243,7 +274,28 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
     }
 
     updateNode(nodeId, { offset: clampedOffset, rotation: transform.rotation });
-    if (nodeId === getSelectedId()) { renderInspectorOnly(); }
+
+    // A shelf (or any other panel) can be one of a door's 4 boundary
+    // panels (see features/door.js#createDoorNode's boundaryIds) — if
+    // this node just moved, any door bounded by it is now sized/
+    // positioned against stale geometry until re-derived. Same fix
+    // box-wall moves already get via applyRelayoutResult below: re-run
+    // every door in this group against whatever just changed.
+    // applyDoorAdjustmentsForGroup is a cheap no-op (same array
+    // reference back) when the group has no doors at all, which is
+    // how doorsChanged below tells the two cases apart.
+    let doorsChanged = false;
+    if (node.groupId) {
+      const beforeDoors = panels;
+      panels = applyDoorAdjustmentsForGroup(panels, node.groupId);
+      doorsChanged = panels !== beforeDoors;
+    }
+
+    if (doorsChanged) {
+      renderAll(); // more than just this node changed — full reconcile, not just the inspector
+    } else if (nodeId === getSelectedId()) {
+      renderInspectorOnly();
+    }
     if (hitAxis) {
       showDesignLimitError(hitAxis);
       return {
@@ -305,6 +357,28 @@ window.addEventListener('pointerup', () => {
   const isGroup = moveDragIsGroup;
   moveDragBefore = null;
   moveDragIsGroup = false;
+
+  if (isGroup && groupDragStartOffsets) {
+    // onGroupTransformChange (unlike the single-node path above) just
+    // writes `panels` directly on every frame without ever calling
+    // renderAll — the gizmo moves each mesh itself for performance
+    // during the drag. That means any door bounded by one of the
+    // dragged panels (a multi-selected shelf, say) is left stale until
+    // this one catch-up pass, once the drag actually finishes.
+    const groupIds = new Set(
+      Array.from(groupDragStartOffsets.keys())
+        .map((id) => panels.find((p) => p.id === id)?.groupId)
+        .filter(Boolean)
+    );
+    let doorsChanged = false;
+    groupIds.forEach((groupId) => {
+      const before2 = panels;
+      panels = applyDoorAdjustmentsForGroup(panels, groupId);
+      if (panels !== before2) doorsChanged = true;
+    });
+    if (doorsChanged) renderAll();
+  }
+
   const after = panels;
   if (before === after) return;
   recordHistoryCommand(isGroup ? MoveGroupCommand : MovePanelCommand, before, after);
@@ -350,6 +424,15 @@ function applyDimensionChange(nodeId, dims, offsetDeltaMm) {
   }
   const before = panels;
   updateNode(nodeId, { width: dims.width, height: dims.height, thickness: dims.thickness, offset: proposedOffset });
+
+  // Same reasoning as onTransformChange's door catch-up above — a
+  // resize (this handler backs the resize-handle drag, mostly shelves;
+  // see gizmos.js) can change a door's boundary just as easily as a
+  // move can. No-op when `current`'s group has no doors.
+  if (current.groupId) {
+    panels = applyDoorAdjustmentsForGroup(panels, current.groupId);
+  }
+
   const after = panels;
   recordHistoryCommand(ResizePanelCommand, before, after);
   renderAll();
@@ -382,6 +465,7 @@ setCollinearToolContext(toolContext);
 setAttachToolContext(toolContext);
 setBoundaryRectToolContext(toolContext);
 setDoorToolContext({ getPanels: () => panels, renderAll: () => renderAll() });
+setDrawerToolContext({ getPanels: () => panels, renderAll: () => renderAll() });
 
 // The 4 boundary panels adapt to the confirmed door exactly the way
 // features/box.js's Left/Right/Top/Bottom already adapt to Front's/
@@ -408,6 +492,54 @@ function handleDoorConfirmed(placement) {
 function confirmSelectedDoor() {
   const catalogEntry = MATERIAL_CATALOG[0];
   confirmDoorMode({ material: catalogEntry?.name, thicknessMm: catalogEntry?.thicknessMm ?? 18 }, handleDoorConfirmed);
+}
+
+// Same shape as handleDoorConfirmed above, N nodes instead of 1 — see
+// features/drawer.js#computeDrawerFrontsPlacement/createDrawerFrontNodes
+// for the actual math; this is just the single write + one history
+// entry covering all N fronts together (so undo removes/restores the
+// whole stack in one step, not one front at a time). Building a
+// drawer now means building the WORKING drawer, not just its visible
+// front — each front gets its own left/right/bottom/back too (see
+// features/drawer.js#computeDrawerBoxPlacement), all in this same
+// history entry. A front whose box doesn't fit (rare — needs decent
+// depth behind the opening) still gets created on its own; only that
+// one front's box is skipped, with a toast explaining why, rather
+// than failing the whole drawer over one section.
+function handleDrawerConfirmed(placement) {
+  const before = panels;
+
+  placement.panelPatches.forEach((patch) => {
+    panels = applyPanelPatch(panels, patch, placement.normalAxis);
+  });
+
+  const drawerNodes = createDrawerFrontNodes(panels, placement);
+  panels = [...panels, ...drawerNodes];
+
+  const boxFailures = [];
+  drawerNodes.forEach((front) => {
+    const boxPlacement = computeDrawerBoxPlacement(panels, front, front.drawerBoxSpec);
+    if (boxPlacement.ok) {
+      panels = [...panels, ...createDrawerBoxNodes(panels, boxPlacement)];
+    } else {
+      boxFailures.push(front);
+    }
+  });
+  if (boxFailures.length > 0) {
+    showToast(drawerNodes.length > 1
+      ? `Not enough depth behind ${boxFailures.length} of ${drawerNodes.length} drawer front(s) for a box — front(s) added without one`
+      : "Not enough depth behind this opening for a drawer box — front added without one");
+  }
+
+  const after = panels;
+  recordHistoryCommand(AddDrawerCommand, before, after);
+  setSelectedId(drawerNodes[0].id);
+  renderAll();
+}
+
+function confirmSelectedDrawer() {
+  const catalogEntry = MATERIAL_CATALOG[0];
+  confirmDrawerMode({ material: catalogEntry?.name, thicknessMm: catalogEntry?.thicknessMm ?? 18 }, handleDrawerConfirmed);
 }
 
 // Maps a relayoutBox() result (see features/box.js) to the exact same
@@ -440,6 +572,10 @@ function applyRelayoutResult(result) {
   const groupId = panels.find((p) => p.id === result.patches[0]?.id)?.groupId;
   if (groupId) {
     panels = applyDoorAdjustmentsForGroup(panels, groupId);
+    // Same reasoning, drawer-front counterpart — see
+    // features/drawer.js#applyDrawerAdjustmentsForGroup's own doc
+    // comment.
+    panels = applyDrawerAdjustmentsForGroup(panels, groupId);
   }
   return true;
 }
@@ -455,6 +591,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && isCollinearActive()) cancelCollinearMode();
   if (e.key === 'Escape' && getShelfMode()) cancelShelfMode();
   if (e.key === 'Escape' && (isDoorPickActive() || isDoorConfirmActive())) cancelDoorMode();
+  if (e.key === 'Escape' && (isDrawerPickActive() || isDrawerConfirmActive())) cancelDrawerMode();
 
   if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
     e.preventDefault();
@@ -657,10 +794,36 @@ function renderAll() {
   const doorFieldsById = new Map(
     panels.filter((p) => p.isDoor).map((p) => [p.id, { isDoor: true, hinge: p.hinge, doorOpen: !!p.doorOpen, normalAxis: p.normalAxis, doorSign: p.doorSign }])
   );
+  // Same reasoning again, for a drawer front's own isDrawerFront flag
+  // — without this, gizmos.js's isDrawerFront(mesh) check (and
+  // view2d.js's matching one) never sees it true, since
+  // entry.mesh.userData.isDrawerFront in scene.js reads straight off
+  // whatever node object gets passed in here. A resize-lockdown check
+  // reading a flag that's silently always false is worse than no
+  // check at all — it looks fixed and isn't.
+  const drawerFrontFieldsById = new Map(
+    // `sign` needed by shared/handle.js#computeHandlePlacement — see
+    // that function's own comment on why it's needed to know which
+    // way the front's outer face points (so the handle protrudes from
+    // the visible side, not the one facing into the box).
+    panels.filter((p) => p.isDrawerFront).map((p) => [p.id, { isDrawerFront: true, sign: p.sign }])
+  );
+  // Same reasoning again, for a drawer box panel's own isDrawerBoxPanel
+  // flag — these 4 panels per front (left/right/bottom/back) are
+  // locked exactly like the front itself (see
+  // features/drawer.js#createDrawerBoxNodes), so they need the SAME
+  // re-attachment or gizmos.js's isDrawerBoxPanel(mesh) check is
+  // silently always false the same way isDrawerFront's would be
+  // without the map just above.
+  const drawerBoxPanelFieldsById = new Map(
+    panels.filter((p) => p.isDrawerBoxPanel).map((p) => [p.id, { isDrawerBoxPanel: true }])
+  );
   const resolvedWithCodes = resolved.map((r) => ({
     ...r,
     pieceCode: r.pieceCode ?? pieceCodeById.get(r.id),
     ...doorFieldsById.get(r.id),
+    ...drawerFrontFieldsById.get(r.id),
+    ...drawerBoxPanelFieldsById.get(r.id),
   }));
 
   const visiblePanels = resolvedWithCodes.filter((p) => !p.hidden);
@@ -700,14 +863,14 @@ function renderAll() {
     onAddHorizontal: addHorizontalPanel,
     onAddParallel: addParallelPanel,
     onAddBox: handleAddBox,
-    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), startCollinearMode())),
+    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), startCollinearMode())),
     collinearActive: isCollinearActive(),
     collinearGapMm: getCollinearGapMm(),
     onCollinearGapChange: setCollinearGapMm, // deliberately no renderAll() here — see toolbar.js's own comment on why
-    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), startShelfMode('horizontal'))),
-    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), startShelfMode('vertical'))),
+    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), startShelfMode('horizontal'))),
+    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), startShelfMode('vertical'))),
     shelfMode: getShelfMode(),
-    onAddDoor: () => ((isDoorPickActive() || isDoorConfirmActive()) ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), startDoorMode())),
+    onAddDoor: () => ((isDoorPickActive() || isDoorConfirmActive()) ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDrawerMode(), startDoorMode())),
     doorToolActive: isDoorPickActive() || isDoorConfirmActive(),
     doorConfirmActive: isDoorConfirmActive(),
     doorEdgeFit: getDoorEdgeFit(),
@@ -716,6 +879,15 @@ function renderAll() {
     onDoorHingeSelect: setDoorHinge,
     onDoorConfirm: confirmSelectedDoor,
     onDoorCancel: cancelDoorMode,
+    onAddDrawer: () => ((isDrawerPickActive() || isDrawerConfirmActive()) ? cancelDrawerMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), startDrawerMode())),
+    drawerToolActive: isDrawerPickActive() || isDrawerConfirmActive(),
+    drawerConfirmActive: isDrawerConfirmActive(),
+    drawerEdgeFit: getDrawerEdgeFit(),
+    onDrawerEdgeFitChange: setDrawerEdgeFitField,
+    drawerCount: getDrawerCount(),
+    onDrawerCountChange: setDrawerCount,
+    onDrawerConfirm: confirmSelectedDrawer,
+    onDrawerCancel: cancelDrawerMode,
     onOpenCutList: openCutListWindow,
     onNestCutList: openNestingPlan,
   });
@@ -732,7 +904,23 @@ function renderInspectorOnly() {
   const selectedId = getSelectedId();
   const selectedGroupId = getSelectedGroupId();
 
-  const selectedPanel = panels.find((p) => p.id === selectedId) || null;
+  let selectedPanel = panels.find((p) => p.id === selectedId) || null;
+  // An edge-fit edit is a pick-one-of-4-selects-then-click-Apply flow
+  // (see updateSelectedEdgeFit/applyPendingEdgeFit below) — the picked
+  // values live in `pendingEdgeFit`, NOT on the node itself, until
+  // Apply is actually clicked. renderInspectorOnly() runs on every
+  // resize frame of ANY box wall (see onTransformChange's isBoxWall
+  // branch above), which fully regenerates this panel's HTML from
+  // whatever it's handed here — without this override, resizing a
+  // DIFFERENT wall mid-edit would silently blow away the in-progress,
+  // not-yet-applied edge-fit picks, snapping the selects back to the
+  // node's last-committed values (looking, to the person, exactly like
+  // their in/out settings "reverting to default"). Naturally stops
+  // applying itself the moment a different node gets selected, since
+  // pendingEdgeFit.nodeId then no longer matches.
+  if (selectedPanel && pendingEdgeFit && pendingEdgeFit.nodeId === selectedPanel.id) {
+    selectedPanel = { ...selectedPanel, edgeFit: pendingEdgeFit.edgeFit };
+  }
 
   // Recomputed here too (not threaded from renderAll) so the
   // high-frequency onTransformChange path always reflects the current
@@ -777,7 +965,8 @@ function renderInspectorOnly() {
       onUngroup: ungroupSelected,
       onRestoreFace: restoreFace,
       onGroupMaterialChange: updateGroupMaterial,
-      onEdgeFitChange: updateSelectedEdgeFit,
+      onEdgeFitFieldChange: updatePendingEdgeFit,
+      onEdgeFitChange: applyPendingEdgeFit,
       onToggleDoorOpen: toggleSelectedDoorOpen,
       onDoorHingeChange: updateSelectedDoorHinge,
     });
@@ -808,6 +997,20 @@ function renameSelected(newName) {
   renderAll();
 }
 
+// Called on every keystroke/select of one of the 4 Edge Fit dropdowns
+// — merges into `pendingEdgeFit` (see its own comment) rather than
+// committing anything yet. renderInspectorOnly() (not renderAll()) is
+// enough here: nothing about the box's actual geometry has changed,
+// only what the inspector itself should currently display.
+function updatePendingEdgeFit(edge, value) {
+  const node = panels.find((p) => p.id === getSelectedId());
+  if (!node || !node.edgeFit) return; // defensive — the control only renders for a node that already has one
+
+  const base = (pendingEdgeFit && pendingEdgeFit.nodeId === node.id) ? pendingEdgeFit.edgeFit : node.edgeFit;
+  pendingEdgeFit = { nodeId: node.id, edgeFit: { ...base, [edge]: value } };
+  renderInspectorOnly();
+}
+
 // Only ever called for a box's Front or Back wall (that's the only
 // case ui/properties.js shows the Edge Fit control for — see its
 // `node.edgeFit != null` check) — routes through relayoutBox exactly
@@ -815,12 +1018,18 @@ function renameSelected(newName) {
 // because edgeFit feeds into computeBoxLayout()'s own per-wall math
 // (see features/box.js#resolvePanelFit) the same way thickness does.
 // Left/Right/Top/Bottom/the box's own outer footprint are untouched —
-// only the one edited wall's width/height/offset can change.
-function updateSelectedEdgeFit(edgeFit) {
+// only the one edited wall's width/height/offset can change. Commits
+// `pendingEdgeFit` (built up by updatePendingEdgeFit above, one field
+// at a time) rather than taking a value directly — see
+// renderInspectorOnly's own comment on why the value can't just be
+// read fresh off the DOM at Apply time the way it used to be.
+function applyPendingEdgeFit() {
   const selectedId = getSelectedId();
   const node = panels.find((p) => p.id === selectedId);
   if (!node || !node.groupId || !node.edgeFit) return; // defensive — the control only renders for a node that already has one
+  if (!pendingEdgeFit || pendingEdgeFit.nodeId !== node.id) return; // nothing picked since the last Apply/selection change
 
+  const edgeFit = pendingEdgeFit.edgeFit;
   const before = panels;
   updateNode(selectedId, { edgeFit });
   const result = relayoutBox(panels, node.groupId);
@@ -830,6 +1039,7 @@ function updateSelectedEdgeFit(edgeFit) {
     renderAll();
     return;
   }
+  pendingEdgeFit = null;
   const after = panels;
   recordHistoryCommand(ChangeEdgeFitCommand, before, after);
   renderAll();
@@ -1127,23 +1337,42 @@ function removeSelected() {
   const node = panels.find((p) => p.id === selectedId);
   if (!node) return;
 
-  if (node.groupId && (isShelf(node) || node.isDoor)) {
-    // Shelves and doors have no "restore" concept — a shelf's
-    // position, and a door's whole existence, are user choices, not
-    // part of the box's own 6-wall structure — so removing either
-    // erases it from the graph completely and immediately frees the
-    // space it occupied. Critically, a door must NOT fall through to
-    // the generic "hide it" branch below: a hidden-but-still-present
-    // door would keep satisfying restoreFace()'s "a door exists in
-    // this box" check forever, permanently blocking Front/Back/etc.
-    // from ever being restorable again.
+  if (node.groupId && (isShelf(node) || node.isDoor || node.isDrawerFront)) {
+    // Shelves, doors, and drawer fronts have no "restore" concept — a
+    // shelf's position, a door's whole existence, and a drawer front's
+    // whole existence are all user choices, not part of the box's own
+    // 6-wall structure — so removing any of them erases it from the
+    // graph completely and immediately frees the space it occupied.
+    // Critically, a door must NOT fall through to the generic "hide
+    // it" branch below: a hidden-but-still-present door would keep
+    // satisfying restoreFace()'s "a door exists in this box" check
+    // forever, permanently blocking Front/Back/etc. from ever being
+    // restorable again.
+    // KNOWN GAP: unlike a door, deleting a drawer front's own boundary
+    // panel does NOT cascade-delete it the way
+    // cascadeDeleteOrphanedDoors does for doors below — it's left
+    // frozen at its last-known geometry instead (computeDrawerRecompute
+    // in features/drawer.js already returns ok:false rather than crash
+    // when a boundary panel is missing). Not solved speculatively —
+    // flagging here rather than half-replicating the orphan-cascade
+    // logic for a feature whose deletion UX (one front vs the whole
+    // stack) hasn't been designed yet.
     const before = panels;
     let after = panels.filter((p) => p.id !== selectedId);
     after = cascadeDeleteOrphanedDoors(after, node);
+    // A drawer front's own box (left/right/bottom/back — see
+    // features/drawer.js#createDrawerBoxNodes) is useless without the
+    // front it was built for; unlike the boundary-panel case above,
+    // this one IS solved — drawerBoxFrontId makes "which box panels
+    // belong to this front" unambiguous, so there's no deletion-UX
+    // ambiguity to defer.
+    if (node.isDrawerFront) {
+      after = after.filter((p) => p.drawerBoxFrontId !== node.id);
+    }
     panels = after;
     setSelectedGroupId(node.groupId);
     setSelectedId(null);
-    recordHistoryCommand(node.isDoor ? DeleteDoorCommand : DeleteShelfCommand, before, after);
+    recordHistoryCommand(node.isDoor ? DeleteDoorCommand : (node.isDrawerFront ? DeleteDrawerCommand : DeleteShelfCommand), before, after);
     renderAll();
     return;
   }

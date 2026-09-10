@@ -128,6 +128,19 @@ function isBoxWall(mesh) {
   return mesh?.userData?.isBoxWall === true;
 }
 
+// A door, drawer front, or drawer box panel: no independent edge-drag
+// resize here, same reasoning as modeller/gizmos.js's own isDoor(mesh)
+// check for the 3D view — all recomputed whole by their own
+// applyDoorAdjustmentsForGroup/applyDrawerAdjustmentsForGroup, never
+// resized by hand. Unlike isBoxWall just above, this ALSO isn't in the
+// existing positionHandle() code below at all yet (only isBoxWall is
+// checked there) — that's a latent gap, not something introduced by
+// drawer fronts; fixed for all three here rather than leaving doors
+// resizable in the 2D view while drawer fronts/boxes aren't.
+function isDoorOrDrawerFront(mesh) {
+  return !!(mesh?.userData?.isDoor || mesh?.userData?.isDrawerFront || mesh?.userData?.isDrawerBoxPanel);
+}
+
 export function create2DControls(
   canvas,
   camera,
@@ -481,6 +494,22 @@ export function create2DControls(
     // arrows are unaffected — a box wall still moves along its one free
     // axis exactly as before, gated the normal way just below.
     if (isBoxWall(mesh)) {
+      edgeHandles.left.visible = false;
+      edgeHandles.right.visible = false;
+      edgeHandles.top.visible = false;
+      edgeHandles.bottom.visible = false;
+      positionMoveHandles(mesh.position, lockedFields, lockedMoveAxes);
+      updateOutlineForSingleMesh(mesh);
+      return;
+    }
+
+    // No edge-drag resize for a door or drawer front — see
+    // isDoorOrDrawerFront's own comment above. lockedMoveAxes already
+    // covers all 3 axes for both (see features/door.js#createDoorNode
+    // and features/drawer.js#createDrawerFrontNodes), so
+    // positionMoveHandles below hides the move arrows too without
+    // needing a separate check here.
+    if (isDoorOrDrawerFront(mesh)) {
       edgeHandles.left.visible = false;
       edgeHandles.right.visible = false;
       edgeHandles.top.visible = false;

@@ -69,7 +69,21 @@ export function collectAxisSlabs(panels, groupId, axis, overrides = {}) {
     if (p.groupId !== groupId) return;
     if (p.hidden) return; // a hidden (removed-but-restorable) panel no longer occupies space — see removeSelected()
     const isRelevantWall = p.isBoxWall && (p.name === wallRoleLow || p.name === wallRoleHigh);
-    const isRelevantShelf = !p.isBoxWall && rotationsMatch(p.rotation, relevantRotation);
+    // Doors, drawer fronts, and drawer box panels are all DERIVED —
+    // their position/size come from dedicated code
+    // (shared/frontFit.js#computeFrontFit,
+    // features/drawer.js#computeDrawerBoxPlacement), each with its own
+    // MIN_PANEL_DIM_MM validation already. The generic "keep
+    // MIN_WALL_GAP_MM between neighboring shelves" heuristic this
+    // function exists for doesn't apply to them — e.g. a drawer's own
+    // Bottom panel sitting close to the box's actual Bottom wall is
+    // the INTENDED geometry, not two shelves accidentally placed too
+    // close together. Without this exclusion, relayoutBox (which
+    // calls this for every box resize) would spuriously reject a
+    // resize any time a drawer box's own panels happened to sit within
+    // MIN_WALL_GAP_MM of a wall or each other — which, given typical
+    // slide-clearance margins, is common by design, not a mistake.
+    const isRelevantShelf = !p.isBoxWall && !p.isDoor && !p.isDrawerFront && !p.isDrawerBoxPanel && rotationsMatch(p.rotation, relevantRotation);
     if (!isRelevantWall && !isRelevantShelf) return;
     const o = overrides[p.id];
     slabs.push(

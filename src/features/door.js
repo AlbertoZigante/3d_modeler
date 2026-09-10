@@ -18,48 +18,21 @@
  * whichever 2 world axes those actually are depends on which wall the
  * door is replacing (see computeBoundaryRectangle's own doc comment).
  *
- * Placing a door is the SAME physical problem features/box.js just
- * solved for Front/Back vs Left/Right/Top/Bottom — 'out' on an edge
- * means the door covers that boundary panel's end, so the panel must
- * recede by the door's own thickness to avoid interpenetrating it;
- * 'in' means the panel stays flush with the door's inner face. The
- * one real difference: box.js's Left/Right/Top/Bottom already shared
- * one uniform depth range dictated by Back's/Front's fixed Z offsets.
- * A door's 4 boundary panels are whatever the user picked — they
- * don't necessarily already agree on where they end along the door's
- * own normal axis — so each is resolved independently here instead of
- * assuming a shared range.
+ * The actual opening-fitting math (edge fit -> footprint, boundary-
+ * panel patches, interior-panel clearance) lives in
+ * shared/frontFit.js#computeFrontFit — shared with features/drawer.js,
+ * which fits N stacked drawer fronts into the exact same kind of
+ * opening. This file layers door-specific concerns on top: exactly
+ * one panel, a hinge side, and open/close swinging.
  */
-import { createPanelNode, getAlignedAxis, MIN_PANEL_DIM_MM } from '../modeller/modules.js';
-import { resolveConstraints } from '../modeller/snap.js';
-import { panelExtentAlongAxis, computeBoundaryRectangle, PARALLEL_ROTATION, VERTICAL_ROTATION, HORIZONTAL_ROTATION } from '../shared/geometry.js';
+import { createPanelNode } from '../modeller/modules.js';
+import { computeBoundaryRectangle } from '../shared/geometry.js';
+import { computeFrontFit, dimFieldForAxis, ROTATION_FOR_NORMAL_AXIS } from '../shared/frontFit.js';
 
 export const DEFAULT_DOOR_EDGE_FIT = { left: 'in', right: 'in', bottom: 'in', top: 'in' };
 export const DEFAULT_DOOR_HINGE = 'left';
 
-export const ROTATION_FOR_NORMAL_AXIS = { z: PARALLEL_ROTATION, x: VERTICAL_ROTATION, y: HORIZONTAL_ROTATION };
-
-// Which of a node's own width/height/thickness fields actually
-// governs a given world axis, for a given rotation — e.g. for
-// VERTICAL_ROTATION (Left/Right-style), 'width' governs Z and
-// 'height' governs Y, not the other way round (see FACE_TO_DIM_FIELD
-// in modules.js: 'right' face -> width, 'top' face -> height).
-// Reused here instead of hardcoding a per-rotation table so this
-// stays correct if LOCAL_FACES/getAlignedAxis's own convention ever
-// changes.
-function dimFieldForAxis(rotation, axis) {
-  if (getAlignedAxis(rotation, 'right')?.axis === axis) return 'width';
-  if (getAlignedAxis(rotation, 'top')?.axis === axis) return 'height';
-  return 'thickness';
-}
-
-// Maps computeBoundaryRectangle's axisA/axisB near/far sides onto the
-// door's own stable left/right/bottom/top edge labels.
-function edgeSides(boundaryResult) {
-  const a = boundaryResult.sides[boundaryResult.axisA];
-  const b = boundaryResult.sides[boundaryResult.axisB];
-  return { left: a.near, right: a.far, bottom: b.near, top: b.far };
-}
+export { ROTATION_FOR_NORMAL_AXIS };
 
 /**
  * @param {Array} panels - current graph (passed to resolveConstraints)
@@ -69,99 +42,41 @@ function edgeSides(boundaryResult) {
  * @param {{material:string, thicknessMm:number, hinge?:'left'|'right'}} doorSpec
  * @returns {{ ok: true, groupId: string, normalAxis: string,
  *   door: { axisA, axisB, aMin, aMax, bMin, bMax, centerN, thicknessMm, material, hinge, doorSign },
- *   panelPatches: [{ id: string, width?: number, height?: number, thickness?: number, centerN: number }] }
+ *   panelPatches: [{ id: string, dimField?: string, width?: number, height?: number, thickness?: number, centerN: number }] }
  *  | { ok: false, reason: 'invalid-boundary-result' | 'not-resolved' | 'degenerate' | 'panel-too-short' }}
  */
 export function computeDoorPlacement(panels, boundaryResult, edgeFit, doorSpec) {
-  if (!boundaryResult || !boundaryResult.ok) return { ok: false, reason: 'invalid-boundary-result' };
-
-  const N = boundaryResult.normalAxis;
-  const fit = { ...DEFAULT_DOOR_EDGE_FIT, ...(edgeFit || {}) };
-  const sides = edgeSides(boundaryResult);
-
-  // The door's own footprint across the 2 bounded axes — 'out' reaches
-  // to that side's OUTER rect edge (covering the boundary panel);
-  // 'in' stays at the INNER rect edge (flush inside it). Already
-  // computed by computeBoundaryRectangle — no need to re-derive
-  // xInnerMin-style bounds here.
-  const aMin = fit.left === 'out' ? boundaryResult.outer[boundaryResult.axisA].min : boundaryResult.inner[boundaryResult.axisA].min;
-  const aMax = fit.right === 'out' ? boundaryResult.outer[boundaryResult.axisA].max : boundaryResult.inner[boundaryResult.axisA].max;
-  const bMin = fit.bottom === 'out' ? boundaryResult.outer[boundaryResult.axisB].min : boundaryResult.inner[boundaryResult.axisB].min;
-  const bMax = fit.top === 'out' ? boundaryResult.outer[boundaryResult.axisB].max : boundaryResult.inner[boundaryResult.axisB].max;
-  if (aMax <= aMin || bMax <= bMin) return { ok: false, reason: 'degenerate' };
-
-  const resolved = resolveConstraints(panels);
-  const findResolved = (node) => resolved.find((r) => r.id === node.id);
-
-  // Each boundary panel's current extent along N (the door's own
-  // normal/facing axis), and which edge label (hence which fit) it
-  // corresponds to.
-  const extents = Object.entries(sides).map(([edge, node]) => {
-    const r = findResolved(node);
-    const extent = r && panelExtentAlongAxis(r, N);
-    return extent ? { edge, node: r, ...extent } : null;
-  });
-  if (extents.some((e) => !e)) return { ok: false, reason: 'not-resolved' };
-
-  // The structure's current outward-facing opening along N: whichever
-  // face (across all 4 panels) sits farthest from the box's shared
-  // anchor (offset 0 on that axis) — i.e. the side that's presumably
-  // open, not already backed by another wall. This is a heuristic,
-  // not a guarantee: if a door is ever needed on the OTHER side of an
-  // already-enclosed opening, that needs its own explicit direction
-  // control, which nothing built so far requires.
-  const farthestMax = Math.max(...extents.map((e) => e.max));
-  const farthestMin = Math.min(...extents.map((e) => e.min));
-  const facesPositive = Math.abs(farthestMax) >= Math.abs(farthestMin);
-  const doorOuterFaceN = facesPositive ? farthestMax : farthestMin;
-  const doorSign = facesPositive ? 1 : -1; // which way the door's own outer face points, away from the boundary panels
-
-  const doorCenterN = doorOuterFaceN - doorSign * (doorSpec.thicknessMm / 2);
-  const doorInnerFaceN = doorOuterFaceN - doorSign * doorSpec.thicknessMm;
-
-  // Each boundary panel recedes by the door's own thickness on the
-  // end facing the door when that edge's fit is 'out' (the door now
-  // covers that end); stays exactly flush with the door's INNER face
-  // when 'in' (the panel extends/shrinks to meet the door exactly,
-  // whatever its previous extent was — same "flip it and the wall
-  // adapts" rule box.js's depthRangeFor already established).
-  const panelPatches = extents.map(({ edge, node, dimField, min, max }) => {
-    const facingIsMaxEnd = doorSign > 0; // the panel's end pointing toward the door is its `max` end when the door sits on the +N side, `min` end otherwise
-    const otherEnd = facingIsMaxEnd ? min : max;
-    const newFacingEnd = fit[edge] === 'out' ? doorInnerFaceN : doorOuterFaceN;
-    const newMin = facingIsMaxEnd ? otherEnd : newFacingEnd;
-    const newMax = facingIsMaxEnd ? newFacingEnd : otherEnd;
-    return { id: node.id, dimField, oldMin: min, oldMax: max, newMin, newMax, centerN: (newMin + newMax) / 2 };
-  });
-
-  if (panelPatches.some((p) => p.newMax - p.newMin < MIN_PANEL_DIM_MM)) {
-    return { ok: false, reason: 'panel-too-short' };
-  }
+  const front = computeFrontFit(panels, boundaryResult, edgeFit, doorSpec.thicknessMm);
+  if (!front.ok) return front;
 
   return {
     ok: true,
-    groupId: boundaryResult.groupId,
-    normalAxis: N,
+    groupId: front.groupId,
+    normalAxis: front.normalAxis,
     door: {
-      axisA: boundaryResult.axisA,
-      axisB: boundaryResult.axisB,
-      aMin, aMax, bMin, bMax,
-      centerN: doorCenterN,
+      axisA: front.axisA,
+      axisB: front.axisB,
+      aMin: front.aMin,
+      aMax: front.aMax,
+      bMin: front.bMin,
+      bMax: front.bMax,
+      centerN: front.centerN,
       thicknessMm: doorSpec.thicknessMm,
       material: doorSpec.material,
       hinge: doorSpec.hinge === 'right' ? 'right' : DEFAULT_DOOR_HINGE,
-      doorSign, // which way the door's own outer face points — see computeDoorOpenTransform below, which reuses this instead of re-deriving it
-      edgeFit: fit, // the fully-defaulted fit actually used — createDoorNode stores this on the node so a later recompute reuses the SAME fit rather than falling back to DEFAULT_DOOR_EDGE_FIT
-      // The 4 boundary panels' own ids, keyed the same way `sides` is
-      // — createDoorNode stores these on the door node so a later
-      // relayout (features/box.js#relayoutBox) can look the SAME 4
-      // panels back up and recompute this door from scratch against
-      // their new geometry, instead of the door being frozen at
-      // whatever it was computed as the moment it was created. See
+      doorSign: front.sign, // which way the door's own outer face points — see computeDoorOpenTransform below, which reuses this instead of re-deriving it
+      edgeFit: front.edgeFit, // the fully-defaulted fit actually used — createDoorNode stores this on the node so a later recompute reuses the SAME fit rather than falling back to DEFAULT_DOOR_EDGE_FIT
+      // The 4 boundary panels' own ids, keyed the same way
+      // shared/frontFit.js#edgeSides is — createDoorNode stores these
+      // on the door node so a later relayout
+      // (features/box.js#relayoutBox) can look the SAME 4 panels back
+      // up and recompute this door from scratch against their new
+      // geometry, instead of the door being frozen at whatever it was
+      // computed as the moment it was created. See
       // computeDoorRecompute/applyDoorAdjustmentsForGroup below.
-      boundaryIds: Object.fromEntries(Object.entries(sides).map(([edge, node]) => [edge, node.id])),
+      boundaryIds: front.boundaryIds,
     },
-    panelPatches,
+    panelPatches: front.panelPatches,
   };
 }
 

@@ -107,6 +107,70 @@ export function exportCutListPdf(rows, { projectName = 'Cut List', fileName = 'c
 }
 
 // ---------------------------------------------------------------
+// ACTIVITY HISTORY PDF — a plain, one-line-per-action text log (see
+// history/history.js#HistoryManager's own activityLog — a COMPLETE,
+// never-trimmed record of every user action this session, distinct
+// from the undo/redo stacks). Simple enough not to need drawRow's
+// column layout: one line of text, top to bottom, paginated the same
+// way exportCutListPdf's rows above are.
+// ---------------------------------------------------------------
+
+const HISTORY_LINE_HEIGHT_MM = 6;
+
+/**
+ * @param {string[]} lines - pre-formatted text lines, oldest first —
+ *   see history/history.js#HistoryManager.getActivityLogText(), the
+ *   intended source (split on '\n' before calling this).
+ * @param {{projectName?:string, fileName?:string, mode?:'save'|'open'}} [options]
+ */
+export function exportHistoryPdf(lines, { projectName = 'Activity History', fileName = 'activity-history.pdf', mode = 'save' } = {}) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const startX = PAGE_MARGIN_MM;
+  let y = PAGE_MARGIN_MM;
+
+  function drawPageHeader() {
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text(projectName, startX, y);
+    y += 8;
+
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Generated ${new Date().toLocaleString()} — ${lines.length} action(s)`, startX, y);
+    y += 6;
+    doc.setLineWidth(0.3);
+    doc.line(startX, y, doc.internal.pageSize.getWidth() - PAGE_MARGIN_MM, y);
+    y += 6;
+  }
+
+  drawPageHeader();
+
+  doc.setFontSize(9);
+  if (lines.length === 0) {
+    doc.setFont(undefined, 'italic');
+    doc.text('No actions recorded yet this session.', startX, y);
+  } else {
+    lines.forEach((line) => {
+      if (y + HISTORY_LINE_HEIGHT_MM > pageHeight - PAGE_MARGIN_MM) {
+        doc.addPage();
+        y = PAGE_MARGIN_MM;
+        drawPageHeader();
+        doc.setFontSize(9);
+      }
+      doc.text(line, startX, y);
+      y += HISTORY_LINE_HEIGHT_MM;
+    });
+  }
+
+  if (mode === 'open') {
+    window.open(doc.output('bloburl'), '_blank');
+  } else {
+    doc.save(fileName);
+  }
+}
+
+// ---------------------------------------------------------------
 // NESTING PLAN PDF — a summary page (per-material sheet counts,
 // cost, utilization, and any pieces that couldn't be nested at all)
 // followed by one page PER SHEET, each drawn to scale with every
