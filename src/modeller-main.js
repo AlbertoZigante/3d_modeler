@@ -43,7 +43,9 @@ import { resolveConstraints } from './modeller/snap.js';
 import { createModellerScene } from './modeller/scene.js';
 import { getSelectedId, setSelectedId, getSelectedGroupId, setSelectedGroupId } from './modeller/selection.js';
 import { computeBom } from './engine/bom.js';
-import { exportCutListPdf, exportHistoryPdf } from './engine/pdfExport.js';
+import { exportCutListPdf, exportHistoryPdf, exportJointsPdf } from './engine/pdfExport.js';
+import { detectJoints, detectFeatureJoints, buildJointsReport, findOrphanPanels, findCrossGroupJoints } from './engine/joints.js';
+import { buildHardwarePlan } from './engine/hardware.js';
 import { renderProperties } from './ui/properties.js';
 import { renderPanelList } from './ui/toolbar.js';
 import { renderRelations } from './ui/relations.js';
@@ -187,6 +189,8 @@ const pipCanvas = document.getElementById('pip-canvas');
 const undoBtn = document.getElementById('undo-btn');
 const redoBtn = document.getElementById('redo-btn');
 const printHistoryBtn = document.getElementById('print-history-btn');
+const printJointsBtn = document.getElementById('print-joints-btn');
+const exportJointsJsonBtn = document.getElementById('export-joints-json-btn');
 
 function syncHistoryButtons() {
   if (undoBtn) undoBtn.disabled = !history.canUndo();
@@ -204,6 +208,58 @@ redoBtn?.addEventListener('click', () => history.redo());
 printHistoryBtn?.addEventListener('click', () => {
   const lines = history.getActivityLogText().split('\n').filter(Boolean);
   exportHistoryPdf(lines, { projectName: 'Activity History', mode: 'open' });
+});
+// Same "resolve, then read" pattern as the BOM/nesting buttons below —
+// this always reflects the CURRENT design, never a stale snapshot, and
+// deliberately re-runs detectJoints() rather than caching its result
+// anywhere, for the same reason computeBom() isn't cached (see
+// engine/bom.js's own header note: cheap, pure, and any staleness bug
+// would be worse than the recompute cost).
+printJointsBtn?.addEventListener('click', () => {
+  const resolved = resolveConstraints(panels);
+  const { joints, collisions } = detectJoints(resolved);
+  // Door hinges / drawer slides aren't AABB-contact joints (see
+  // detectFeatureJoints's own doc comment) — a separate detector, over
+  // the RAW `panels` array, not `resolved` (same reasoning as
+  // pieceCodeById below: resolveConstraints doesn't reliably carry
+  // feature flags like hinge/boundaryIds/drawerBoxRole through).
+  const featureJoints = detectFeatureJoints(panels);
+  // pieceCode isn't reliably preserved by resolveConstraints (see
+  // buildJointsReport's own doc comment on this) — same fix
+  // renderAll() already applies for the BOM/panel-list, sourced from
+  // the raw, authoritative `panels` array.
+  const pieceCodeById = new Map(panels.map((p) => [p.id, p.pieceCode]));
+  const report = buildJointsReport(resolved, joints, collisions, featureJoints, { pieceCodeById });
+  // buildHardwarePlan takes the raw `panels` array itself and reruns
+  // detectJoints/detectFeatureJoints internally — a second pass over
+  // the same design, same tradeoff computeJointExtremities/detectJoints
+  // already make elsewhere (cheap and pure beats caching and risking
+  // staleness — see engine/hardware.js's own doc comment).
+  const hardwarePlan = buildHardwarePlan(panels);
+  exportJointsPdf(report, hardwarePlan, { projectName: 'Joint Report', mode: 'open' });
+});
+// JSON sibling of the button above — same underlying data
+// (buildJointsReport is the single source both formats read from, see
+// engine/joints.js), just serialized instead of laid out as text.
+// Meant for scripting/diffing (e.g. snapshot a design's joint report,
+// re-run it after a change, and diff the two — a cheap regression
+// check without a full geometry test fixture) rather than for reading
+// directly, so this bypasses pdfExport.js entirely: a plain Blob
+// download, no PDF library involved.
+exportJointsJsonBtn?.addEventListener('click', () => {
+  const resolved = resolveConstraints(panels);
+  const { joints, collisions } = detectJoints(resolved);
+  const featureJoints = detectFeatureJoints(panels);
+  const pieceCodeById = new Map(panels.map((p) => [p.id, p.pieceCode]));
+  const report = buildJointsReport(resolved, joints, collisions, featureJoints, { pieceCodeById });
+  const hardware = buildHardwarePlan(panels);
+  const blob = new Blob([JSON.stringify({ ...report, hardware }, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'joint-report.json';
+  link.click();
+  URL.revokeObjectURL(url);
 });
 syncHistoryButtons();
 
@@ -776,6 +832,58 @@ function ungroupSelected() {
   renderAll();
 }
 
+// ---------------------------------------------------------------
+// Orphan panel / cross-group joint LIVE WARNINGS. Runs at the end of
+// every renderAll() call below — renderAll already resolves +
+// reconciles on every state change, live drags included, so this is
+// the natural place to notice these two states the moment they
+// appear, the same way checkMinGap's spacing check runs on every
+// shelf-drag frame further up. UNLIKE checkMinGap, neither of these
+// BLOCKS anything — an orphan panel or a cross-group joint are both
+// plausible, sometimes intentional states — so this only toasts on
+// the frame a given orphan/cross-group joint FIRST appears (tracked
+// via the two Sets below), rather than re-flagging the same
+// still-open issue on every subsequent frame while a drag continues.
+// Without that, a toast (and the activity-history log every
+// showToast call feeds — see ui/toast.js) would fire dozens of times
+// for one drag that merely leaves an existing orphan sitting there.
+//
+// detectJoints() itself is O(panel count squared) but cheap per pair
+// (a handful of subtractions/comparisons — see engine/joints.js), so
+// running it once per render is fine at the panel counts this app
+// deals with today; if designs ever grow into the hundreds of panels
+// and this becomes measurable, the fix is throttling THIS call (e.g.
+// only every Nth render, or on drag-end rather than every frame), not
+// touching detectJoints's own algorithm.
+// ---------------------------------------------------------------
+let knownOrphanPanelIds = new Set();
+let knownCrossGroupJointIds = new Set();
+
+function checkJointWarnings(resolvedPanels) {
+  const { joints } = detectJoints(resolvedPanels);
+  const orphans = findOrphanPanels(resolvedPanels, joints);
+  const crossGroup = findCrossGroupJoints(resolvedPanels, joints);
+  const nameById = new Map(resolvedPanels.map((p) => [p.id, p.name || p.id]));
+
+  const newOrphans = orphans.filter((p) => !knownOrphanPanelIds.has(p.id));
+  const newCrossGroup = crossGroup.filter((j) => !knownCrossGroupJointIds.has(j.id));
+
+  knownOrphanPanelIds = new Set(orphans.map((p) => p.id));
+  knownCrossGroupJointIds = new Set(crossGroup.map((j) => j.id));
+
+  if (newOrphans.length === 0 && newCrossGroup.length === 0) return;
+
+  const parts = [];
+  if (newOrphans.length > 0) {
+    parts.push(`Orphan panel${newOrphans.length > 1 ? 's' : ''} (no joint detected): ${newOrphans.map((p) => p.name).join(', ')}`);
+  }
+  if (newCrossGroup.length > 0) {
+    const pairs = newCrossGroup.map((j) => `${nameById.get(j.panelA) ?? '?'} ↔ ${nameById.get(j.panelB) ?? '?'}`);
+    parts.push(`Cross-group contact: ${pairs.join(', ')}`);
+  }
+  showToast(parts.join('  •  '));
+}
+
 function renderAll() {
   const selectedId = getSelectedId();
   const selectedGroupId = getSelectedGroupId();
@@ -898,6 +1006,8 @@ function renderAll() {
   setBomRows(rows);
   renderNestingSummary(); // re-check staleness against the freshly recomputed BOM rows, without re-nesting
   stageLabelEl.textContent = `${visiblePanels.length} node(s) · constraints active`;
+
+  checkJointWarnings(resolvedWithCodes);
 }
 
 function renderInspectorOnly() {
