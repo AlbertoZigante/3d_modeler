@@ -320,7 +320,7 @@ export function applyDrawerAdjustmentsForGroup(panels, groupId) {
   return next;
 }
 
-export const DEFAULT_DRAWER_BOX_WIDTH_MARGIN_MM = 13; // typical per-side clearance for a pair of ball-bearing runners
+export const DEFAULT_DRAWER_BOX_WIDTH_MARGIN_MM = 21; // Blum TANDEM/LEGRABOX spec: inside drawer width = opening width - 42mm, i.e. 21mm clearance per side (see engine/hardware.js's RUNNER_CATALOG + REF 4) — kept in sync with that number on purpose, since a mismatch here would mean the drawer is built without enough room for the runner engine/hardware.js recommends for it
 export const DEFAULT_DRAWER_BOX_DEPTH_MARGIN_MM = 20; // clearance so the box doesn't strike the back wall when pushed fully in
 export const DEFAULT_DRAWER_BOX_THICKNESS_MM = 12; // drawer boxes conventionally use thinner material than the front/carcass
 

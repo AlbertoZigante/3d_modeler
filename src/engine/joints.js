@@ -490,6 +490,7 @@ function nextJointId() {
  * @property {{x:number,y:number,z:number}} p1
  * @property {{x:number,y:number,z:number}} p2
  * @property {number} lengthMm
+ * @property {number} [clearanceMm] - drawer_slide only: the actual measured gap between the box side and its carcass boundary panel, along the width axis (perpendicular to the slide's own run) — see detectFeatureJoints's own doc comment on why this exists
  */
 export function detectFeatureJoints(panels) {
   const resolved = resolveConstraints(panels);
@@ -541,7 +542,8 @@ export function detectFeatureJoints(panels) {
         const boundaryPanelId = frontRaw.boundaryIds[side];
         const boxPanelRaw = panels.find((p) => p.isDrawerBoxPanel && p.drawerBoxFrontId === frontRaw.id && p.drawerBoxRole === side);
         const boxPanel = boxPanelRaw && resolvedById.get(boxPanelRaw.id);
-        if (!boundaryPanelId || !boxPanel || !resolvedById.has(boundaryPanelId)) return;
+        const boundaryPanel = resolvedById.get(boundaryPanelId);
+        if (!boundaryPanelId || !boxPanel || !boundaryPanel) return;
 
         // The slide's own run length = the box side panel's own depth
         // extent along the front's normalAxis.
@@ -551,6 +553,28 @@ export function detectFeatureJoints(panels) {
         const p2 = { ...boxPanel.position };
         p1[frontRaw.normalAxis] = boxPanel.position[frontRaw.normalAxis] - halfDepth;
         p2[frontRaw.normalAxis] = boxPanel.position[frontRaw.normalAxis] + halfDepth;
+
+        // The ACTUAL measured gap between the box side's outer face and
+        // the carcass side's inner face, along the width axis (NOT the
+        // normalAxis above, which only measures the slide's own run
+        // length/depth). This is the number a runner's own
+        // sideClearanceMm spec has to match — see
+        // engine/hardware.js#selectRunnerHardware, which validates
+        // against it rather than trusting the geometry blindly. Without
+        // this, a design built with the wrong margin (see
+        // features/drawer.js's own DEFAULT_DRAWER_BOX_WIDTH_MARGIN_MM
+        // history) would still get a runner "recommended" that doesn't
+        // physically fit the gap actually built.
+        const widthAxis = AXES.find((a) => a !== frontRaw.normalAxis && a !== 'y');
+        const boxHalf = computeWorldHalfExtents(boxPanel);
+        const boundaryHalf = computeWorldHalfExtents(boundaryPanel);
+        const boxFacingEdge = side === 'left'
+          ? boxPanel.position[widthAxis] - boxHalf[widthAxis]
+          : boxPanel.position[widthAxis] + boxHalf[widthAxis];
+        const boundaryFacingEdge = side === 'left'
+          ? boundaryPanel.position[widthAxis] + boundaryHalf[widthAxis]
+          : boundaryPanel.position[widthAxis] - boundaryHalf[widthAxis];
+        const clearanceMm = Math.abs(boxFacingEdge - boundaryFacingEdge);
 
         featureJoints.push({
           id: `${boxPanelRaw.id}:${boundaryPanelId}:slide`,
@@ -562,6 +586,7 @@ export function detectFeatureJoints(panels) {
           p1,
           p2,
           lengthMm: Math.hypot(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z),
+          clearanceMm,
         });
       });
     });

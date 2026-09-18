@@ -43,9 +43,10 @@ import { resolveConstraints } from './modeller/snap.js';
 import { createModellerScene } from './modeller/scene.js';
 import { getSelectedId, setSelectedId, getSelectedGroupId, setSelectedGroupId } from './modeller/selection.js';
 import { computeBom } from './engine/bom.js';
-import { exportCutListPdf, exportHistoryPdf, exportJointsPdf } from './engine/pdfExport.js';
+import { exportCutListPdf, exportHistoryPdf, exportJointsPdf, exportAssemblyPlanPdf } from './engine/pdfExport.js';
 import { detectJoints, detectFeatureJoints, buildJointsReport, findOrphanPanels, findCrossGroupJoints } from './engine/joints.js';
 import { buildHardwarePlan } from './engine/hardware.js';
+import { buildAssemblyPlan } from './engine/ergonomics.js';
 import { renderProperties } from './ui/properties.js';
 import { renderPanelList } from './ui/toolbar.js';
 import { renderRelations } from './ui/relations.js';
@@ -191,6 +192,7 @@ const redoBtn = document.getElementById('redo-btn');
 const printHistoryBtn = document.getElementById('print-history-btn');
 const printJointsBtn = document.getElementById('print-joints-btn');
 const exportJointsJsonBtn = document.getElementById('export-joints-json-btn');
+const printAssemblyBtn = document.getElementById('print-assembly-btn');
 
 function syncHistoryButtons() {
   if (undoBtn) undoBtn.disabled = !history.canUndo();
@@ -260,6 +262,17 @@ exportJointsJsonBtn?.addEventListener('click', () => {
   link.download = 'joint-report.json';
   link.click();
   URL.revokeObjectURL(url);
+});
+// buildAssemblyPlan takes the raw `panels` array (same reasoning as
+// buildHardwarePlan above) and reruns the whole joints/hardware/
+// sequencing pass itself; exportAssemblyPlanPdf additionally needs
+// `resolved` directly (not just the plan) since the schematic
+// diagrams draw real panel geometry, which the plan's own step
+// objects reference only by id.
+printAssemblyBtn?.addEventListener('click', () => {
+  const resolved = resolveConstraints(panels);
+  const plan = buildAssemblyPlan(panels);
+  exportAssemblyPlanPdf(plan, resolved, { projectName: 'Assembly Instructions', mode: 'open' });
 });
 syncHistoryButtons();
 

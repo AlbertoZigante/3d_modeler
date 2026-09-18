@@ -107,6 +107,26 @@ section('selectRunnerHardware — real drawer fixture', () => {
   const thickSel = selectRunnerHardware(thickSideJoint, 25); // outside TANDEM's 11-16mm
   assert(thickSel !== null, 'selection: a drawer side too thick for TANDEM still gets a runner (LEGRABOX, not wood-thickness-gated)');
   assertEqual(thickSel.hardware.series, 'LEGRABOX', 'selection: falls through to LEGRABOX when TANDEM\'s thickness range is exceeded');
+
+  // The real fixture's ACTUAL measured clearance must equal Blum's own
+  // published 21mm spec — this is the number features/drawer.js's
+  // DEFAULT_DRAWER_BOX_WIDTH_MARGIN_MM has to stay in sync with; a
+  // regression here means the geometry and the hardware catalog have
+  // drifted apart again.
+  assert(Math.abs(slideJoint.clearanceMm - 21) < 1e-6, `fixture sanity: the real drawer box is built with exactly Blum's 21mm side clearance (got ${slideJoint.clearanceMm})`);
+  RUNNER_CATALOG.forEach((r) => assertEqual(r.sideClearanceMm, 21, `catalog: ${r.series} publishes the same 21mm side clearance Blum specifies`));
+
+  // A drawer box built with the WRONG margin (note: no clearanceMm field at
+  // all on tinyJoint/thickSideJoint above means those two tests exercise the
+  // "no measured clearance available" fallback path, not this check) must be
+  // rejected outright rather than getting a runner recommended that doesn't
+  // physically fit the gap actually built.
+  const wrongMarginJoint = { kind: 'drawer_slide', lengthMm: 400, clearanceMm: 13, p1: { x: 0, y: 0, z: -200 }, p2: { x: 0, y: 0, z: 200 } };
+  assertEqual(selectRunnerHardware(wrongMarginJoint, 16), null, 'selection: a built clearance of 13mm (the old, wrong default) matches no catalog runner\'s 21mm spec, and is correctly rejected');
+
+  // A clearance that DOES match (within floating-point tolerance) is accepted
+  const rightMarginJoint = { kind: 'drawer_slide', lengthMm: 400, clearanceMm: 21.2, p1: { x: 0, y: 0, z: -200 }, p2: { x: 0, y: 0, z: 200 } };
+  assert(selectRunnerHardware(rightMarginJoint, 16) !== null, 'selection: a clearance within tolerance of the 21mm spec (21.2mm) is still accepted');
 });
 
 // ---------------------------------------------------------------

@@ -527,4 +527,69 @@ section('Feature joints — report integration', () => {
   assert(lines.some((l) => l.includes('drawer_slide')), 'text report: at least one drawer_slide line present');
 });
 
+// ---------------------------------------------------------------
+// drawer_slide clearanceMm — the measured gap must match what
+// features/drawer.js actually built (DEFAULT_DRAWER_BOX_WIDTH_MARGIN_MM),
+// and must agree with engine/hardware.js's RUNNER_CATALOG spec it's
+// validated against (see selectRunnerHardware).
+// ---------------------------------------------------------------
+section('detectFeatureJoints — drawer_slide clearanceMm', () => {
+  const { panels } = drawerFixture;
+  const featureJoints = detectFeatureJoints(panels);
+  const slideJoints = featureJoints.filter((j) => j.kind === 'drawer_slide');
+  assert(slideJoints.length > 0, 'clearance fixture: at least one drawer_slide joint present');
+  slideJoints.forEach((j) => {
+    assert(typeof j.clearanceMm === 'number', 'clearance fixture: every drawer_slide joint reports a numeric clearanceMm');
+    assert(Math.abs(j.clearanceMm - 21) < 1e-6, `clearance fixture: measured clearance matches the built 21mm margin (got ${j.clearanceMm})`);
+  });
+});
+
+// ---------------------------------------------------------------
+// Multiple stacked drawer fronts in one opening — each front's own
+// drawer box must independently resolve to the correct carcass sides
+// ---------------------------------------------------------------
+section('detectFeatureJoints — multiple stacked drawers', () => {
+  const { nodes: boxNodes } = addBox([]);
+  const left = boxNodes.find((n) => n.name === 'Left');
+  const right = boxNodes.find((n) => n.name === 'Right');
+  const top = boxNodes.find((n) => n.name === 'Top');
+  const bottom = boxNodes.find((n) => n.name === 'Bottom');
+  const boundaryResult = computeBoundaryRectangle(boxNodes, [left, right, top, bottom]);
+  const frontsPlacement = computeDrawerFrontsPlacement(boxNodes, boundaryResult, DEFAULT_DRAWER_EDGE_FIT, { material: 'Melamine White 18mm', thicknessMm: 18, count: 3 });
+  assert(frontsPlacement.ok, 'stacked drawers: 3-front placement succeeds');
+  const frontNodes = createDrawerFrontNodes(boxNodes, frontsPlacement, {});
+  assertEqual(frontNodes.length, 3, 'stacked drawers: 3 front nodes created');
+
+  let panels = [...boxNodes];
+  frontsPlacement.panelPatches.forEach((patch) => { panels = applyPanelPatch(panels, patch, frontsPlacement.normalAxis); });
+  panels = [...panels, ...frontNodes];
+
+  const allBoxNodes = [];
+  frontNodes.forEach((front) => {
+    const boxPlacement = computeDrawerBoxPlacement(panels, front, { material: 'Melamine White 18mm', thicknessMm: 18 });
+    assert(boxPlacement.ok, `stacked drawers: box placement succeeds for drawer index ${front.drawerIndex}`);
+    const boxNodes2 = createDrawerBoxNodes(panels, boxPlacement);
+    allBoxNodes.push(...boxNodes2);
+    panels = [...panels, ...boxNodes2];
+  });
+
+  const featureJoints = detectFeatureJoints(panels);
+  const slideJoints = featureJoints.filter((j) => j.kind === 'drawer_slide');
+  assertEqual(slideJoints.length, 6, 'stacked drawers: 6 drawer_slide joints total (2 sides x 3 drawers)');
+
+  frontNodes.forEach((front) => {
+    const boxLeft = allBoxNodes.find((n) => n.drawerBoxFrontId === front.id && n.drawerBoxRole === 'left');
+    const boxRight = allBoxNodes.find((n) => n.drawerBoxFrontId === front.id && n.drawerBoxRole === 'right');
+    const leftJoint = slideJoints.find((j) => j.panelA === boxLeft.id);
+    const rightJoint = slideJoints.find((j) => j.panelA === boxRight.id);
+    assert(!!leftJoint && !!rightJoint, `stacked drawers: drawer index ${front.drawerIndex} has both its slide joints`);
+    assertEqual(leftJoint.panelB, left.id, `stacked drawers: drawer index ${front.drawerIndex}'s left side associates with the carcass Left (not a neighboring drawer)`);
+    assertEqual(rightJoint.panelB, right.id, `stacked drawers: drawer index ${front.drawerIndex}'s right side associates with the carcass Right`);
+  });
+
+  // No cross-wiring: every drawer's box panels must map to their OWN front, never another drawer's
+  const uniquePanelAIds = new Set(slideJoints.map((j) => j.panelA));
+  assertEqual(uniquePanelAIds.size, 6, 'stacked drawers: 6 distinct drawer-box side panels drive the 6 joints (no duplicate/misattributed panelA)');
+});
+
 report();

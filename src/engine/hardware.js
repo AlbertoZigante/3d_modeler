@@ -179,9 +179,16 @@ export const RUNNER_CATALOG = [
   },
 ];
 
+// Blum publishes sideClearanceMm as an exact spec (42mm opening width
+// reduction / 2), so a real built gap should match closely — this
+// tolerance only absorbs floating-point noise from geometry math, not
+// genuine design differences.
+const CLEARANCE_TOLERANCE_MM = 1;
+
 /**
  * Picks a runner model + nominal length for a drawer_slide
  * FeatureJoint pair, from the drawer box's own depth (the slide
+ * FeatureJoint's `lengthMm` — see detectFeatureJoints, which derives
  * FeatureJoint's `lengthMm` — see detectFeatureJoints, which derives
  * this straight from the drawer box side panel's own depth extent)
  * and its side-panel thickness.
@@ -189,6 +196,18 @@ export const RUNNER_CATALOG = [
  * The nominal length picked is the LARGEST catalog length that still
  * fits within the drawer box's actual depth — never longer, since an
  * oversized runner would collide with the cabinet back.
+ *
+ * Also validates the ACTUAL measured side clearance
+ * (`slideJoint.clearanceMm` — see detectFeatureJoints) against the
+ * catalog entry's own `sideClearanceMm` spec, within
+ * CLEARANCE_TOLERANCE_MM. A drawer box built with the wrong margin
+ * (see features/drawer.js#DEFAULT_DRAWER_BOX_WIDTH_MARGIN_MM) has a
+ * gap detectJoints already confirmed isn't a physical contact — but
+ * "no contact" isn't the same as "the right gap for THIS runner", and
+ * without this check a runner would still get recommended for a slot
+ * it doesn't actually fit. Falls back to thickness-only matching when
+ * `clearanceMm` isn't available (e.g. a hand-built FeatureJoint in a
+ * test that skips real geometry) rather than rejecting everything.
  *
  * @param {import('./joints.js').FeatureJoint} slideJoint - kind:'drawer_slide'
  * @param {number} drawerSideThicknessMm
@@ -201,12 +220,17 @@ export function selectRunnerHardware(slideJoint, drawerSideThicknessMm) {
   // range; LEGRABOX is its own steel profile system and isn't
   // constrained by the drawer side's wood thickness the same way, so
   // it's always a fallback candidate.
-  const candidates = RUNNER_CATALOG.filter((r) => {
+  const thicknessMatched = RUNNER_CATALOG.filter((r) => {
     if (!r.drawerSideThicknessMm) return true;
     return drawerSideThicknessMm >= r.drawerSideThicknessMm.min && drawerSideThicknessMm <= r.drawerSideThicknessMm.max;
   });
-  if (candidates.length === 0) return null;
-  const hardware = candidates[0];
+  if (thicknessMatched.length === 0) return null;
+
+  const clearanceMatched = slideJoint.clearanceMm == null
+    ? thicknessMatched
+    : thicknessMatched.filter((r) => Math.abs(slideJoint.clearanceMm - r.sideClearanceMm) <= CLEARANCE_TOLERANCE_MM);
+  if (clearanceMatched.length === 0) return null; // the built gap doesn't match any catalog runner's own clearance spec
+  const hardware = clearanceMatched[0];
 
   const fittingLengths = hardware.nominalLengthsMm.filter((nl) => nl <= slideJoint.lengthMm);
   if (fittingLengths.length === 0) return null; // drawer box too shallow for anything in the catalog
