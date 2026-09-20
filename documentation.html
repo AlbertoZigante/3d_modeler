@@ -863,6 +863,19 @@ footer {
   font: 13px/1.5 var(--sans);
 }
 
+footer a {
+  color: var(--accent);
+}
+
+.verified-against {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.verified-against a {
+  color: var(--accent);
+}
+
 /* ---------- exact documentation targets ---------- */
 
 .function-anchor {
@@ -1073,6 +1086,485 @@ footer {
     white-space: normal;
   }
 }
+
+/* ====================================================================
+   Overview / module pages (landing map + didactic per-subsystem pages)
+   ==================================================================== */
+
+/* ---------- sidebar: top-level view switcher ---------- */
+
+.sidebar-views {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #293241;
+}
+
+.sidebar-view-link {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  color: #d7dde5;
+  text-decoration: none;
+  font: 650 13px/1.4 var(--sans);
+  transition: background .12s, color .12s;
+}
+
+.sidebar-view-link:hover {
+  background: #1d2938;
+  color: white;
+  text-decoration: none;
+}
+
+.sidebar-view-link .view-icon {
+  font-size: 14px;
+  width: 16px;
+  text-align: center;
+  flex: none;
+}
+
+body[data-view="overview"] .sidebar-view-link[data-view-target="overview"],
+body[data-view="reference"] .sidebar-view-link[data-view-target="reference"] {
+  color: white;
+  background: #1d2938;
+  box-shadow: inset 3px 0 0 #60a5fa;
+}
+
+/* ---------- generic view show/hide ---------- */
+
+.app-view[hidden] { display: none !important; }
+
+/* ---------- breadcrumb ---------- */
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 18px;
+  font: 600 13px/1.4 var(--sans);
+  color: var(--muted);
+}
+
+.breadcrumb a {
+  color: var(--accent);
+}
+
+.breadcrumb .sep {
+  color: var(--border);
+}
+
+.breadcrumb .current {
+  color: var(--text);
+}
+
+/* ---------- architecture diagram ---------- */
+
+.arch-diagram {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 32px clamp(16px, 4vw, 40px);
+  margin-bottom: 30px;
+}
+
+.arch-diagram-intro {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0 0 26px;
+  max-width: 70ch;
+}
+
+.arch-flow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.arch-row {
+  display: flex;
+  justify-content: center;
+}
+
+.arch-node {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color .15s, box-shadow .15s, transform .1s;
+}
+
+.arch-node:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.arch-node .arch-node-title {
+  display: block;
+  font: 700 15px/1.3 var(--sans);
+  color: var(--text);
+  margin: 0 0 3px;
+}
+
+.arch-node .arch-node-sub {
+  display: block;
+  font: 13px/1.5 var(--sans);
+  color: var(--muted);
+}
+
+.arch-node .arch-node-groups {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.arch-node .arch-tag {
+  font: 650 10.5px/1.4 var(--mono);
+  letter-spacing: .01em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 5px;
+  padding: 2px 7px;
+}
+
+.arch-arrow {
+  display: flex;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  margin: 2px 0;
+}
+
+.arch-arrow-label {
+  font: 600 11px/1.4 var(--sans);
+  color: var(--muted);
+  text-align: center;
+  margin: -2px 0 4px;
+}
+
+.arch-loop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  color: var(--muted);
+  font: 600 12px/1.4 var(--sans);
+  margin-top: 10px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+  text-align: center;
+}
+
+.arch-side-row {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 18px auto 0;
+  max-width: 720px;
+}
+
+.arch-side-row .arch-node {
+  width: auto;
+  min-width: 200px;
+  flex: 1 1 220px;
+  background: var(--bg);
+}
+
+/* ---------- module summary cards (below the diagram) ---------- */
+
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.module-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color .15s, transform .1s;
+}
+
+.module-card:hover {
+  border-color: var(--accent);
+  text-decoration: none;
+  transform: translateY(-2px);
+}
+
+.module-card h4 {
+  margin: 0;
+  font: 700 17px/1.3 var(--sans);
+  color: var(--text);
+}
+
+.module-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.module-card .module-card-cta {
+  margin-top: auto;
+  padding-top: 6px;
+  color: var(--accent);
+  font: 650 13px/1.4 var(--sans);
+}
+
+/* ---------- known gaps panel (overview) ---------- */
+
+.known-gaps {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--warn);
+  border-radius: 14px;
+  padding: 22px clamp(18px, 3vw, 30px);
+  box-shadow: var(--shadow);
+  margin-bottom: 30px;
+}
+
+.known-gaps-title {
+  margin: 0 0 8px;
+  font: 700 18px/1.3 var(--sans);
+  color: var(--text);
+}
+
+.known-gaps-title::before {
+  content: "⚠";
+  color: var(--warn);
+  margin-right: 8px;
+}
+
+.known-gaps-intro {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 75ch;
+}
+
+.known-gaps-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.known-gaps-list li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.known-gaps-list .gap-files {
+  font: 700 13.5px var(--mono);
+  flex: 0 0 auto;
+}
+
+.known-gaps-list .gap-desc {
+  color: var(--muted);
+  font-size: 13.5px;
+  flex: 1 1 320px;
+}
+
+.known-gaps-list .gap-module-link {
+  flex: 0 0 auto;
+  font: 650 12.5px/1.4 var(--sans);
+  color: var(--accent);
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+/* ---------- module detail page ---------- */
+
+.module-hero {
+  background: linear-gradient(135deg, #172033, #253b67);
+  color: white;
+  border-radius: 18px;
+  padding: 34px clamp(20px, 4vw, 42px);
+  box-shadow: var(--shadow);
+  margin-bottom: 26px;
+}
+
+.module-hero .kicker {
+  color: #93c5fd;
+  font: 700 12px/1.4 var(--sans);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin: 0 0 10px;
+}
+
+.module-hero h2 {
+  margin: 0 0 10px;
+  color: white;
+  font-size: clamp(26px, 3.6vw, 38px);
+  line-height: 1.15;
+  letter-spacing: -.02em;
+}
+
+.module-hero p {
+  max-width: 820px;
+  color: #dbeafe;
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.module-flow-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.module-flow-chip {
+  font: 600 12px/1.4 var(--sans);
+  color: #dbeafe;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 999px;
+  padding: 5px 12px;
+  text-decoration: none;
+}
+
+.module-flow-chip:hover {
+  background: rgba(255,255,255,.16);
+  text-decoration: none;
+}
+
+.module-flow-chip .flow-dir {
+  color: #93c5fd;
+  margin-right: 5px;
+}
+
+.module-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px clamp(18px, 3vw, 30px);
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+}
+
+.module-section h3 {
+  margin: 0 0 12px;
+  font: 700 19px/1.3 var(--sans);
+  color: var(--text);
+}
+
+.module-section p {
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.7;
+  margin: 0 0 14px;
+  max-width: 80ch;
+}
+
+.module-section p:last-child { margin-bottom: 0; }
+
+.module-section ul.didactic-list {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.module-section ul.didactic-list li { margin-bottom: 8px; }
+.module-section ul.didactic-list li:last-child { margin-bottom: 0; }
+
+.module-file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.module-file-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.module-file-row .file-ref-link {
+  font: 700 14px var(--mono);
+}
+
+.module-file-row .module-file-desc {
+  color: var(--muted);
+  font-size: 13.5px;
+  flex: 1 1 260px;
+}
+
+.module-nav-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.module-nav-footer a {
+  font: 650 13.5px/1.4 var(--sans);
+  color: var(--accent);
+}
+
+/* ---------- "part of X module" crumb on reference file cards ---------- */
+
+.file-module-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: 650 11.5px/1.4 var(--sans);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 3px 11px;
+  margin-bottom: 10px;
+  text-decoration: none;
+}
+
+.file-module-crumb:hover {
+  text-decoration: underline;
+}
 </style>
 </head>
 <body>
@@ -1085,6 +1577,15 @@ footer {
       <h1>3D Modeler</h1>
     </div>
     <p class="brand-sub">architecture reference · Joints branch</p>
+
+    <div class="sidebar-views">
+      <a class="sidebar-view-link" data-view-target="overview" href="#overview">
+        <span class="view-icon">◧</span> Overview
+      </a>
+      <a class="sidebar-view-link" data-view-target="reference" href="#reference">
+        <span class="view-icon">☰</span> Full reference
+      </a>
+    </div>
 
     <div class="search-wrap">
       <span class="search-icon">⌕</span>
@@ -1104,18 +1605,60 @@ footer {
 
   <!-- ============= MAIN ============= -->
   <main>
-    <div class="page-head">
-      <p class="kicker">Internal documentation</p>
-      <h2>Project structure</h2>
-      <p>Every script in the modeller, grouped by folder, with each file's role and — where the file has been reviewed in detail — the input/output of every function it exports.</p>
-      <p>Every file and function is now documented from real source — pulled directly from the repository, not inferred. The four-tier status badges reflect what's been fixed in this restructure: <b>corrected</b> (rewritten/fixed as part of this pass), <b>needs attention</b> (a real, flagged problem — duplication, missing dependency, or a stale carcass convention), and <b>stub</b> (genuinely empty, not yet implemented).</p>
+
+    <!-- ============= OVERVIEW VIEW (landing page) ============= -->
+    <div class="app-view view-overview" id="viewOverview">
+      <div class="page-head">
+        <p class="kicker">Internal documentation</p>
+        <h2>How the 3D Modeler works</h2>
+        <p>A schematic map of the system: how a click in the viewport becomes a panel, how panels become a resolved graph, and how that graph becomes a bill of materials, a nesting plan and a PDF.</p>
+        <p>Start here for the big picture, then open a subsystem below for a didactic walkthrough of its own functioning — each one links straight into the full reference for the scripts and functions involved.</p>
+        <p class="verified-against">
+          Reference content checked against
+          <a href="https://github.com/AlbertoZigante/3d_modeler/commit/8616f9959d051714a05f2939ed79907a42c8ca85" target="_blank" rel="noopener">master @ 8616f99</a>
+          (2026-09-18) — not auto-synced, so it can drift from source between updates.
+        </p>
+      </div>
+
+      <div id="archDiagram" class="arch-diagram"></div>
+
+      <div id="moduleGrid" class="module-grid"></div>
+
+      <div id="knownGaps" class="known-gaps"></div>
     </div>
 
-    <div id="content"></div>
+    <!-- ============= MODULE VIEW (one subsystem, didactic) ============= -->
+    <div class="app-view view-module" id="viewModule" hidden>
+      <nav class="breadcrumb">
+        <a href="#overview">Overview</a>
+        <span class="sep">/</span>
+        <span class="current" id="moduleBreadcrumbLabel"></span>
+      </nav>
 
-    <div class="empty-state" id="emptyState">No files or functions match "<span id="emptyQuery"></span>".</div>
+      <div id="moduleContent"></div>
+    </div>
 
-    <footer>3d_modeler — Joints branch · generated reference, not auto-synced with source</footer>
+    <!-- ============= REFERENCE VIEW (existing, unchanged content) ============= -->
+    <div class="app-view view-reference" id="viewReference" hidden>
+      <nav class="breadcrumb">
+        <a href="#overview">Overview</a>
+        <span class="sep">/</span>
+        <span class="current">Full reference</span>
+      </nav>
+
+      <div class="page-head">
+        <p class="kicker">Internal documentation</p>
+        <h2>Project structure</h2>
+        <p>Every script in the modeller, grouped by folder, with each file's role and — where the file has been reviewed in detail — the input/output of every function it exports.</p>
+        <p>Every file and function is now documented from real source — pulled directly from the repository, not inferred. The four-tier status badges reflect what's been fixed in this restructure: <b>corrected</b> (rewritten/fixed as part of this pass), <b>needs attention</b> (a real, flagged problem — duplication, missing dependency, or a stale carcass convention), and <b>stub</b> (genuinely empty, not yet implemented).</p>
+      </div>
+
+      <div id="content"></div>
+
+      <div class="empty-state" id="emptyState">No files or functions match "<span id="emptyQuery"></span>".</div>
+    </div>
+
+    <footer>3d_modeler — reference checked against <a href="https://github.com/AlbertoZigante/3d_modeler/commit/8616f9959d051714a05f2939ed79907a42c8ca85" target="_blank" rel="noopener">master @ 8616f99</a> (2026-09-18) · not auto-synced with source</footer>
   </main>
 </div>
 
@@ -1186,7 +1729,7 @@ const GROUPS = [
         path: 'features/box.js',
         status: 'ok',
         imports: [{from:'../modeller/modules.js',names:['createPanelNode','computeNextBasePosition','MATERIAL_CATALOG','MIN_PANEL_DIM_MM']},{from:'../modeller/snap.js',names:['resolveConstraints']},{from:'../shared/geometry.js',names:['VERTICAL_ROTATION','HORIZONTAL_ROTATION','PARALLEL_ROTATION','collectAxisSlabs','checkMinGap','findPanelSizeViolation','findDesignLimitViolation']}],
-        exportsList: ['DEFAULT_BOX_WIDTH_MM','DEFAULT_BOX_HEIGHT_MM','DEFAULT_BOX_DEPTH_MM','computeBoxLayout','addBox','findBoxSibling','relayoutBox'],
+        exportsList: ['DEFAULT_BOX_WIDTH_MM','DEFAULT_BOX_HEIGHT_MM','DEFAULT_BOX_DEPTH_MM','DEFAULT_EDGE_FIT','computeBoxLayout','addBox','findBoxSibling','relayoutBox'],
         role: 'Box carcass construction and relayout. Left/Right run full height+depth; Top/Bottom run the full outer width; Back overlays the whole outer footprint (W×H+2T); Front is inset only in width and created hidden ("open-front box").',
         fns: [
           { name:'computeBoxLayout', io:'({left,right,top,bottom,back,front}: WallNode) → <b>LayoutByRole</b>', role:'Pure carcass math — given 6 walls\' thickness+offset, returns every wall\'s width/height/offset.' , calls: [] },
@@ -1198,14 +1741,13 @@ const GROUPS = [
       {
         path: 'features/shelf.js',
         status: 'ok',
-        imports: [{from:'../modeller/modules.js',names:['createPanelNode','nextConstraintId','getAlignedAxis','LOCAL_FACES']},{from:'../modeller/snap.js',names:['resolveConstraints']},{from:'./box.js',names:['findBoxSibling','DEFAULT_BOX_DEPTH_MM']},{from:'../shared/geometry.js',names:['collectAxisSlabs','VERTICAL_ROTATION','HORIZONTAL_ROTATION','rotationsMatch','MIN_WALL_GAP_MM']}],
+        imports: [{from:'../modeller/modules.js',names:['createPanelNode','nextConstraintId','getAlignedAxis','LOCAL_FACES']},{from:'../modeller/snap.js',names:['resolveConstraints']},{from:'./box.js',names:['findBoxSibling','DEFAULT_BOX_DEPTH_MM']},{from:'../shared/geometry.js',names:['collectAxisSlabs','VERTICAL_ROTATION','HORIZONTAL_ROTATION','rotationsMatch','MIN_WALL_GAP_MM','facingFace']}],
         exportsList: ['addShelf','isShelf'],
         role: 'Shelf creation via live spansBetween constraints against two picked boundary panels, plus the box\'s Back/Front for depth.',
         fns: [
-          { name:'addShelf', io:'(panels, pick1, pick2, {mode, clickMm}) → <b>{ok:true,node,groupId} | {ok:false,reason}</b>', role:'Builds a shelf constrained to its boundaries. Pure — tools/shelfTool.js commits the result.' , calls: ['findBoxSibling() — features/box.js','resolveConstraints() — modeller/snap.js','facingFace() / pickGapForPosition() / findBestShelfSlot() — same file','collectAxisSlabs() — shared/geometry.js','nextConstraintId() / createPanelNode() — modeller/modules.js','DEFAULT_BOX_DEPTH_MM — features/box.js (constant)','MIN_WALL_GAP_MM — shared/geometry.js (constant)'] },
+          { name:'addShelf', io:'(panels, pick1, pick2, {mode, clickMm}) → <b>{ok:true,node,groupId} | {ok:false,reason}</b>', role:'Builds a shelf constrained to its boundaries. Pure — tools/shelfTool.js commits the result.' , calls: ['findBoxSibling() — features/box.js','resolveConstraints() — modeller/snap.js','facingFace() — shared/geometry.js','pickGapForPosition() / findBestShelfSlot() — same file','collectAxisSlabs() — shared/geometry.js','nextConstraintId() / createPanelNode() — modeller/modules.js','DEFAULT_BOX_DEPTH_MM — features/box.js (constant)','MIN_WALL_GAP_MM — shared/geometry.js (constant)'] },
           { name:'findBestShelfSlot', io:'(sortedSlabs, thickness) → <b>{center,clearSpan} | null</b>', role:'Auto-placement: largest available gap.', tag:'internal' , calls: [] },
           { name:'pickGapForPosition', io:'(sortedSlabs, desiredMm, thickness) → <b>{fits,center}</b>', role:'Click-placement: nearest valid spot to where the user clicked.', tag:'internal' , calls: ['MIN_WALL_GAP_MM — shared/geometry.js (constant)'] },
-          { name:'facingFace', io:'(resolved, axis, otherResolved) → <b>faceName | null</b>', role:'Which local face of a boundary panel actually faces the other pick.', tag:'internal' , calls: ['getAlignedAxis() — modeller/modules.js','LOCAL_FACES — modeller/modules.js (constant)'] },
           { name:'isShelf', io:'(node) → <b>boolean</b>', role:'Grouped, not a box wall, rotation matches horizontal/vertical shelf.' , calls: ['rotationsMatch() — shared/geometry.js','HORIZONTAL_ROTATION / VERTICAL_ROTATION — shared/geometry.js (constants)'] },
         ]
       },
@@ -1287,11 +1829,11 @@ const GROUPS = [
       },
       {
         path: 'tools/attachTool.js',
-        status: 'warn',
+        status: 'ok',
         imports: [{from:'../modeller/selection.js',names:['setSelectedId','setSelectedGroupId']},{from:'../ui/toast.js',names:['showToast','hideToast']},{from:'../engine/joints.js',names:['classifyJoint','declareJoint']},{from:'../history/history.js',names:['AddConstraintCommand']}],
         exportsList: ['setAttachToolContext','isAttachActive','getPendingAttach','startAttachMode','cancelAttachMode','cancelPendingAttach','confirmAttach'],
         role: 'Manual panel-to-panel joint declaration — the generic path outside any automated feature. Two-pick, then requires explicit user confirmation before writing anything to the graph.',
-        note: 'Depends on <b>engine/joints.js</b>, which is currently empty. classifyJoint()/declareJoint() need real implementations before this tool can run.',
+        note: 'engine/joints.js is now fully implemented — classifyJoint()/declareJoint() are real, and this manual-attach flow runs end to end.',
         fns: [
           { name:'setAttachToolContext', io:'(context: AttachToolContext) → <span class="ret">void</span>' , calls: [] },
           { name:'isAttachActive / getPendingAttach', io:'() → boolean / PendingAttach|null' , calls: [] },
@@ -1304,12 +1846,14 @@ const GROUPS = [
         path: 'tools/boundaryRectTool.js',
         status: 'ok',
         imports: [{from:'../shared/geometry.js',names:['computeBoundaryRectangle']},{from:'../ui/toast.js',names:['showToast']}],
-        exportsList: ['setBoundaryRectToolContext','startBoundaryRectMode','cancelBoundaryRectMode'],
+        exportsList: ['setBoundaryRectToolContext','startBoundaryRectMode','cancelBoundaryRectMode','isBoundaryRectActive','getBoundaryRectProgress'],
         role: 'The shared "pick 4 boundary panels" interaction both tools/doorTool.js and tools/drawerTool.js build on — front-fitting\'s own generic entry point, used for anything that needs to build FROM a computeBoundaryRectangle() result (doors, drawers, and whatever else picks up the same pattern later). Guides the pick step by step (2 of one boundary type + 2 of another; rejects a 3rd of the same type, a panel outside the box, or a non-rectangular set), then hands the finished boundaryResult to a caller-supplied callback — itself has no idea what gets built from it.',
         fns: [
           { name:'setBoundaryRectToolContext', io:'({getPanels, renderAll}) → <span class="ret">void</span>' , calls: [] },
           { name:'startBoundaryRectMode', io:'(onComplete) → <span class="ret">void</span>', role:'onComplete receives the computeBoundaryRectangle() result (ok:true with the boundary data, or ok:false with a reason) once 4 valid panels are picked.' , calls: ['showToast() — ui/toast.js'] },
           { name:'cancelBoundaryRectMode', io:'() → <span class="ret">void</span>', role:'Clears the in-progress pick, its own highlight state, and any toast.' , calls: [] },
+          { name:'isBoundaryRectActive', io:'() → <b>boolean</b>', role:'For modeller-main.js\'s toolbar rendering (button active-state).' , calls: [] },
+          { name:'getBoundaryRectProgress', io:'() → <b>number</b>', role:'How many of the 4 panels have been picked so far — for status UI.' , calls: [] },
         ]
       },
       {
@@ -1345,6 +1889,12 @@ const GROUPS = [
           { name:'confirmDoorMode', io:'(doorSpec, onConfirm) → <span class="ret">void</span>' , calls: ['computeDoorPlacement() — features/door.js','showToast() — ui/toast.js'] },
         ]
       },
+      {
+        path: 'tools/plinth.js',
+        status: 'stub',
+        role: 'Empty (0 bytes) — the interaction-layer counterpart to features/plinth.js, which is also empty. Neither half of a plinth-adding tool exists yet.',
+        fns: []
+      },
     ]
   },
   {
@@ -1356,10 +1906,12 @@ const GROUPS = [
         path: 'shared/geometry.js',
         status: 'ok',
         imports: [{from:'../modeller/modules.js',names:['computeWorldHalfExtents','DESIGN_LIMITS_MM','PANEL_SIZE_LIMITS_MM','LOCAL_FACES','FACE_TO_DIM_FIELD','getAlignedAxis']}],
-        exportsList: ['VERTICAL_ROTATION','HORIZONTAL_ROTATION','PARALLEL_ROTATION','MIN_WALL_GAP_MM','rotationsMatch','checkMinGap','collectAxisSlabs','clampOffsetToDesignLimits','clampGroupOffsetToDesignLimits','findPanelSizeViolation','findDesignLimitViolation','panelExtentAlongAxis','computeBoundaryRectangle'],
+        exportsList: ['VERTICAL_ROTATION','HORIZONTAL_ROTATION','PARALLEL_ROTATION','BOUNDARY_ROTATION_BY_AXIS','OPPOSITE_FACE','MIN_WALL_GAP_MM','rotationsMatch','checkMinGap','collectAxisSlabs','clampOffsetToDesignLimits','clampGroupOffsetToDesignLimits','findPanelSizeViolation','findDesignLimitViolation','panelExtentAlongAxis','computeBoundaryRectangle','facingFace'],
         role: 'Rotation constants, axis-slab collection, every design-limit / panel-size validation function, plus panelExtentAlongAxis and computeBoundaryRectangle (the shared "4 picked panels define a rectangular opening" math every door/drawer/collinear pick ultimately reduces to). Nothing here knows what a "box" or "shelf" is.',
         fns: [
           { name:'VERTICAL_ROTATION / HORIZONTAL_ROTATION / PARALLEL_ROTATION', io:'<b>{x,y,z}</b> (constants)', role:'The 3 panel orientation presets.' },
+          { name:'BOUNDARY_ROTATION_BY_AXIS', io:'<b>{x,y,z} → rotation</b> (constant)', role:'Which of the 3 rotation presets a boundary-picking tool should validate a pick against, keyed by the opening\'s own normal axis — exported so tools/boundaryRectTool.js checks picks against this exact vocabulary instead of a second copy.' },
+          { name:'OPPOSITE_FACE', io:'<b>{right:left, left:right, top:bottom, bottom:top, front:back, back:front}</b> (constant)' },
           { name:'MIN_WALL_GAP_MM', io:'<b>15</b> (constant)' },
           { name:'rotationsMatch', io:'(a, b) → <b>boolean</b>' , calls: [] },
           { name:'checkMinGap', io:'(elements: Slab[]) → <b>{ok:true} | {ok:false,a,b}</b>', role:'Every neighbor pair on an axis keeps ≥ MIN_WALL_GAP_MM apart.' , calls: ['MIN_WALL_GAP_MM — same file (constant)'] },
@@ -1370,6 +1922,7 @@ const GROUPS = [
           { name:'findDesignLimitViolation', io:'(rotation, positionMm, dims) → <b>axis|null</b>' , calls: ['computeWorldHalfExtents() — modeller/modules.js','DESIGN_LIMITS_MM — modeller/modules.js (constant)'] },
           { name:'panelExtentAlongAxis', io:'(resolvedNode, axis) → <b>{min,max,dimField}|null</b>', role:'A resolved node\'s min/max extent along ANY given world axis, and which of its own width/height/thickness fields governs it — used by shared/frontFit.js for both the 4 boundary panels and the interior-clearance sweep.' , calls: ['getAlignedAxis() — modeller/modules.js'] },
           { name:'computeBoundaryRectangle', io:'(panels, [p1,p2,p3,p4]) → <b>{ok:true, groupId, normalAxis, axisA, axisB, sides, inner, outer} | {ok:false, reason}</b>', role:'The "4 already-picked panels define a rectangular opening" primitive — categorizes the 4 panels into left/right/bottom/top by axis, derives the leftover normalAxis (the opening\'s facing direction), and computes both the inner (flush inside) and outer (covering the boundary panels\' ends) rectangles. Shared by tools/boundaryRectTool.js (doors/drawers) — the single source of truth every "in"/"out" edge fit measurement reads from.' , calls: ['getAlignedAxis() — modeller/modules.js'] },
+          { name:'facingFace', io:'(resolved, axis, otherResolved) → <b>faceName | null</b>', role:'Which local face of a panel actually faces another panel along a shared axis, determined from real current positions rather than assumed from role/name. Moved here from features/shelf.js so shelf.js\'s addShelf and this file\'s own computeBoundaryRectangle share the exact same "which face faces which" logic instead of duplicating it — and so engine/joints.js can use the identical test for real physical contact detection.' , calls: ['getAlignedAxis() — modeller/modules.js','LOCAL_FACES — modeller/modules.js (constant)'] },
         ]
       },
       {
@@ -1466,15 +2019,6 @@ const GROUPS = [
         path: 'modeller/materials.js',
         status: 'stub',
         role: 'Intended split target for the material catalog out of modules.js — same issue as node.js: placeholder text, not implemented.',
-        fns: []
-      },
-      {
-        path: 'modeller/validation.js',
-        status: 'warn',
-        imports: [{from:'./modules.js',names:['computeWorldHalfExtents','DESIGN_LIMITS_MM','PANEL_SIZE_LIMITS_MM']}],
-        exportsList: ['findPanelSizeViolation','findDesignLimitViolation'],
-        role: 'findPanelSizeViolation / findDesignLimitViolation.',
-        note: 'Duplicates shared/geometry.js, which is the version everything actually imports. Recommend deleting this file rather than maintaining two copies of the same validators.',
         fns: []
       },
       {
@@ -1593,7 +2137,7 @@ const GROUPS = [
   {
     id: 'engine',
     title: 'engine/',
-    desc: 'Computed projections from the resolved graph — BOM, nesting, PDF export. Stateless, regenerated on demand.',
+    desc: 'Computed projections from the resolved graph — BOM, nesting, PDF export, joint/hardware/assembly-sequence detection. Stateless, regenerated on demand.',
     files: [
       {
         path: 'engine/bom.js',
@@ -1635,23 +2179,93 @@ const GROUPS = [
       {
         path: 'engine/pdfExport.js',
         status: 'ok',
-        imports: [{from:'jspdf (external)',names:['jsPDF']}],
-        exportsList: ['exportCutListPdf','exportNestingPdf','exportHistoryPdf'],
-        role: 'Cut-list, nesting-plan, and (new this pass) activity-history PDF generation.',
+        imports: [{from:'jspdf (external)',names:['jsPDF']},{from:'./joints.js',names:['formatSummaryLines','formatAttentionLines','formatJointTableRow','formatFeatureJointTableRow']},{from:'./hardware.js',names:['formatHardwareTableRow']},{from:'../modeller/modules.js',names:['computeWorldHalfExtents']}],
+        exportsList: ['exportCutListPdf','exportNestingPdf','exportHistoryPdf','exportJointsPdf','exportAssemblyPlanPdf'],
+        role: 'Cut-list, nesting-plan, activity-history, joints, and assembly-instructions PDF generation.',
         fns: [
   { name:'formatDim / rowCell / drawRow', io:'various', role:'Cut-list table formatting helpers.', calls:[], tag:'internal' },
   { name:'exportCutListPdf', io:'(rows, {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Paginated cut-list table PDF. mode:&#39;open&#39; opens in a new tab (synchronous jsPDF bloburl, so it stays in the same click-handler call stack &mdash; async would get popup-blocked).', calls:['drawRow() / rowCell() &mdash; same file', 'jsPDF &mdash; jspdf (external)'] },
   { name:'drawNestingSummaryPage', io:'(doc, summary, projectName) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Per-material sheet counts, cost, utilization, and any unplaced pieces.', calls:[], tag:'internal' },
   { name:'drawSheetPage', io:'(doc, materialLabel, sheet, sheetNumber, totalSheets) &rarr; <span class=&quot;ret&quot;>void</span>', role:'One page per sheet, drawn to scale with every placed piece as a labeled rectangle; rotates the drawing (not the nesting coordinates) when that fits the A4 page better.', calls:['formatDim() &mdash; same file'], tag:'internal' },
   { name:'exportNestingPdf', io:'(nestResults, summary, {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Summary page + one page per sheet.', calls:['drawNestingSummaryPage() / drawSheetPage() &mdash; same file'] },
-  { name:'exportHistoryPdf', io:'(lines: string[], {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'NEW this pass — one line of plain text per activity-log entry (see history/history.js#HistoryManager.getActivityLogText(), the intended source), paginated the same way exportCutListPdf\'s rows are. Wired to the toolbar\'s new "Print History" button (modeller.html #print-history-btn / modeller-main.js) with mode:\'open\', same convention as #open-cutlist-btn.', calls:['jsPDF &mdash; jspdf (external)'] },
+  { name:'exportHistoryPdf', io:'(lines: string[], {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'One line of plain text per activity-log entry (see history/history.js#HistoryManager.getActivityLogText()), paginated the same way exportCutListPdf&#39;s rows are. Wired to the toolbar&#39;s &quot;Print History&quot; button.', calls:['jsPDF &mdash; jspdf (external)'] },
+  { name:'exportJointsPdf', io:'(report, hardwarePlan?, {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Joints report as a real table (see JOINTS_TABLE_COLUMNS) &mdash; summary + needs-attention text from joints.js, then the joints table and, if a hardwarePlan is supplied, a third table of hinges/runners/fasteners.', calls:['formatSummaryLines() / formatAttentionLines() / formatJointTableRow() / formatFeatureJointTableRow() &mdash; engine/joints.js', 'formatHardwareTableRow() &mdash; engine/hardware.js', 'jsPDF &mdash; jspdf (external)'] },
+  { name:'exportAssemblyPlanPdf', io:'(plan, resolvedPanels, {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Step-by-step assembly instructions PDF from engine/ergonomics.js#buildAssemblyPlan &mdash; one step per page/section with its cluster, hardware, tools and ergonomics flags, plus a per-step insertion-arrow diagram for integration steps.', calls:['computeWorldHalfExtents() &mdash; modeller/modules.js', 'jsPDF &mdash; jspdf (external)'] },
 ]
       },
       {
         path: 'engine/joints.js',
-        status: 'stub',
-        role: 'Not yet implemented (0 bytes) — the single shared source of joint truth. Required by tools/attachTool.js and, eventually, by every automated feature\'s internal joint declarations.',
-        note: 'Required exports: <b>classifyJoint(panels, nodeAId, faceA, nodeBId, faceB) → {type, params} | null</b> and <b>declareJoint(nodeAId, faceA, nodeBId, faceB, type, params) → relation</b>.',
+        status: 'verified',
+        imports: [{from:'../modeller/modules.js',names:['computeWorldHalfExtents','getAlignedAxis','LOCAL_FACES']},{from:'../shared/geometry.js',names:['facingFace']},{from:'../modeller/snap.js',names:['resolveConstraints']},{from:'../shared/frontFit.js',names:['dimFieldForAxis']}],
+        exportsList: ['JOINT_TYPES','FEATURE_JOINT_KINDS','detectJoints','classifyJoint','declareJoint','detectFeatureJoints','computeJointExtremities','findOrphanPanels','findCrossGroupJoints','buildJointsReport','formatJointTableRow','formatFeatureJointTableRow','formatSummaryLines','formatAttentionLines','formatJointsReportLines'],
+        role: 'The single shared source of joint truth: pure geometry detection (&quot;where do resolved panels actually touch, and what kind of contact is it&quot;) &mdash; deliberately never hardware selection (engine/hardware.js) or user-confirmed intent (tools/attachTool.js). Two entry points share one contact test so a batch scan and a manual two-pick confirmation can never disagree.',
+        note: 'Now a real 1000+ line module &mdash; no longer the stub tools/attachTool.js was waiting on. classifyJoint()/declareJoint() are implemented; the manual-attach flow works end to end.',
+        fns: [
+  { name:'JOINT_TYPES / FEATURE_JOINT_KINDS', io:'string[] constants', role:'face_to_face / corner_butt / t_butt / edge_to_edge / near_contact, and door_hinge / drawer_slide.', calls:[], tag:'internal' },
+  { name:'computeAABB / axisOverlap / classifyButtGeometry / evaluateAxisContact', io:'various', role:'Shared per-axis contact test both detectJoints and classifyJoint call, so a batch scan and a manual confirmation can never quietly disagree.', calls:[], tag:'internal' },
+  { name:'detectJoints', io:'(resolvedPanels, options?) &rarr; <b>{ joints: Joint[], collisions: Collision[] }</b>', role:'Batch scan: every panel pair, every candidate contact axis, keeping the tightest valid one per pair. Pure &mdash; safe to call on every resolve, same convention as bom.js#computeBom.', calls:['computeAABB() / axisOverlap() / evaluateAxisContact() &mdash; same file'] },
+  { name:'classifyJoint', io:'(panels, nodeAId, faceA, nodeBId, faceB, options?) &rarr; <b>{type, params} | null</b>', role:'Single-pair check for tools/attachTool.js&#39;s manual flow: resolves the graph itself, verifies the two picked faces actually face each other, then runs the same contact test detectJoints uses. null on any failure drives attachTool.js&#39;s &quot;not a recognizable joint&quot; message.', calls:['resolveConstraints() &mdash; modeller/snap.js', 'getAlignedAxis() &mdash; modeller/modules.js', 'facingFace() &mdash; shared/geometry.js', 'evaluateAxisContact() &mdash; same file'] },
+  { name:'declareJoint', io:'(nodeAId, faceA, nodeBId, faceB, type, params) &rarr; <b>relation object</b>', role:'Pure builder for the relation object attachTool.js attaches to a node&#39;s own relations array &mdash; deliberately a separate array from constraints. No lookup or validation; classifyJoint already did that.', calls:[] },
+  { name:'detectFeatureJoints', io:'(panels) &rarr; <b>FeatureJoint[]</b>', role:'Door hinges and drawer slides &mdash; mechanical associations between two ALREADY-COMPLETE sub-assemblies, not an AABB contact, so no contactAxis/overlap/gap: just which two panels, which side, and the 3D line a hinge or slide runs along. Reads feature flags (isDoor, hinge, drawerBoxFrontId&#8230;) from the RAW panels array, not resolved output.', calls:['resolveConstraints() &mdash; modeller/snap.js'] },
+  { name:'computeJointExtremities', io:'(joint) &rarr; <b>{p1, p2, lengthMm}</b>', role:'Reduces a joint&#39;s 2D contact footprint to a single 3D line segment &mdash; the way you&#39;d describe a physical joint on a cut sheet.', calls:[] },
+  { name:'findOrphanPanels', io:'(resolvedPanels, joints) &rarr; <b>{id, name}[]</b>', role:'Visible panels in NO joint at all &mdash; almost always a constraint bug (a floating, unattached panel).', calls:[] },
+  { name:'findCrossGroupJoints', io:'(resolvedPanels, joints) &rarr; <b>Joint[]</b>', role:'Joints between two panels belonging to two DIFFERENT groups &mdash; e.g. two separately-built box modules pushed together until they touch.', calls:[] },
+  { name:'buildJointsReport', io:'(resolvedPanels, joints, collisions, featureJoints?, {pieceCodeById?}) &rarr; <b>JointsReport</b>', role:'Single source of truth for both the PDF and JSON joint exports, already cross-referenced against panel names/codes. pieceCodeById is passed separately since resolveConstraints() doesn&#39;t reliably carry a custom field like pieceCode through for constrained nodes.', calls:['findCrossGroupJoints() / summarizeJointTypes() / findOrphanPanels() &mdash; same file'] },
+  { name:'formatJointTableRow / formatFeatureJointTableRow', io:'(joint) &rarr; <b>row object</b>', role:'Per-row cell values for engine/pdfExport.js#exportJointsPdf&#39;s two tables.', calls:['computeJointExtremities() &mdash; same file'] },
+  { name:'formatSummaryLines / formatAttentionLines / formatJointsReportLines', io:'(report) &rarr; <b>string[]</b>', role:'Plain-text summary / needs-attention / full-report lines, factored apart so exportJointsPdf can print the summary above a real table instead of formatJointsReportLines&#39; prose dump.', calls:['buildJointsReport() &mdash; same file'] },
+]
+      },
+      {
+        path: 'engine/hardware.js',
+        status: 'verified',
+        imports: [{from:'../modeller/snap.js',names:['resolveConstraints']},{from:'./joints.js',names:['detectJoints','detectFeatureJoints','computeJointExtremities']}],
+        exportsList: ['HINGE_CATALOG','RUNNER_CATALOG','PANEL_CONNECTOR_CATALOG','selectHingeHardware','selectRunnerHardware','placeFastenersAlongSeam','selectPanelConnector','buildHardwarePlan','formatHardwareTableRow','REFERENCES'],
+        role: 'Hardware / rule-registry layer: Joint + FeatureJoint &rarr; hardware selection &rarr; fastener/hinge/runner positions. Geometry (joints.js) answers where things meet; this answers what hardware goes there and exactly where its own fixings go. Hinges and runners are modeled on Blum&#39;s published catalogue (CLIP top BLUMOTION, TANDEM plus BLUMOTION, LEGRABOX); panel connectors are explicitly generic/non-Blum, since Blum doesn&#39;t publish one.',
+        fns: [
+  { name:'HINGE_CATALOG / RUNNER_CATALOG / PANEL_CONNECTOR_CATALOG / REFERENCES', io:'array constants', role:'Blum-sourced hinge/runner specs, a generic panel-connector table, and the citation list for exactly which numbers came from where (vs. industry rule-of-thumb).', calls:[], tag:'internal' },
+  { name:'selectHingeHardware', io:'(hingeJoint, doorThicknessMm) &rarr; <b>{hardware, count, positions} | null</b>', role:'Selects a hinge model and computes where each one goes, from a door_hinge FeatureJoint and the door&#39;s own thickness.', calls:['HINGE_CATALOG &mdash; same file (constant)'] },
+  { name:'selectRunnerHardware', io:'(slideJoint, drawerSideThicknessMm) &rarr; <b>{hardware, nominalLengthMm} | null</b>', role:'Picks the largest catalog runner that still fits the drawer box&#39;s depth, and validates the FeatureJoint&#39;s own measured side clearance against the catalog spec &mdash; a runner is never recommended for a slot it doesn&#39;t physically fit.', calls:['RUNNER_CATALOG &mdash; same file (constant)'] },
+  { name:'placeFastenersAlongSeam', io:'({p1, p2, lengthMm}, edgeOffsetMm, maxSpacingMm) &rarr; <b>{x,y,z}[]</b>', role:'Evenly spaces fasteners along a joint&#39;s own seam (see joints.js#computeJointExtremities), inset from each end &mdash; min edge distance + max spacing &rarr; N fasteners, run against real seam geometry.', calls:['computeJointExtremities() &mdash; engine/joints.js'] },
+  { name:'selectPanelConnector', io:'(joint, extremities, panelThicknessMm) &rarr; <b>{hardware, positions} | null</b>', role:'Recommends a connector + fastener positions for a corner_butt/t_butt joint only &mdash; null for face_to_face (glue/clamp, no discrete positions) or edge_to_edge (still unhandled upstream).', calls:['placeFastenersAlongSeam() &mdash; same file', 'PANEL_CONNECTOR_CATALOG &mdash; same file (constant)'] },
+  { name:'buildHardwarePlan', io:'(panels) &rarr; <b>HardwarePlan</b>', role:'Full pass over a design&#39;s joints and feature joints: every hinge, runner and panel connector, cross-referenced against panel name/pieceCode. Anything that doesn&#39;t match a catalog entry is recorded in `unmatched`, not silently dropped &mdash; the hardware-layer equivalent of joints.js#findOrphanPanels.', calls:['detectJoints() / detectFeatureJoints() / computeJointExtremities() &mdash; engine/joints.js', 'selectHingeHardware() / selectRunnerHardware() / selectPanelConnector() &mdash; same file'] },
+  { name:'formatHardwareTableRow', io:'(item) &rarr; <b>row object</b>', role:'Per-row cell values for engine/pdfExport.js&#39;s hardware table.', calls:[] },
+]
+      },
+      {
+        path: 'engine/assembly.js',
+        status: 'verified',
+        imports: [{from:'../modeller/snap.js',names:['resolveConstraints']},{from:'./joints.js',names:['detectJoints','detectFeatureJoints']},{from:'./hardware.js',names:['buildHardwarePlan']}],
+        exportsList: ['buildAssemblySequence','formatAssemblySequenceLines'],
+        role: '<b>This is where &quot;assembly&quot; lives.</b> Assembly SEQUENCING: in what order a design actually gets put together. Sits above engine/hardware.js the way hardware.js sits above engine/joints.js &mdash; geometry says where things meet, hardware says what holds them together, this says in what order a person does it. Core insight: a structural Joint (corner_butt/t_butt/face_to_face) means two panels are rigidly joined into the same sub-assembly, built panel by panel; a FeatureJoint (drawer_slide/door_hinge) means two ALREADY-COMPLETE sub-assemblies get connected to each other, scheduled only once both sides are finished, hinges always last.',
+        note: 'Known gap, flagged in the file itself: a drawer front&#39;s attachment to its drawer box isn&#39;t modeled as a joint yet (matched via drawerBoxFrontId, not a Joint/FeatureJoint) &mdash; a front with no other structural joints shows up as its own flagged `kind:&#39;unattached&#39;` step rather than being silently dropped, same philosophy as joints.js#findOrphanPanels.',
+        fns: [
+  { name:'computeClusters', io:'(panelIds, structuralJoints) &rarr; <b>{panelIds}[]</b>', role:'Connected components over the STRUCTURAL graph only (near_contact/edge_to_edge don&#39;t count as real connections yet).', calls:[], tag:'internal' },
+  { name:'buildAssemblySequence', io:'(panels) &rarr; <b>{ steps: AssemblyStep[], clusters }</b>', role:'Clusters panels into rigid sub-assemblies, orders each cluster&#39;s own panels internally, pre-installs single-panel hardware (a runner bracket, a hinge cup/plate) before that panel&#39;s first structural joint, then schedules integration steps (drawer insertion, door hanging) once both sides are complete &mdash; hinges always last. Pure function, nothing persisted, same convention as buildJointsReport/buildHardwarePlan.', calls:['computeClusters() &mdash; same file', 'detectJoints() / detectFeatureJoints() &mdash; engine/joints.js', 'buildHardwarePlan() &mdash; engine/hardware.js'] },
+  { name:'formatAssemblySequenceLines', io:'(sequence) &rarr; <b>string[]</b>', role:'Plain-text rendering of a sequence &mdash; print-and-eyeball the order before building anything visual, same convention as joints.js/hardware.js&#39;s own text formatters.', calls:[] },
+]
+      },
+      {
+        path: 'engine/ergonomics.js',
+        status: 'verified',
+        imports: [{from:'../modeller/snap.js',names:['resolveConstraints']},{from:'./assembly.js',names:['buildAssemblySequence']}],
+        exportsList: ['TOOL_CATALOG','annotateStepsWithTools','scoreErgonomics','buildAssemblyPlan','formatAssemblyPlanLines'],
+        role: 'Tool identification + ergonomics scoring &mdash; an ANNOTATION pass over engine/assembly.js#buildAssemblySequence&#39;s output, not a second sequencer: neither phase invents a new order, both just attach information to the order assembly.js already computed. Three concrete per-step checks: cumulative weightKg / twoPersonJob (union-find over panels as they get joined), plus whatever else the original ergonomics plan scoped (flip-count, cantilever/support).',
+        note: 'The confirmat screw drive type in TOOL_CATALOG is flagged as a convention to confirm per actual screw brand, not cited as a verified spec the way the Blum numbers in engine/hardware.js are.',
+        fns: [
+  { name:'TOOL_CATALOG', io:'object constant', role:'Maps a hardware kind (from buildHardwarePlan) to the tool(s) it needs.', calls:[], tag:'internal' },
+  { name:'annotateStepsWithTools', io:'(sequence) &rarr; <b>{ steps, toolsSummary: string[] }</b>', role:'A step&#39;s tools are the union of tools its hardware needs.', calls:['TOOL_CATALOG &mdash; same file (constant)'] },
+  { name:'scoreErgonomics', io:'(panels, sequence) &rarr; <b>{ steps }</b>', role:'Attaches weightKg/twoPersonJob and the other ergonomics flags to each step.', calls:[] },
+  { name:'buildAssemblyPlan', io:'(panels) &rarr; <b>{ steps, clusters, toolsSummary }</b>', role:'Ties sequencing + tools + ergonomics into one call &mdash; same &quot;one entry point, same shape&quot; pattern as buildJointsReport/buildHardwarePlan.', calls:['buildAssemblySequence() &mdash; engine/assembly.js', 'annotateStepsWithTools() / scoreErgonomics() &mdash; same file'] },
+  { name:'formatAssemblyPlanLines', io:'(plan) &rarr; <b>string[]</b>', role:'Plain-text rendering of a full assembly plan.', calls:[] },
+]
+      },
+      {
+        path: 'engine/helpers.mjs',
+        status: 'warn',
+        imports: [{from:'../modeller/modules.js',names:['loadMaterialCatalog']}],
+        exportsList: ['ensureMaterialCatalog','assert','assertEqual','section','report'],
+        role: 'Shared assertion-based test bootstrap for the .mjs test files (run directly with `node tests/&lt;file&gt;.mjs`, no bundler/runner).',
+        note: 'Likely misplaced: its own file header says &quot;tests/helpers.mjs&quot; and it imports <code>&#39;../src/modeller/modules.js&#39;</code> &mdash; a path that only resolves correctly from a real tests/ directory. From its actual location (src/engine/) that import would resolve to src/src/modeller/modules.js, which doesn&#39;t exist. Worth confirming whether this is a stray duplicate of a tests/helpers.mjs, or whether it needs its import path fixed in place.',
         fns: []
       },
       {
@@ -1761,12 +2375,6 @@ const GROUPS = [
   { name:'setupResizer', io:'(resizerId, panelId, side) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Pointer-drag width resize, clamped to MIN_WIDTH/MAX_WIDTH.', calls:[], tag:'internal' },
   { name:'setupCollapseToggle', io:'(buttonId, panelId) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Collapse/restore, remembering the last width to restore to.', calls:[], tag:'internal' },
 ]
-      },
-      {
-        path: 'ui/export.js',
-        status: 'stub',
-        role: 'Empty, unused.',
-        fns: []
       },
     ]
   },
@@ -2129,7 +2737,7 @@ function renderContent() {
 
       <p class="group-desc">${g.desc}</p>
 
-      ${g.files.map(f => renderFileCard(f)).join('')}
+      ${g.files.map(f => renderFileCard(f, g.id)).join('')}
     </section>
   `).join('');
 }
@@ -2253,7 +2861,7 @@ function fileHasCalls(f) {
    File card
    ------------------------------------------------------------ */
 
-function renderFileCard(f) {
+function renderFileCard(f, groupId) {
   const meta = statusMeta[f.status];
 
   const parts = f.path.split('/');
@@ -2263,6 +2871,9 @@ function renderFileCard(f) {
     : '';
 
   const filePart = parts[parts.length - 1];
+
+  const moduleId = GROUP_TO_MODULE[groupId];
+  const moduleLabel = moduleId ? MODULE_META[moduleId].label : null;
 
   /*
    * IMPORTANT:
@@ -2294,8 +2905,14 @@ function renderFileCard(f) {
       ]
         .join(' ')
         .toLowerCase()
-        .replace(/"/g, '&quot;')}
+        .replace(/"/g, '&quot;')}"
     >
+
+      ${moduleLabel ? `
+        <a class="file-module-crumb" href="#module-${moduleId}">
+          ↑ Part of the ${moduleLabel} module
+        </a>
+      ` : ''}
 
       <div
         class="file-card-head"
@@ -2446,12 +3063,502 @@ function renderFileCard(f) {
   `;
 }
 
+/* ======================================================================
+   OVERVIEW / MODULE PAGES
+
+   A hand-written, didactic map of the system sitting on top of the
+   file-level reference above. It documents nothing new — every link
+   below points at the exact same #file-… / #fn-… anchors the reference
+   itself defines via fileId()/symbolId(). If a file gets renamed here,
+   the reference is the thing to fix; this map should keep working.
+   ====================================================================== */
+
+const MODULE_META = {
+  interaction: {
+    label: 'Tools & Features',
+    kicker: 'Creation layer',
+    groups: ['tools', 'features'],
+    summary: 'Turns a click, a drag or a pick into pure geometry — a new box, shelf, door or drawer. Nothing here touches application state.',
+    upstream: [{ id: 'ui', label: 'triggered from' }],
+    downstream: [{ id: 'core', label: 'hands nodes to' }]
+  },
+  core: {
+    label: 'Application Core',
+    kicker: 'modeller-main.js',
+    groups: ['root'],
+    summary: 'The single writer of the graph. Owns state and history, and is the only place anything is actually mutated.',
+    upstream: [
+      { id: 'interaction', label: 'commits results from' },
+      { id: 'foundations', label: 'records commands into' }
+    ],
+    downstream: [{ id: 'graph', label: 'asks to resolve' }]
+  },
+  graph: {
+    label: 'Modeller Engine',
+    kicker: 'Graph, constraints & scene',
+    groups: ['modeller'],
+    summary: 'Panel/constraint primitives, the constraint resolver, and the Three.js 3D/2D view layer.',
+    upstream: [{ id: 'core', label: 'resolved once per render by' }],
+    downstream: [{ id: 'engine', label: 'feeds resolved panels to' }]
+  },
+  engine: {
+    label: 'Engine',
+    kicker: 'BOM, nesting, PDF & assembly',
+    groups: ['engine'],
+    summary: 'Computed projections of the resolved graph: bill of materials, cutting layout, joints, hardware, assembly sequencing and PDF exports.',
+    upstream: [{ id: 'graph', label: 'reads the resolved graph from' }],
+    downstream: [{ id: 'ui', label: 'rendered by' }]
+  },
+  ui: {
+    label: 'UI Rendering',
+    kicker: 'Panels & inspector',
+    groups: ['ui'],
+    summary: 'DOM-facing, callback-driven rendering of everything the person sees outside the 3D/2D canvas — panel list, inspector, relations, cut list.',
+    upstream: [
+      { id: 'engine', label: 'displays projections from' },
+      { id: 'core', label: 'driven by callbacks from' }
+    ],
+    downstream: [{ id: 'interaction', label: 'fires callbacks back into' }]
+  },
+  foundations: {
+    label: 'Foundations',
+    kicker: 'Shared helpers & history',
+    groups: ['shared', 'history'],
+    summary: 'Feature-agnostic geometry/validation helpers shared by tools and features, plus the undo/redo command stack.',
+    upstream: [],
+    downstream: [
+      { id: 'interaction', label: 'used by' },
+      { id: 'core', label: 'used by' }
+    ]
+  }
+};
+
+const MODULE_CHAIN = ['interaction', 'core', 'graph', 'engine', 'ui'];
+
+/*
+ * Reverse lookup — reference-view file cards use this to link back
+ * up to "the module this file belongs to" (see renderFileCard's
+ * file-module-crumb).
+ */
+const GROUP_TO_MODULE = {};
+Object.entries(MODULE_META).forEach(([moduleId, m]) => {
+  m.groups.forEach(groupId => { GROUP_TO_MODULE[groupId] = moduleId; });
+});
+
+const ARCH_ARROW_LABELS = {
+  'interaction-core': 'commits nodes',
+  'core-graph': 'resolves constraints',
+  'graph-engine': 'resolved panels',
+  'engine-ui': 'BOM / cut list / nesting'
+};
+
+function groupLink(groupId, label) {
+  const g = GROUPS.find(x => x.id === groupId);
+  if (!g) return label || groupId;
+
+  return `
+    <a class="symbol-link file-ref-link" href="#group-${g.id}" title="Go to ${g.title} section">${label || g.title}</a>
+  `;
+}
+
+function moduleFiles(groupIds) {
+  return GROUPS
+    .filter(g => groupIds.includes(g.id))
+    .flatMap(g => g.files.map(f => ({ ...f, groupId: g.id, groupTitle: g.title })));
+}
+
+/* ------------------------------------------------------------
+   Architecture diagram (overview landing page)
+   ------------------------------------------------------------ */
+
+function archNodeHtml(id) {
+  const m = MODULE_META[id];
+
+  return `
+    <a class="arch-node" href="#module-${id}">
+      <span class="arch-node-title">${m.label}</span>
+      <span class="arch-node-sub">${m.summary}</span>
+      <span class="arch-node-groups">
+        ${m.groups.map(g => `<span class="arch-tag">${g}/</span>`).join('')}
+      </span>
+    </a>
+  `;
+}
+
+function renderArchDiagram() {
+  const root = document.getElementById('archDiagram');
+
+  root.innerHTML = `
+    <p class="arch-diagram-intro">One render pass, top to bottom — this is what modeller-main.js#renderAll runs on every change. The loop closes at the bottom: whatever the person sees in the panels on the right is what they act on next.</p>
+
+    <div class="arch-flow">
+      ${MODULE_CHAIN.map((id, i) => `
+        <div class="arch-row">${archNodeHtml(id)}</div>
+        ${i < MODULE_CHAIN.length - 1 ? `
+          <div class="arch-arrow">↓</div>
+          <div class="arch-arrow-label">${ARCH_ARROW_LABELS[id + '-' + MODULE_CHAIN[i + 1]] || ''}</div>
+        ` : ''}
+      `).join('')}
+
+      <div class="arch-loop">↺ back to Tools &amp; Features — the person picks, drags or clicks again</div>
+    </div>
+
+    <div class="arch-side-row">
+      ${archNodeHtml('foundations')}
+    </div>
+  `;
+}
+
+function renderModuleGrid() {
+  const root = document.getElementById('moduleGrid');
+  const order = [...MODULE_CHAIN, 'foundations'];
+
+  root.innerHTML = order.map(id => {
+    const m = MODULE_META[id];
+
+    return `
+      <a class="module-card" href="#module-${id}">
+        <h4>${m.label}</h4>
+        <p>${m.summary}</p>
+        <span class="module-card-cta">Read how it works →</span>
+      </a>
+    `;
+  }).join('');
+}
+
+/* ------------------------------------------------------------
+   Known gaps — everything empty, unfinished, or self-flagged as
+   incomplete, gathered in one place on the landing page instead of
+   scattered one-per-module. Hand-curated (not auto-scanned from
+   status:'stub'/'warn') so this stays a "what's actually missing"
+   list rather than a mechanical badge count.
+   ------------------------------------------------------------ */
+
+function renderKnownGaps() {
+  const root = document.getElementById('knownGaps');
+
+  root.innerHTML = `
+    <h3 class="known-gaps-title">Known gaps</h3>
+    <p class="known-gaps-intro">Everything below is empty, unfinished, or flagged as incomplete right in the file it's found in — gathered here in one place since this is usually the first thing worth checking before planning new work.</p>
+    <ul class="known-gaps-list">
+      <li>
+        <span class="gap-files">${fileLink('engine/validator.js')} &amp; ${fileLink('engine/extractor.js')}</span>
+        <span class="gap-desc">Both empty (0 bytes) — no documented intent yet.</span>
+        <a class="gap-module-link" href="#module-engine">Engine module →</a>
+      </li>
+      <li>
+        <span class="gap-files">${fileLink('engine/resolveConstraints.js')}</span>
+        <span class="gap-desc">Dead scaffolding from an earlier restructure — ${fileLink('modeller/snap.js')} is the resolver actually in use; nothing imports this one.</span>
+        <a class="gap-module-link" href="#module-engine">Engine module →</a>
+      </li>
+      <li>
+        <span class="gap-files">${fileLink('engine/helpers.mjs')}</span>
+        <span class="gap-desc">Likely misplaced — its own header claims a tests/ location its import path doesn't support from where it actually sits.</span>
+        <a class="gap-module-link" href="#module-engine">Engine module →</a>
+      </li>
+      <li>
+        <span class="gap-files">${fileLink('engine/assembly.js')}</span>
+        <span class="gap-desc">Self-flagged: a drawer front's attachment to its own box isn't modeled as a real joint yet — it surfaces as its own flagged step instead.</span>
+        <a class="gap-module-link" href="#module-engine">Engine module →</a>
+      </li>
+      <li>
+        <span class="gap-files">${fileLink('modeller/node.js')} &amp; ${fileLink('modeller/materials.js')}</span>
+        <span class="gap-desc">Stub split targets out of modules.js — never populated; modules.js still covers this ground.</span>
+        <a class="gap-module-link" href="#module-graph">Modeller Engine module →</a>
+      </li>
+      <li>
+        <span class="gap-files">${fileLink('features/plinth.js')} &amp; ${fileLink('tools/plinth.js')}</span>
+        <span class="gap-desc">A plinth-adding feature has neither its creation math nor its tool wired up yet.</span>
+        <a class="gap-module-link" href="#module-interaction">Tools &amp; Features module →</a>
+      </li>
+    </ul>
+  `;
+}
+
+/* ------------------------------------------------------------
+   Module detail pages
+   ------------------------------------------------------------ */
+
+function moduleFlowChipsHtml(id) {
+  const m = MODULE_META[id];
+
+  const chips = [
+    ...m.upstream.map(u => `
+      <a class="module-flow-chip" href="#module-${u.id}">
+        <span class="flow-dir">←</span>${u.label} ${MODULE_META[u.id].label}
+      </a>
+    `),
+    ...m.downstream.map(d => `
+      <a class="module-flow-chip" href="#module-${d.id}">
+        <span class="flow-dir">→</span>${d.label} ${MODULE_META[d.id].label}
+      </a>
+    `)
+  ];
+
+  return chips.join('');
+}
+
+function moduleFileListHtml(groupIds, overrides = {}) {
+  const files = moduleFiles(groupIds);
+
+  return `
+    <ul class="module-file-list">
+      ${files.map(f => `
+        <li class="module-file-row">
+          ${fileLink(f.path, f.path)}
+          <span class="module-file-desc">
+            ${overrides[f.path] || f.role || (f.status === 'stub' ? 'Not yet implemented.' : '')}
+          </span>
+        </li>
+      `).join('')}
+    </ul>
+  `;
+}
+
+const MODULE_NARRATIVES = {
+
+  interaction: () => `
+    <div class="module-section">
+      <h3>What it does</h3>
+      <p>This is where a user gesture stops being a mouse event and starts being furniture. ${fileLink('features/box.js')}, ${fileLink('features/shelf.js')}, ${fileLink('features/door.js')} and ${fileLink('features/drawer.js')} are all pure creation math — each one reads the current panels (read-only) and returns <code>{ nodes, groupId }</code>. None of them touch history, render anything, or change selection: that discipline is what lets ${functionLink('applyRelayoutResult')} and friends in the core call any of them without side effects sneaking in.</p>
+      <p>${groupLink('tools')} modules sit one layer above that. Each tool (${fileLink('tools/shelfTool.js')}, ${fileLink('tools/collinearTool.js')}, ${fileLink('tools/doorTool.js')}, ${fileLink('tools/drawerTool.js')}, ${fileLink('tools/boundaryRectTool.js')}, ${fileLink('tools/attachTool.js')}) owns the pick-mode interaction state for one multi-click flow — "user clicked panel A's face, now waiting for panel B's face" — and is wired to the live app through a small context object set once from ${fileLink('modeller-main.js')}. Once enough picks are in, the tool calls the matching features/ function to compute the actual geometry.</p>
+    </div>
+
+    <div class="module-section">
+      <h3>Why the split matters for future work</h3>
+      <ul class="didactic-list">
+        <li>A new furniture element (say, a plinth) needs a pure <code>features/</code> function first — ${fileLink('features/plinth.js')} and its tool-layer counterpart ${fileLink('tools/plinth.js')} are already stubbed as the intended home — before any UI wiring.</li>
+        <li>${fileLink('tools/attachTool.js')} is the manual entry point for joint confirmation — it now runs end to end against a real ${fileLink('engine/joints.js')}. See the Engine module for what that layer actually does.</li>
+      </ul>
+    </div>
+
+    <div class="module-section">
+      <h3>Files in this module</h3>
+      ${moduleFileListHtml(['tools', 'features'])}
+    </div>
+  `,
+
+  core: () => `
+    <div class="module-section">
+      <h3>What it does</h3>
+      <p>${fileLink('modeller-main.js')} is the single writer of the graph — the only file in the whole codebase allowed to mutate panels, record history, or trigger a render. Every feature/tool module hands it plain data; every UI module fires callbacks at it. It owns application state (panels, selection, drag state, pending edge-fit), the DOM references, and the scene wiring.</p>
+      <p>The seam that ties everything else in this map together is ${functionLink('renderAll')}: called after essentially every change, it resolves constraints through the Modeller Engine, re-attaches the transient per-node fields the resolver strips out (door/drawer flags, piece codes), and then re-renders the scene, panel list, inspector and BOM in one pass. If you're tracing "what happens after I change X", this is almost always the function to start from.</p>
+    </div>
+
+    <div class="module-section">
+      <h3>Key entry points worth knowing before extending it</h3>
+      <ul class="didactic-list">
+        <li>${functionLink('updateNode')} — the sole graph-mutation primitive; every other function in the file patches panels through this one.</li>
+        <li>${functionLink('recordHistoryCommand')} — wraps a before/after panels pair into a history command for undo/redo.</li>
+        <li>${functionLink('commitAddedNodes')} — the shared append + history path for anything that <em>adds</em> nodes (box, shelf, plinth).</li>
+        <li>${functionLink('applyDimensionChange')} / ${functionLink('applyRelayoutResult')} — validate and commit a resize, then cascade it into any door/drawer adjustments that resize implies.</li>
+      </ul>
+    </div>
+
+    <div class="module-section">
+      <h3>Files in this module</h3>
+      ${moduleFileListHtml(['root'])}
+    </div>
+  `,
+
+  graph: () => `
+    <div class="module-section">
+      <h3>What it does</h3>
+      <p>${fileLink('modeller/modules.js')} defines the node vocabulary: faces, axes, the material catalog, design limits — the primitives everything else in the app is built from. ${fileLink('modeller/snap.js')} is the constraint resolver: its exported ${functionLink('resolveConstraints')} is <em>the</em> seam between the raw graph (literal values plus <code>spansBetween</code>/<code>attachedTo</code> constraints) and the resolved graph (concrete numbers everywhere), and it's the one function the Application Core calls once per render to get there. Internally it topologically sorts nodes by their constraint references and flags any cycle instead of trying to resolve it.</p>
+      <p>${fileLink('modeller/scene.js')} owns the actual Three.js scene: its ${functionLink('reconcile')} diffs the resolved panels against the live mesh registry and applies exactly the add/remove/resize/selection changes needed — mode-agnostic, so it behaves identically whichever of ${fileLink('modeller/gizmos.js')} (3D handles) or ${fileLink('modeller/view2d.js')} (2D edge-drag) is currently active.</p>
+    </div>
+
+    <div class="module-section">
+      <h3>Known rough edges (from the reference, not guesswork)</h3>
+      <ul class="didactic-list">
+        <li>${fileLink('modeller/node.js')} and ${fileLink('modeller/materials.js')} are stubs — intended split targets out of modules.js that were never populated. Nothing should import from them yet; modules.js still covers that ground.</li>
+      </ul>
+    </div>
+
+    <div class="module-section">
+      <h3>Files in this module</h3>
+      ${moduleFileListHtml(['modeller'])}
+    </div>
+  `,
+
+  engine: () => `
+    <div class="module-section">
+      <h3>What it does</h3>
+      <p>Everything here is a computed projection of the resolved graph — nothing is stored, everything regenerates on demand. ${functionLink('computeBom')} in ${fileLink('engine/bom.js')} turns resolved panels into cut-list rows, merging pieces only within the same assembly and only when the material is grain-interchangeable. ${functionLink('nestCutList')} in ${fileLink('engine/nesting.js')} expands those rows into individual pieces and packs them onto stock sheets with a deterministic guillotine / best-area-fit algorithm — no AI, no randomness, same input always gives the same layout.</p>
+    </div>
+
+    <div class="module-section">
+      <h3>Where "assembly" actually lives</h3>
+      <p>Four files form one pipeline, each building on the one before it — same "one entry point, same shape" convention throughout (<code>buildX(panels) → {…}</code>, plus a <code>formatXLines()</code> text renderer):</p>
+      <ul class="didactic-list">
+        <li>${fileLink('engine/joints.js')} — <b>where do panels actually touch, and what kind of contact is it.</b> Pure geometry: ${functionLink('detectJoints')} batch-scans a whole design; ${functionLink('classifyJoint')} does the identical single-pair check for ${fileLink('tools/attachTool.js')}'s manual confirmation flow (see the Tools &amp; Features module) — deliberately the same contact test, so the two can never disagree.</li>
+        <li>${fileLink('engine/hardware.js')} — <b>what hardware goes there, and exactly where its own fixings go.</b> ${functionLink('buildHardwarePlan')} selects real Blum hinges/runners against joints.js's output, plus generic panel connectors, and flags anything unmatched rather than dropping it.</li>
+        <li>${fileLink('engine/assembly.js')} — <b>what order a person actually builds it in.</b> ${functionLink('buildAssemblySequence')} clusters panels into rigid sub-assemblies via the structural joints, then schedules door/drawer integration once both sides of a hinge or slide are complete.</li>
+        <li>${fileLink('engine/ergonomics.js')} — an annotation pass over assembly.js's own sequence: which tools each step needs, and weight/two-person flags. Doesn't re-order anything.</li>
+      </ul>
+      <p>${fileLink('engine/pdfExport.js')} is the one file that reads across all of it — cut list, nesting, joints, hardware and the full assembly plan all export as PDFs from here.</p>
+    </div>
+
+    <div class="module-section">
+      <h3>What's still actually missing</h3>
+      <ul class="didactic-list">
+        <li>${fileLink('engine/validator.js')} and ${fileLink('engine/extractor.js')} — still empty; no documented intent yet. Likely candidates for the geometric bounds/collision checks the roadmap has separately flagged as the next big step after joints.</li>
+        <li>${fileLink('engine/resolveConstraints.js')} — empty scaffolding from an earlier restructure; the app still correctly uses ${fileLink('modeller/snap.js')}'s resolver, nothing imports this one.</li>
+        <li>${fileLink('engine/assembly.js')} itself flags one gap: a drawer front's attachment to its own box isn't modeled as a real joint yet, so it currently surfaces as its own flagged step rather than a proper structural connection.</li>
+        <li>${fileLink('engine/helpers.mjs')} looks misplaced — its own header claims a <code>tests/</code> location its actual import path doesn't match from where it sits.</li>
+      </ul>
+    </div>
+
+    <div class="module-section">
+      <h3>Files in this module</h3>
+      ${moduleFileListHtml(['engine'])}
+    </div>
+  `,
+
+  ui: () => `
+    <div class="module-section">
+      <h3>What it does</h3>
+      <p>Everything in ${groupLink('ui')} is DOM-facing and callback-driven: it reads data handed to it and fires callbacks back up to ${fileLink('modeller-main.js')} — it never mutates the graph itself. ${functionLink('renderPanelList')} in ${fileLink('ui/toolbar.js')} is the entire left sidebar (element tree, add-panel/box buttons, the building tools and their confirm forms). ${functionLink('renderProperties')} in ${fileLink('ui/properties.js')} is the inspector — group-level or per-panel depending on selection, including the door-specific hinge/open controls. ${fileLink('ui/relations.js')} lists constraints on the selected panel; ${fileLink('ui/cutlist.js')} owns "last computed BOM/nesting" state and is what actually calls into ${fileLink('engine/pdfExport.js')} and ${fileLink('engine/nesting.js')} when the person opens the cut list or nests it.</p>
+    </div>
+
+    <div class="module-section">
+      <h3>Worth knowing</h3>
+      <ul class="didactic-list">
+        <li>${fileLink('ui/layout.js')} handles only the resizable sidebar/viewport splitters — layout, not content.</li>
+      </ul>
+    </div>
+
+    <div class="module-section">
+      <h3>Files in this module</h3>
+      ${moduleFileListHtml(['ui'])}
+    </div>
+  `,
+
+  foundations: () => `
+    <div class="module-section">
+      <h3>What it does</h3>
+      <p>${fileLink('shared/geometry.js')} and ${fileLink('shared/frontFit.js')} hold the feature-agnostic geometry and validation helpers that both ${groupLink('tools')} and ${groupLink('features')} depend on — design-limit checks, minimum gaps, and the boundary-rectangle / front-fit math that ${fileLink('features/door.js')} and ${fileLink('features/drawer.js')} share verbatim. ${fileLink('shared/handle.js')} computes where a door or drawer handle mesh sits, used by ${fileLink('modeller/scene.js')}.</p>
+      <p>${fileLink('history/history.js')} is the undo/redo command stack. Every mutation the Application Core makes goes through its own ${functionLink('recordHistoryCommand')} first, which wraps a before/after panels pair into one command here.</p>
+    </div>
+
+    <div class="module-section">
+      <h3>Files in this module</h3>
+      ${moduleFileListHtml(['shared', 'history'])}
+    </div>
+  `
+};
+
+function renderModulePage(id) {
+  const m = MODULE_META[id];
+  const content = document.getElementById('moduleContent');
+  const breadcrumb = document.getElementById('moduleBreadcrumbLabel');
+
+  if (!m) {
+    content.innerHTML = `<p>Unknown module “${id}”.</p>`;
+    breadcrumb.textContent = '';
+    return;
+  }
+
+  breadcrumb.textContent = m.label;
+
+  const order = [...MODULE_CHAIN, 'foundations'];
+  const idx = order.indexOf(id);
+  const prevId = idx > 0 ? order[idx - 1] : null;
+  const nextId = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : null;
+
+  content.innerHTML = `
+    <div class="module-hero">
+      <p class="kicker">${m.kicker}</p>
+      <h2>${m.label}</h2>
+      <p>${m.summary}</p>
+      <div class="module-flow-chips">${moduleFlowChipsHtml(id)}</div>
+    </div>
+
+    ${MODULE_NARRATIVES[id] ? MODULE_NARRATIVES[id]() : ''}
+
+    <div class="module-nav-footer">
+      ${prevId ? `<a href="#module-${prevId}">← ${MODULE_META[prevId].label}</a>` : '<span></span>'}
+      ${nextId ? `<a href="#module-${nextId}">${MODULE_META[nextId].label} →</a>` : '<span></span>'}
+    </div>
+  `;
+}
+
+/* ------------------------------------------------------------
+   View controller — overview / module / full reference
+
+   The reference content below (#content, rendered by renderContent()
+   above) is completely unchanged: this only decides which of the
+   three top-level views is visible, so the reference stays reachable
+   but is no longer what loads by default.
+   ------------------------------------------------------------ */
+
+const viewEls = {
+  overview: document.getElementById('viewOverview'),
+  module: document.getElementById('viewModule'),
+  reference: document.getElementById('viewReference')
+};
+
+function showView(view, moduleId) {
+  Object.keys(viewEls).forEach(key => {
+    viewEls[key].hidden = key !== view;
+  });
+
+  document.body.dataset.view = view;
+
+  if (view === 'module' && moduleId) {
+    renderModulePage(moduleId);
+  }
+
+  window.scrollTo(0, 0);
+}
+
+function handleHashChange(isInitial) {
+  const hash = window.location.hash || '';
+
+  if (hash.startsWith('#module-')) {
+    showView('module', hash.slice('#module-'.length));
+    return;
+  }
+
+  if (hash === '#reference') {
+    showView('reference');
+    return;
+  }
+
+  if (hash === '#overview' || hash === '' || hash === '#') {
+    showView('overview');
+    return;
+  }
+
+  /*
+   * Anything else is an existing reference anchor — #file-… or #fn-…,
+   * from the sidebar tree, an import/export pill, or a "calls" link.
+   * Switch into the reference view first, then let the browser's own
+   * anchor scrolling (plus the existing flash listeners below) do
+   * the rest.
+   */
+  showView('reference');
+
+  const raf = window.requestAnimationFrame || (fn => setTimeout(fn, 0));
+
+  raf(() => {
+    const target = document.getElementById(hash.slice(1));
+    if (target) target.scrollIntoView({ block: 'start' });
+  });
+}
+
+window.addEventListener('hashchange', () => handleHashChange(false));
+
 /* ------------------------------------------------------------
    Initial render
    ------------------------------------------------------------ */
 
 renderSidebar();
 renderContent();
+renderArchDiagram();
+renderModuleGrid();
+renderKnownGaps();
+handleHashChange(true);
 
 /* ------------------------------------------------------------
    Active sidebar link on scroll
@@ -2599,6 +3706,15 @@ function normalize(s) {
 searchInput.addEventListener('input', () => {
   const q =
     normalize(searchInput.value.trim());
+
+  /*
+   * Searching only means something in the full reference — jump
+   * there automatically so results are actually visible, without
+   * fighting whatever module/overview page the person was reading.
+   */
+  if (q && document.body.dataset.view !== 'reference') {
+    showView('reference');
+  }
 
   let visibleFiles = 0;
 
