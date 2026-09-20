@@ -11,7 +11,7 @@
  * read the old `lastBomRows` module-level variable directly (e.g. the
  * "Export BOM PDF" button handler).
  */
-import { exportCutListPdf, exportNestingPdf } from '../engine/pdfExport.js';
+import { exportCutListPdf, exportNestingPdf } from '../engine/pdfExport-bom.js';
 import { nestCutList, summarizeNestingResult } from '../engine/nesting.js';
 import { MATERIAL_CATALOG } from '../modeller/modules.js';
 import { escapeHtmlLocal } from './toast.js';
