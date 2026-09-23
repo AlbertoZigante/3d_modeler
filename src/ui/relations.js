@@ -27,7 +27,7 @@ export function renderRelations(
   if (!container) {
     console.warn(
       '[relations.js] Relations container not found. ' +
-      'Expected an element with id="relations-mount".'
+      'Expected an element with id="relations-container".'
     );
     return;
   }

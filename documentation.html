@@ -1615,8 +1615,8 @@ body[data-view="reference"] .sidebar-view-link[data-view-target="reference"] {
         <p>Start here for the big picture, then open a subsystem below for a didactic walkthrough of its own functioning — each one links straight into the full reference for the scripts and functions involved.</p>
         <p class="verified-against">
           Reference content checked against
-          <a href="https://github.com/AlbertoZigante/3d_modeler/commit/8616f9959d051714a05f2939ed79907a42c8ca85" target="_blank" rel="noopener">master @ 8616f99</a>
-          (2026-09-18) — not auto-synced, so it can drift from source between updates.
+          <a href="https://github.com/AlbertoZigante/3d_modeler/commit/d13f590b1c55280ef5db8506a11f6ec0f8da691e" target="_blank" rel="noopener">master @ d13f590</a>
+          (2026-09-20), plus engine/validator.js, ui/warnings.js, and the relations-container fix — written and tested but not yet pushed to master as of this update — not auto-synced, so it can drift from source between updates.
         </p>
       </div>
 
@@ -1658,7 +1658,7 @@ body[data-view="reference"] .sidebar-view-link[data-view-target="reference"] {
       <div class="empty-state" id="emptyState">No files or functions match "<span id="emptyQuery"></span>".</div>
     </div>
 
-    <footer>3d_modeler — reference checked against <a href="https://github.com/AlbertoZigante/3d_modeler/commit/8616f9959d051714a05f2939ed79907a42c8ca85" target="_blank" rel="noopener">master @ 8616f99</a> (2026-09-18) · not auto-synced with source</footer>
+    <footer>3d_modeler — reference checked against <a href="https://github.com/AlbertoZigante/3d_modeler/commit/d13f590b1c55280ef5db8506a11f6ec0f8da691e" target="_blank" rel="noopener">master @ d13f590</a> (2026-09-20), plus not-yet-pushed validator/warnings work · not auto-synced with source</footer>
   </main>
 </div>
 
@@ -1679,7 +1679,7 @@ const GROUPS = [
       {
         path: 'modeller-main.js',
         status: 'ok',
-        imports: [{from:'./modeller/modules.js',names:['createPanelNode','computeNextBasePosition','MM_TO_UNIT','MATERIAL_CATALOG','loadMaterialCatalog']},{from:'./modeller/snap.js',names:['resolveConstraints']},{from:'./modeller/scene.js',names:['createModellerScene']},{from:'./modeller/selection.js',names:['getSelectedId','setSelectedId','getSelectedGroupId','setSelectedGroupId']},{from:'./engine/bom.js',names:['computeBom']},{from:'./engine/pdfExport.js',names:['exportCutListPdf','exportHistoryPdf']},{from:'./ui/properties.js',names:['renderProperties']},{from:'./ui/toolbar.js',names:['renderPanelList']},{from:'./ui/relations.js',names:['renderRelations']},{from:'./ui/layout.js',names:['initResizableLayout']},{from:'./ui/toast.js',names:['showToast','showDesignLimitError','showPanelSizeLimitError']},{from:'./ui/cutlist.js',names:['openCutListWindow','openNestingPlan','renderNestingSummary','setBomRows','getLastBomRows']},{from:'./shared/geometry.js',names:['clampOffsetToDesignLimits','clampGroupOffsetToDesignLimits','findPanelSizeViolation','findDesignLimitViolation','collectAxisSlabs','checkMinGap','rotationsMatch','VERTICAL_ROTATION','HORIZONTAL_ROTATION','PARALLEL_ROTATION','MIN_WALL_GAP_MM']},{from:'./features/box.js',names:['addBox','relayoutBox']},{from:'./features/shelf.js',names:['isShelf']},{from:'./features/door.js',names:['createDoorNode','computeDoorOpenTransform','applyDoorAdjustmentsForGroup','applyPanelPatch']},{from:'./features/drawer.js',names:['createDrawerFrontNodes','createDrawerBoxNodes','computeDrawerBoxPlacement','applyDrawerAdjustmentsForGroup']},{from:'./tools/shelfTool.js',names:['startShelfMode','cancelShelfMode','getShelfMode','setShelfToolContext']},{from:'./tools/collinearTool.js',names:['startCollinearMode','cancelCollinearMode','isCollinearActive','getCollinearGapMm','setCollinearGapMm','setCollinearToolContext']},{from:'./tools/attachTool.js',names:['setAttachToolContext']},{from:'./tools/boundaryRectTool.js',names:['setBoundaryRectToolContext']},{from:'./tools/doorTool.js',names:['startDoorMode','cancelDoorMode','confirmDoorMode','setDoorEdgeFitField','setDoorHinge','isDoorPickActive','isDoorConfirmActive','getDoorEdgeFit','getDoorHinge','setDoorToolContext']},{from:'./tools/drawerTool.js',names:['startDrawerMode','cancelDrawerMode','confirmDrawerMode','setDrawerEdgeFitField','setDrawerCount','isDrawerPickActive','isDrawerConfirmActive','getDrawerEdgeFit','getDrawerCount','setDrawerToolContext']},{from:'./history/history.js',names:['history','createStateCommand','MovePanelCommand','MoveGroupCommand','ResizePanelCommand','ChangeMaterialCommand','ChangeGroupMaterialCommand','RenamePanelCommand','AddPanelCommand','DeletePanelCommand','AddBoxCommand','DeleteBoxCommand','GroupPanelsCommand','UngroupPanelsCommand','DeleteShelfCommand','RemoveConstraintCommand','UnlinkConstraintCommand','HideBoxWallCommand','RestoreBoxWallCommand','ChangeEdgeFitCommand','AddDoorCommand','SetDoorHingeCommand','DeleteDoorCommand','AddDrawerCommand','DeleteDrawerCommand']}],
+        imports: [{from:'./modeller/modules.js',names:['createPanelNode','computeNextBasePosition','MM_TO_UNIT','MATERIAL_CATALOG','loadMaterialCatalog']},{from:'./modeller/snap.js',names:['resolveConstraints']},{from:'./modeller/scene.js',names:['createModellerScene']},{from:'./modeller/selection.js',names:['getSelectedId','setSelectedId','getSelectedGroupId','setSelectedGroupId']},{from:'./engine/bom.js',names:['computeBom']},{from:'./engine/pdfExport-bom.js',names:['exportCutListPdf']},{from:'./engine/pdfExport-history.js',names:['exportHistoryPdf']},{from:'./engine/pdfExport-joints.js',names:['exportJointsPdf']},{from:'./engine/pdfExport-assembly.js',names:['exportAssemblyPlanPdf']},{from:'./engine/validator.js',names:['validateDesign']},{from:'./ui/warnings.js',names:['renderWarnings']},{from:'./ui/properties.js',names:['renderProperties']},{from:'./ui/toolbar.js',names:['renderPanelList']},{from:'./ui/relations.js',names:['renderRelations']},{from:'./ui/layout.js',names:['initResizableLayout']},{from:'./ui/toast.js',names:['showToast','showDesignLimitError','showPanelSizeLimitError']},{from:'./ui/cutlist.js',names:['openCutListWindow','openNestingPlan','renderNestingSummary','setBomRows','getLastBomRows']},{from:'./shared/geometry.js',names:['clampOffsetToDesignLimits','clampGroupOffsetToDesignLimits','findPanelSizeViolation','findDesignLimitViolation','collectAxisSlabs','checkMinGap','rotationsMatch','VERTICAL_ROTATION','HORIZONTAL_ROTATION','PARALLEL_ROTATION','MIN_WALL_GAP_MM']},{from:'./features/box.js',names:['addBox','relayoutBox']},{from:'./features/shelf.js',names:['isShelf']},{from:'./features/door.js',names:['createDoorNode','computeDoorOpenTransform','applyDoorAdjustmentsForGroup','applyPanelPatch']},{from:'./features/drawer.js',names:['createDrawerFrontNodes','createDrawerBoxNodes','computeDrawerBoxPlacement','applyDrawerAdjustmentsForGroup']},{from:'./tools/shelfTool.js',names:['startShelfMode','cancelShelfMode','getShelfMode','setShelfToolContext']},{from:'./tools/collinearTool.js',names:['startCollinearMode','cancelCollinearMode','isCollinearActive','getCollinearGapMm','setCollinearGapMm','setCollinearToolContext']},{from:'./tools/attachTool.js',names:['setAttachToolContext']},{from:'./tools/boundaryRectTool.js',names:['setBoundaryRectToolContext']},{from:'./tools/doorTool.js',names:['startDoorMode','cancelDoorMode','confirmDoorMode','setDoorEdgeFitField','setDoorHinge','isDoorPickActive','isDoorConfirmActive','getDoorEdgeFit','getDoorHinge','setDoorToolContext']},{from:'./tools/drawerTool.js',names:['startDrawerMode','cancelDrawerMode','confirmDrawerMode','setDrawerEdgeFitField','setDrawerCount','isDrawerPickActive','isDrawerConfirmActive','getDrawerEdgeFit','getDrawerCount','setDrawerToolContext']},{from:'./history/history.js',names:['history','createStateCommand','MovePanelCommand','MoveGroupCommand','ResizePanelCommand','ChangeMaterialCommand','ChangeGroupMaterialCommand','RenamePanelCommand','AddPanelCommand','DeletePanelCommand','AddBoxCommand','DeleteBoxCommand','GroupPanelsCommand','UngroupPanelsCommand','DeleteShelfCommand','RemoveConstraintCommand','UnlinkConstraintCommand','HideBoxWallCommand','RestoreBoxWallCommand','ChangeEdgeFitCommand','AddDoorCommand','SetDoorHingeCommand','DeleteDoorCommand','AddDrawerCommand','DeleteDrawerCommand']}],
         exportsList: [],
         role: 'The single writer of the graph. Owns application state (panels, selection, drag state, pendingEdgeFit), DOM refs, scene wiring, and every commit path. Every feature/tool module is pure and returns data — this file is the only place that mutates panels, records history, or triggers a render. Substantially extended this pass for doors, drawers (fronts + their own boxes), edge-fit editing that survives a mid-edit resize elsewhere, and the "Print History" button.',
         fns: [
@@ -1715,7 +1715,7 @@ const GROUPS = [
           { name:'cascadeDeleteOrphanedDoors', io:'(panelsAfterChange, affectedNode) → <b>Array</b>', role:'When a door\'s own boundary panel gets deleted/hidden, the door itself would otherwise be left pointing at nothing — deletes it too. NOT (yet) replicated for a drawer stack\'s boundary panels; see features/drawer.js\'s own KNOWN GAP note.' , calls: [] },
           { name:'restoreFace', io:'(nodeId) → <span class="ret">void</span>', role:'Un-hides a previously hidden box wall.' , calls: ['recordHistoryCommand() — same file','renderAll() — same file'] },
           { name:'unlinkOrRemoveConstraint', io:'(identifier, opts) → <span class="ret">void</span>', role:'Detach (soft) or delete (hard) an existing constraint.' , calls: ['getSelectedId() — modeller/selection.js','updateNode() — same file','resolveConstraints() — modeller/snap.js','recordHistoryCommand() — same file','renderAll() — same file'] },
-          { name:'bootstrap', io:'() → <b>Promise&lt;void&gt;</b>', role:'Loads the material catalog, creates the first box, wires the Undo/Redo/Print History buttons (#undo-btn/#redo-btn/#print-history-btn in modeller.html\'s #topbar), and clears history.' , calls: ['loadMaterialCatalog() — modeller/modules.js','handleAddBox() — same file','exportHistoryPdf() — engine/pdfExport.js','history.getActivityLogText() / history.canUndo() / history.canRedo() / history.undo() / history.redo() / history.clear() — history/history.js'] },
+          { name:'bootstrap', io:'() → <b>Promise&lt;void&gt;</b>', role:'Loads the material catalog, creates the first box, wires the Undo/Redo/Print History buttons (#undo-btn/#redo-btn/#print-history-btn in modeller.html\'s #topbar), and clears history.' , calls: ['loadMaterialCatalog() — modeller/modules.js','handleAddBox() — same file','exportHistoryPdf() — engine/pdfExport-history.js','history.getActivityLogText() / history.canUndo() / history.canRedo() / history.undo() / history.redo() / history.clear() — history/history.js'] },
         ]
       }
     ]
@@ -2177,20 +2177,61 @@ const GROUPS = [
 ]
       },
       {
-        path: 'engine/pdfExport.js',
+        path: 'engine/pdfExport-shared.js',
         status: 'ok',
-        imports: [{from:'jspdf (external)',names:['jsPDF']},{from:'./joints.js',names:['formatSummaryLines','formatAttentionLines','formatJointTableRow','formatFeatureJointTableRow']},{from:'./hardware.js',names:['formatHardwareTableRow']},{from:'../modeller/modules.js',names:['computeWorldHalfExtents']}],
-        exportsList: ['exportCutListPdf','exportNestingPdf','exportHistoryPdf','exportJointsPdf','exportAssemblyPlanPdf'],
-        role: 'Cut-list, nesting-plan, activity-history, joints, and assembly-instructions PDF generation.',
+        imports: [],
+        exportsList: ['PAGE_MARGIN_MM','HEADER_BLOCK_HEIGHT_MM','TEXT_LINE_HEIGHT_MM','drawTableRow','outputPdf'],
+        role: 'The pieces genuinely shared by 2+ of the split pdfExport files, pulled out of the old monolithic pdfExport.js. Deliberately NOT a dumping ground &mdash; helpers used by only one split file (formatDim, drawRow, the nesting sheet-drawing helpers) stay local to that file instead.',
         fns: [
-  { name:'formatDim / rowCell / drawRow', io:'various', role:'Cut-list table formatting helpers.', calls:[], tag:'internal' },
-  { name:'exportCutListPdf', io:'(rows, {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Paginated cut-list table PDF. mode:&#39;open&#39; opens in a new tab (synchronous jsPDF bloburl, so it stays in the same click-handler call stack &mdash; async would get popup-blocked).', calls:['drawRow() / rowCell() &mdash; same file', 'jsPDF &mdash; jspdf (external)'] },
+  { name:'drawTableRow', io:'(doc, startX, y, columns, cells) &rarr; <span class=&quot;ret&quot;>void</span>', role:'One row of cells across a set of columns, respecting each column&#39;s own width/alignment. Shared by pdfExport-bom.js&#39;s own drawRow() wrapper (fixed COLUMNS) and pdfExport-joints.js (which passes its own JOINTS_TABLE_COLUMNS / FEATURE_JOINTS_TABLE_COLUMNS / HARDWARE_TABLE_COLUMNS directly).', calls:[] },
+  { name:'outputPdf', io:'(doc, mode, fileName) &rarr; <span class=&quot;ret&quot;>void</span>', role:'The &quot;open in a new tab vs. trigger a download&quot; branch every export function used to repeat inline &mdash; one place instead of five near-identical if/else blocks. mode:&#39;open&#39; relies on jsPDF&#39;s synchronous &#39;bloburl&#39; output, so it must be called in the same click-handler call stack that triggered it (async would get popup-blocked).', calls:[] },
+]
+      },
+      {
+        path: 'engine/pdfExport-bom.js',
+        status: 'ok',
+        imports: [{from:'jspdf (external)',names:['jsPDF']},{from:'./pdfExport-shared.js',names:['PAGE_MARGIN_MM','HEADER_BLOCK_HEIGHT_MM','drawTableRow','outputPdf']}],
+        exportsList: ['exportCutListPdf','exportNestingPdf'],
+        role: 'Cut-list and nesting-plan PDF generation &mdash; the bom branch&#39;s own export file, split out of the old monolithic pdfExport.js. formatDim/rowCell/drawRow/COLUMNS and the nesting sheet-drawing helpers are used only within this file, so they stayed local rather than moving to pdfExport-shared.js.',
+        fns: [
+  { name:'formatDim / rowCell / drawRow', io:'various', role:'Cut-list table formatting helpers, local to this file.', calls:['drawTableRow() &mdash; engine/pdfExport-shared.js'], tag:'internal' },
+  { name:'exportCutListPdf', io:'(rows, {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Paginated cut-list table PDF.', calls:['drawRow() / rowCell() &mdash; same file', 'outputPdf() &mdash; engine/pdfExport-shared.js', 'jsPDF &mdash; jspdf (external)'] },
   { name:'drawNestingSummaryPage', io:'(doc, summary, projectName) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Per-material sheet counts, cost, utilization, and any unplaced pieces.', calls:[], tag:'internal' },
   { name:'drawSheetPage', io:'(doc, materialLabel, sheet, sheetNumber, totalSheets) &rarr; <span class=&quot;ret&quot;>void</span>', role:'One page per sheet, drawn to scale with every placed piece as a labeled rectangle; rotates the drawing (not the nesting coordinates) when that fits the A4 page better.', calls:['formatDim() &mdash; same file'], tag:'internal' },
-  { name:'exportNestingPdf', io:'(nestResults, summary, {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Summary page + one page per sheet.', calls:['drawNestingSummaryPage() / drawSheetPage() &mdash; same file'] },
-  { name:'exportHistoryPdf', io:'(lines: string[], {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'One line of plain text per activity-log entry (see history/history.js#HistoryManager.getActivityLogText()), paginated the same way exportCutListPdf&#39;s rows are. Wired to the toolbar&#39;s &quot;Print History&quot; button.', calls:['jsPDF &mdash; jspdf (external)'] },
-  { name:'exportJointsPdf', io:'(report, hardwarePlan?, {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Joints report as a real table (see JOINTS_TABLE_COLUMNS) &mdash; summary + needs-attention text from joints.js, then the joints table and, if a hardwarePlan is supplied, a third table of hinges/runners/fasteners.', calls:['formatSummaryLines() / formatAttentionLines() / formatJointTableRow() / formatFeatureJointTableRow() &mdash; engine/joints.js', 'formatHardwareTableRow() &mdash; engine/hardware.js', 'jsPDF &mdash; jspdf (external)'] },
-  { name:'exportAssemblyPlanPdf', io:'(plan, resolvedPanels, {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Step-by-step assembly instructions PDF from engine/ergonomics.js#buildAssemblyPlan &mdash; one step per page/section with its cluster, hardware, tools and ergonomics flags, plus a per-step insertion-arrow diagram for integration steps.', calls:['computeWorldHalfExtents() &mdash; modeller/modules.js', 'jsPDF &mdash; jspdf (external)'] },
+  { name:'exportNestingPdf', io:'(nestResults, summary, {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Summary page + one page per sheet.', calls:['drawNestingSummaryPage() / drawSheetPage() &mdash; same file', 'outputPdf() &mdash; engine/pdfExport-shared.js'] },
+]
+      },
+      {
+        path: 'engine/pdfExport-joints.js',
+        status: 'ok',
+        imports: [{from:'jspdf (external)',names:['jsPDF']},{from:'./joints.js',names:['formatSummaryLines','formatAttentionLines','formatJointTableRow','formatFeatureJointTableRow']},{from:'./hardware.js',names:['formatHardwareTableRow']},{from:'./pdfExport-shared.js',names:['PAGE_MARGIN_MM','HEADER_BLOCK_HEIGHT_MM','TEXT_LINE_HEIGHT_MM','drawTableRow','outputPdf']}],
+        exportsList: ['exportJointsPdf'],
+        role: 'Joint report PDF &mdash; a debug/verification view over engine/joints.js#detectJoints&#39;s current output, not a fabrication document the way the cut-list/nesting PDFs are. The joinery branch&#39;s own export file, split out of the old monolithic pdfExport.js.',
+        fns: [
+  { name:'exportJointsPdf', io:'(report, hardwarePlan?, {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Summary + needs-attention text from joints.js, then the joints table, then (if a hardwarePlan is supplied) a feature-joints table and a third table of hinges/runners/fasteners.', calls:['formatSummaryLines() / formatAttentionLines() / formatJointTableRow() / formatFeatureJointTableRow() &mdash; engine/joints.js', 'formatHardwareTableRow() &mdash; engine/hardware.js', 'drawTableRow() / outputPdf() &mdash; engine/pdfExport-shared.js', 'jsPDF &mdash; jspdf (external)'] },
+]
+      },
+      {
+        path: 'engine/pdfExport-history.js',
+        status: 'ok',
+        imports: [{from:'jspdf (external)',names:['jsPDF']},{from:'./pdfExport-shared.js',names:['PAGE_MARGIN_MM','TEXT_LINE_HEIGHT_MM','outputPdf']}],
+        exportsList: ['exportHistoryPdf'],
+        role: 'Activity-history PDF export &mdash; a generic &quot;one line of text at a time&quot; renderer, split out of the old monolithic pdfExport.js.',
+        fns: [
+  { name:'renderLinesPdf', io:'(lines, {projectName, fileName, mode, countLabel, emptyMessage}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Generic paginated plain-text PDF, local to this file.', calls:['outputPdf() &mdash; engine/pdfExport-shared.js'], tag:'internal' },
+  { name:'exportHistoryPdf', io:'(lines: string[], {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'One line per activity-log entry (see history/history.js#HistoryManager.getActivityLogText()). Wired to the toolbar&#39;s &quot;Print History&quot; button.', calls:['renderLinesPdf() &mdash; same file'] },
+]
+      },
+      {
+        path: 'engine/pdfExport-assembly.js',
+        status: 'ok',
+        imports: [{from:'jspdf (external)',names:['jsPDF']},{from:'../modeller/modules.js',names:['computeWorldHalfExtents']},{from:'./pdfExport-shared.js',names:['PAGE_MARGIN_MM','TEXT_LINE_HEIGHT_MM','outputPdf']}],
+        exportsList: ['exportAssemblyPlanPdf'],
+        role: 'Assembly instructions PDF &mdash; schematic wireframe diagrams under a simple oblique (&quot;cabinet&quot;) projection, one step per page, in the style of a real flat-pack booklet: already-placed panels faint, this step&#39;s new panel(s) bold, an insertion arrow for join/integrate steps. Deliberately not photorealistic &mdash; jsPDF&#39;s own line-drawing primitives, no separate rendering pipeline. The assembly branch&#39;s own export file, split out of the old monolithic pdfExport.js.',
+        fns: [
+  { name:'projectOblique / computeBoxCorners / boxEdges / computeSharedProjectionBounds / toDiagramXY', io:'various', role:'The oblique-projection math &mdash; a panel&#39;s 8 AABB corners projected to 2D, with the SAME scale/bounds reused across every step&#39;s diagram so proportions never shift between pages.', calls:['computeWorldHalfExtents() &mdash; modeller/modules.js'], tag:'internal' },
+  { name:'drawPanelWireframe / drawInsertionArrow / drawStepDiagram', io:'various', role:'Draws one panel&#39;s 12 edges, a plain insertion arrow, and a full step&#39;s diagram box (every already-placed panel faint, this step&#39;s new panel(s) bold).', calls:[], tag:'internal' },
+  { name:'exportAssemblyPlanPdf', io:'(plan, resolvedPanels, {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Cover page (tools needed + parts list) then one page per step from engine/ergonomics.js#buildAssemblyPlan &mdash; diagram, ergonomics flags, hardware, tools.', calls:['drawStepDiagram() &mdash; same file', 'outputPdf() &mdash; engine/pdfExport-shared.js', 'jsPDF &mdash; jspdf (external)'] },
 ]
       },
       {
@@ -2260,15 +2301,6 @@ const GROUPS = [
 ]
       },
       {
-        path: 'engine/helpers.mjs',
-        status: 'warn',
-        imports: [{from:'../modeller/modules.js',names:['loadMaterialCatalog']}],
-        exportsList: ['ensureMaterialCatalog','assert','assertEqual','section','report'],
-        role: 'Shared assertion-based test bootstrap for the .mjs test files (run directly with `node tests/&lt;file&gt;.mjs`, no bundler/runner).',
-        note: 'Likely misplaced: its own file header says &quot;tests/helpers.mjs&quot; and it imports <code>&#39;../src/modeller/modules.js&#39;</code> &mdash; a path that only resolves correctly from a real tests/ directory. From its actual location (src/engine/) that import would resolve to src/src/modeller/modules.js, which doesn&#39;t exist. Worth confirming whether this is a stray duplicate of a tests/helpers.mjs, or whether it needs its import path fixed in place.',
-        fns: []
-      },
-      {
         path: 'engine/resolveConstraints.js',
         status: 'stub',
         role: 'Empty scaffolding — created during the restructure but never populated. The app still correctly uses modeller/snap.js#resolveConstraints; nothing imports from this file today.',
@@ -2276,9 +2308,19 @@ const GROUPS = [
       },
       {
         path: 'engine/validator.js',
-        status: 'stub',
-        role: 'Empty, unused.',
-        fns: []
+        status: 'ok',
+        imports: [{from:'./joints.js',names:['detectJoints']},{from:'../shared/geometry.js',names:['findPanelSizeViolation','findDesignLimitViolation','checkMinGap','collectAxisSlabs']},{from:'../modeller/modules.js',names:['MIN_PANEL_DIM_MM']}],
+        exportsList: ['validateDesign'],
+        role: 'A whole-design audit, run once per render alongside detectJoints. Deliberately NOT where &quot;can this specific edit happen&quot; checks live &mdash; those already exist inline, at the moment of interaction (shared/geometry.js&#39;s find*Violation / clamp* functions, called directly from features/box.js#relayoutBox, tools/collinearTool.js, and modeller-main.js&#39;s resize/drag handlers). This file exists for violations that can only be seen against the WHOLE resolved graph &mdash; most obviously two panels overlapping because of an edit made somewhere else entirely &mdash; plus a backstop re-sweep of every panel&#39;s own size/position limits in case an indirect cascade produced an invalid state without going through one of those direct interactive paths.',
+        note: 'Same &quot;detect and surface, never silently block&quot; principle as joints.js&#39;s own collisions field: a collision or an out-of-bounds panel is often a transient mid-drag state that resolves itself once the person finishes the edit. See modeller-main.js#checkJointWarnings, which calls this and both toasts on a violation&#39;s first appearance and refreshes the persistent ui/warnings.js panel every render.',
+        fns: [
+  { name:'displayName', io:'(panel) &rarr; <b>string</b>', role:'panel.name || panel.id, for message text.', calls:[], tag:'internal' },
+  { name:'collisionViolations', io:'(collisions, resolvedById) &rarr; <b>Violation[]</b>', role:'Wraps detectJoints&#39;s own collisions array into Violation objects &mdash; reads the SAME detectJoints() result the caller already computed, never re-derives overlap math itself.', calls:[], tag:'internal' },
+  { name:'panelSizeViolations', io:'(visibleResolvedPanels) &rarr; <b>Violation[]</b>', role:'Whole-design backstop for MIN_PANEL_DIM_MM (too thin/short &mdash; only otherwise enforced inline inside relayoutBox&#39;s own wall-resize path) and findPanelSizeViolation&#39;s max width/height.', calls:['findPanelSizeViolation() &mdash; shared/geometry.js'], tag:'internal' },
+  { name:'designLimitViolations', io:'(visibleResolvedPanels) &rarr; <b>Violation[]</b>', role:'Whole-design backstop for DESIGN_LIMITS_MM &mdash; what &quot;too tall furniture&quot; actually is: a panel whose resolved Y extent pushes past DESIGN_LIMITS_MM.y.max.', calls:['findDesignLimitViolation() &mdash; shared/geometry.js'], tag:'internal' },
+  { name:'minGapViolations', io:'(panels) &rarr; <b>Violation[]</b>', role:'Whole-design backstop for MIN_WALL_GAP_MM (&quot;too close shelves&quot;), swept across EVERY group and both axes rather than just the one group/axis a direct drag happens to be touching. Operates on the RAW graph, not resolved &mdash; collectAxisSlabs reads each panel&#39;s own pre-resolve .offset field.', calls:['collectAxisSlabs() / checkMinGap() &mdash; shared/geometry.js'], tag:'internal' },
+  { name:'validateDesign', io:'(panels, resolvedPanels, {joints?, collisions?}) &rarr; <b>{ violations: Violation[] }</b>', role:'The single entry point &mdash; runs all four sweeps above. Reuses a precomputed `collisions` array if the caller supplies one (see modeller-main.js#checkJointWarnings, which already calls detectJoints() for its own orphan/cross-group checks) rather than running a second full O(panel count²) pass for the same answer.', calls:['collisionViolations() / panelSizeViolations() / designLimitViolations() / minGapViolations() &mdash; same file', 'detectJoints() &mdash; engine/joints.js (only if collisions not supplied)'] },
+]
       },
       {
         path: 'engine/extractor.js',
@@ -2310,12 +2352,12 @@ const GROUPS = [
       {
         path: 'ui/cutlist.js',
         status: 'ok',
-        imports: [{from:'../engine/pdfExport.js',names:['exportCutListPdf','exportNestingPdf']},{from:'../engine/nesting.js',names:['nestCutList','summarizeNestingResult']},{from:'../modeller/modules.js',names:['MATERIAL_CATALOG']},{from:'./toast.js',names:['escapeHtmlLocal']}],
+        imports: [{from:'../engine/pdfExport-bom.js',names:['exportCutListPdf','exportNestingPdf']},{from:'../engine/nesting.js',names:['nestCutList','summarizeNestingResult']},{from:'../modeller/modules.js',names:['MATERIAL_CATALOG']},{from:'./toast.js',names:['escapeHtmlLocal']}],
         exportsList: ['setBomRows','getLastBomRows','openCutListWindow','openNestingPlan','renderNestingSummary'],
         role: 'Owns "last computed BOM / nesting result" state, same dedicated-module treatment modeller/selection.js gives selection state.',
         fns: [
           { name:'setBomRows / getLastBomRows', io:'(rows) → void / () → <b>BomRow[]</b>' , calls: [] },
-          { name:'openCutListWindow / openNestingPlan', io:'() → <span class="ret">void</span>' , calls: ['openCutListWindow() calls: exportCutListPdf() — engine/pdfExport.js','openNestingPlan() calls: nestCutList() / summarizeNestingResult() — engine/nesting.js; bomRowsSignature() / renderNestingSummary() — same file; exportNestingPdf() — engine/pdfExport.js; MATERIAL_CATALOG — modeller/modules.js (constant)'] },
+          { name:'openCutListWindow / openNestingPlan', io:'() → <span class="ret">void</span>' , calls: ['openCutListWindow() calls: exportCutListPdf() — engine/pdfExport-bom.js','openNestingPlan() calls: nestCutList() / summarizeNestingResult() — engine/nesting.js; bomRowsSignature() / renderNestingSummary() — same file; exportNestingPdf() — engine/pdfExport-bom.js; MATERIAL_CATALOG — modeller/modules.js (constant)'] },
           { name:'renderNestingSummary', io:'() → <span class="ret">void</span>' , calls: ['bomRowsSignature() — same file','escapeHtmlLocal() — ui/toast.js'] },
         ]
       },
@@ -2340,11 +2382,24 @@ const GROUPS = [
         status: 'ok',
         imports: [{from:'../modeller/modules.js',names:['getDisplayName']}],
         exportsList: ['renderRelations'],
-        role: 'The "Relations" list panel — constraints on the selected panel. Confirmed byte-identical to master.',
+        role: 'The "Relations" list panel — constraints on the selected panel, in the right inspector below Properties.',
+        note: 'Was silently dead code until recently: modeller-main.js looked up an element with id=&quot;relations-container&quot;, but no such element existed anywhere in modeller.html or the generated sidebar &mdash; the mount div was simply never added, so the `if (relationsMountEl)` guard always skipped the render. Fixed by adding the missing &lt;div id=&quot;relations-container&quot;&gt; as a static sibling to #properties-container in modeller.html&#39;s right inspector (the same stable-container pattern #properties-container already used, so the module-level cached DOM reference is safe). This file&#39;s own warning message used to cite the wrong id (&quot;relations-mount&quot;) too &mdash; also fixed.',
         fns: [
   { name:'renderRelations', io:'(container, {selectedPanel, allPanels, onUnlinkConstraint}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Read-only list of the selected panel&#39;s constraints, each with a &times; to hard-remove it. Creating relations happens via the collinear/shelf tools, not here.', calls:['renderConstraintList() &mdash; same file', 'onUnlinkConstraint() &mdash; callback from modeller-main.js'] },
   { name:'renderConstraintList', io:'(constraints, allPanels) &rarr; <b>string</b>', role:'Human-readable description per constraint (&quot;spans X&middot;face &harr; Y&middot;face&quot; / &quot;attached (face) to X&middot;face&quot;).', calls:['getDisplayName() &mdash; modeller/modules.js', 'escapeHtml() &mdash; same file'], tag:'internal' },
   { name:'escapeHtml', io:'(value) &rarr; <b>string</b>', calls:[], tag:'internal' },
+]
+      },
+      {
+        path: 'ui/warnings.js',
+        status: 'ok',
+        imports: [],
+        exportsList: ['renderWarnings'],
+        role: 'The "Design Warnings" panel — right inspector, below Relations. Whole-design (not per-selection, unlike Properties/Relations above it): every currently-open violation from engine/validator.js#validateDesign, refreshed every render. The persistent counterpart to the transient toast modeller-main.js#checkJointWarnings also fires on a violation&#39;s first appearance &mdash; a collision or oversized panel stays visible here for as long as it&#39;s actually still unresolved, not just the ~2 seconds the toast is on screen.',
+        fns: [
+  { name:'renderWarnings', io:'(container, {violations}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Read-only list of current Violation objects (see engine/validator.js). Same &quot;never let a missing mount point crash the modeller&quot; guard as relations.js.', calls:['renderViolationList() &mdash; same file'] },
+  { name:'renderViolationList', io:'(violations) &rarr; <b>string</b>', calls:['escapeHtml() &mdash; same file'], tag:'internal' },
+  { name:'escapeHtml', io:'(value) &rarr; <b>string</b>', role:'Same implementation as relations.js&#39;s own, duplicated rather than shared &mdash; a 4-line DOM-based utility, not worth a shared/ file for two call sites.', calls:[], tag:'internal' },
 ]
       },
       {
@@ -3105,7 +3160,7 @@ const MODULE_META = {
     label: 'Engine',
     kicker: 'BOM, nesting, PDF & assembly',
     groups: ['engine'],
-    summary: 'Computed projections of the resolved graph: bill of materials, cutting layout, joints, hardware, assembly sequencing and PDF exports.',
+    summary: 'Computed projections of the resolved graph: bill of materials, cutting layout, joints, hardware, assembly sequencing, whole-design validation, and PDF exports.',
     upstream: [{ id: 'graph', label: 'reads the resolved graph from' }],
     downstream: [{ id: 'ui', label: 'rendered by' }]
   },
@@ -3242,8 +3297,13 @@ function renderKnownGaps() {
     <p class="known-gaps-intro">Everything below is empty, unfinished, or flagged as incomplete right in the file it's found in — gathered here in one place since this is usually the first thing worth checking before planning new work.</p>
     <ul class="known-gaps-list">
       <li>
-        <span class="gap-files">${fileLink('engine/validator.js')} &amp; ${fileLink('engine/extractor.js')}</span>
-        <span class="gap-desc">Both empty (0 bytes) — no documented intent yet.</span>
+        <span class="gap-files">${fileLink('engine/extractor.js')}</span>
+        <span class="gap-desc">Empty (0 bytes) — no documented intent yet.</span>
+        <a class="gap-module-link" href="#module-engine">Engine module →</a>
+      </li>
+      <li>
+        <span class="gap-files">engine/pdfExport.js</span>
+        <span class="gap-desc">Orphaned leftover from the pdfExport split — the 5 replacement files (pdfExport-shared/bom/joints/history/assembly.js) were added, but this original file was never deleted. Nothing imports it anymore; safe to remove.</span>
         <a class="gap-module-link" href="#module-engine">Engine module →</a>
       </li>
       <li>
@@ -3396,16 +3456,20 @@ const MODULE_NARRATIVES = {
         <li>${fileLink('engine/assembly.js')} — <b>what order a person actually builds it in.</b> ${functionLink('buildAssemblySequence')} clusters panels into rigid sub-assemblies via the structural joints, then schedules door/drawer integration once both sides of a hinge or slide are complete.</li>
         <li>${fileLink('engine/ergonomics.js')} — an annotation pass over assembly.js's own sequence: which tools each step needs, and weight/two-person flags. Doesn't re-order anything.</li>
       </ul>
-      <p>${fileLink('engine/pdfExport.js')} is the one file that reads across all of it — cut list, nesting, joints, hardware and the full assembly plan all export as PDFs from here.</p>
+      <p>PDF export for all four (plus BOM/nesting/history) used to be one shared file; it's now split one-per-domain — ${fileLink('engine/pdfExport-bom.js')}, ${fileLink('engine/pdfExport-joints.js')}, ${fileLink('engine/pdfExport-assembly.js')}, ${fileLink('engine/pdfExport-history.js')} — plus ${fileLink('engine/pdfExport-shared.js')} for the handful of genuinely shared drawing helpers, specifically so the bom/joinery/assembly branches never collide editing the same export file.</p>
+    </div>
+
+    <div class="module-section">
+      <h3>Whole-design validation</h3>
+      <p>${fileLink('engine/validator.js')} is a fifth, separate pass — ${functionLink('validateDesign')} — run alongside detectJoints rather than part of the build-a-piece pipeline above. It exists for the class of problem NONE of the inline per-operation checks (${fileLink('shared/geometry.js')}'s find*Violation/clamp* functions, called directly from ${fileLink('features/box.js')}#relayoutBox and the tools) can catch: violations that only exist in relation to the WHOLE resolved graph — two panels overlapping because of an edit made somewhere else entirely, or an indirect cascade leaving some panel out of bounds without ever passing through a direct interactive path. Same "detect and surface, never silently block" principle as joints.js's own collisions field: see ${fileLink('modeller-main.js')}#checkJointWarnings, which calls it every render and both toasts on a violation's first appearance and refreshes the persistent ${fileLink('ui/warnings.js')} panel (see the UI module) with the full current list.</p>
     </div>
 
     <div class="module-section">
       <h3>What's still actually missing</h3>
       <ul class="didactic-list">
-        <li>${fileLink('engine/validator.js')} and ${fileLink('engine/extractor.js')} — still empty; no documented intent yet. Likely candidates for the geometric bounds/collision checks the roadmap has separately flagged as the next big step after joints.</li>
+        <li>${fileLink('engine/extractor.js')} — still empty; no documented intent yet.</li>
         <li>${fileLink('engine/resolveConstraints.js')} — empty scaffolding from an earlier restructure; the app still correctly uses ${fileLink('modeller/snap.js')}'s resolver, nothing imports this one.</li>
         <li>${fileLink('engine/assembly.js')} itself flags one gap: a drawer front's attachment to its own box isn't modeled as a real joint yet, so it currently surfaces as its own flagged step rather than a proper structural connection.</li>
-        <li>${fileLink('engine/helpers.mjs')} looks misplaced — its own header claims a <code>tests/</code> location its actual import path doesn't match from where it sits.</li>
       </ul>
     </div>
 
@@ -3418,13 +3482,15 @@ const MODULE_NARRATIVES = {
   ui: () => `
     <div class="module-section">
       <h3>What it does</h3>
-      <p>Everything in ${groupLink('ui')} is DOM-facing and callback-driven: it reads data handed to it and fires callbacks back up to ${fileLink('modeller-main.js')} — it never mutates the graph itself. ${functionLink('renderPanelList')} in ${fileLink('ui/toolbar.js')} is the entire left sidebar (element tree, add-panel/box buttons, the building tools and their confirm forms). ${functionLink('renderProperties')} in ${fileLink('ui/properties.js')} is the inspector — group-level or per-panel depending on selection, including the door-specific hinge/open controls. ${fileLink('ui/relations.js')} lists constraints on the selected panel; ${fileLink('ui/cutlist.js')} owns "last computed BOM/nesting" state and is what actually calls into ${fileLink('engine/pdfExport.js')} and ${fileLink('engine/nesting.js')} when the person opens the cut list or nests it.</p>
+      <p>Everything in ${groupLink('ui')} is DOM-facing and callback-driven: it reads data handed to it and fires callbacks back up to ${fileLink('modeller-main.js')} — it never mutates the graph itself. ${functionLink('renderPanelList')} in ${fileLink('ui/toolbar.js')} is the entire left sidebar (element tree, add-panel/box buttons, the building tools and their confirm forms). ${functionLink('renderProperties')} in ${fileLink('ui/properties.js')} is the inspector — group-level or per-panel depending on selection, including the door-specific hinge/open controls. ${fileLink('ui/relations.js')} lists constraints on the selected panel; ${fileLink('ui/cutlist.js')} owns "last computed BOM/nesting" state and is what actually calls into ${fileLink('engine/pdfExport-bom.js')} and ${fileLink('engine/nesting.js')} when the person opens the cut list or nests it.</p>
+      <p>${fileLink('ui/warnings.js')} is the newest panel — right inspector, below Relations — showing every currently-open ${fileLink('engine/validator.js')} violation, refreshed every render. Unlike the toast modeller-main.js also fires on a violation's first appearance, this one doesn't disappear after a couple of seconds: it reflects the current state, clearing itself the moment the last open issue actually gets fixed.</p>
     </div>
 
     <div class="module-section">
       <h3>Worth knowing</h3>
       <ul class="didactic-list">
         <li>${fileLink('ui/layout.js')} handles only the resizable sidebar/viewport splitters — layout, not content.</li>
+        <li>${fileLink('ui/relations.js')}'s panel was silently dead code until recently — its mount point (<code>#relations-container</code>) was never actually added to the page. Fixed alongside adding warnings.js's own mount point; see relations.js's own note.</li>
       </ul>
     </div>
 

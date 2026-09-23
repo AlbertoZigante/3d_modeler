@@ -48,11 +48,13 @@ import { exportHistoryPdf } from './engine/pdfExport-history.js';
 import { exportJointsPdf } from './engine/pdfExport-joints.js';
 import { exportAssemblyPlanPdf } from './engine/pdfExport-assembly.js';
 import { detectJoints, detectFeatureJoints, buildJointsReport, findOrphanPanels, findCrossGroupJoints } from './engine/joints.js';
+import { validateDesign } from './engine/validator.js';
 import { buildHardwarePlan } from './engine/hardware.js';
 import { buildAssemblyPlan } from './engine/ergonomics.js';
 import { renderProperties } from './ui/properties.js';
 import { renderPanelList } from './ui/toolbar.js';
 import { renderRelations } from './ui/relations.js';
+import { renderWarnings } from './ui/warnings.js';
 import { initResizableLayout } from './ui/layout.js';
 import { showToast, showDesignLimitError, showPanelSizeLimitError } from './ui/toast.js';
 import { openCutListWindow, openNestingPlan, renderNestingSummary, setBomRows, getLastBomRows } from './ui/cutlist.js';
@@ -186,6 +188,7 @@ const canvas = document.getElementById('canvas');
 const main = document.getElementById('main');
 const panelListMountEl = document.getElementById('panel-list-mount');
 const relationsMountEl = document.getElementById('relations-container');
+const designWarningsMountEl = document.getElementById('design-warnings-container');
 const inspectorEl = document.getElementById('properties-container');
 const stageLabelEl = document.getElementById('stage-label');
 const axesCanvas = document.getElementById('axes-gizmo-canvas');
@@ -849,20 +852,34 @@ function ungroupSelected() {
 }
 
 // ---------------------------------------------------------------
-// Orphan panel / cross-group joint LIVE WARNINGS. Runs at the end of
-// every renderAll() call below — renderAll already resolves +
-// reconciles on every state change, live drags included, so this is
-// the natural place to notice these two states the moment they
-// appear, the same way checkMinGap's spacing check runs on every
-// shelf-drag frame further up. UNLIKE checkMinGap, neither of these
-// BLOCKS anything — an orphan panel or a cross-group joint are both
-// plausible, sometimes intentional states — so this only toasts on
-// the frame a given orphan/cross-group joint FIRST appears (tracked
-// via the two Sets below), rather than re-flagging the same
-// still-open issue on every subsequent frame while a drag continues.
-// Without that, a toast (and the activity-history log every
-// showToast call feeds — see ui/toast.js) would fire dozens of times
-// for one drag that merely leaves an existing orphan sitting there.
+// Orphan panel / cross-group joint / whole-design validation LIVE
+// WARNINGS. Runs at the end of every renderAll() call below —
+// renderAll already resolves + reconciles on every state change, live
+// drags included, so this is the natural place to notice these
+// states the moment they appear, the same way checkMinGap's spacing
+// check runs on every shelf-drag frame further up. UNLIKE
+// checkMinGap, NONE of these BLOCK anything — an orphan panel, a
+// cross-group joint, a collision, or a panel that's drifted past a
+// design limit are all plausible, sometimes-transient states (often
+// mid-drag) — so this only toasts on the frame a given issue FIRST
+// appears (tracked via the Sets below), rather than re-flagging the
+// same still-open issue on every subsequent frame while a drag
+// continues. Without that, a toast (and the activity-history log
+// every showToast call feeds — see ui/toast.js) would fire dozens of
+// times for one drag that merely leaves an existing issue sitting
+// there.
+//
+// engine/validator.js#validateDesign is where the whole-design sweep
+// (collisions, panel-size backstop, design-limit backstop, min-gap
+// backstop) actually lives — this function just reuses the SAME
+// detectJoints() call's `collisions` output rather than asking
+// validateDesign to recompute it, folds its violations into the
+// same toast/dedup mechanism already built for orphans/cross-group,
+// AND refreshes the persistent Design Warnings panel (ui/warnings.js,
+// mounted at #design-warnings-container in the right inspector) with
+// the current full list every render — the toast is transient and
+// dedup'd to "new this render", the panel is not, so an issue stays
+// visible for as long as it's actually still unresolved.
 //
 // detectJoints() itself is O(panel count squared) but cheap per pair
 // (a handful of subtractions/comparisons — see engine/joints.js), so
@@ -874,9 +891,10 @@ function ungroupSelected() {
 // ---------------------------------------------------------------
 let knownOrphanPanelIds = new Set();
 let knownCrossGroupJointIds = new Set();
+let knownViolationKeys = new Set();
 
 function checkJointWarnings(resolvedPanels) {
-  const { joints } = detectJoints(resolvedPanels);
+  const { joints, collisions } = detectJoints(resolvedPanels);
   const orphans = findOrphanPanels(resolvedPanels, joints);
   const crossGroup = findCrossGroupJoints(resolvedPanels, joints);
   const nameById = new Map(resolvedPanels.map((p) => [p.id, p.name || p.id]));
@@ -887,7 +905,26 @@ function checkJointWarnings(resolvedPanels) {
   knownOrphanPanelIds = new Set(orphans.map((p) => p.id));
   knownCrossGroupJointIds = new Set(crossGroup.map((j) => j.id));
 
-  if (newOrphans.length === 0 && newCrossGroup.length === 0) return;
+  // validateDesign() reuses the collisions this same detectJoints() call
+  // already computed, rather than running its own second O(panel
+  // count²) pass for the same answer — see validator.js's own comment
+  // on why. `panels` (raw, module-level) is passed alongside the
+  // resolved graph since the min-gap sweep needs each panel's own
+  // pre-resolve `.offset` field (see collectAxisSlabs).
+  const { violations } = validateDesign(panels, resolvedPanels, { collisions });
+  const newViolations = violations.filter((v) => !knownViolationKeys.has(v.key));
+  knownViolationKeys = new Set(violations.map((v) => v.key));
+
+  // The persistent panel always reflects the CURRENT full list —
+  // unlike the toast below, it has to update even when nothing is
+  // NEW (most importantly: clearing back to "no issues" the moment
+  // the last open violation gets fixed, which is exactly the render
+  // where newViolations.length is 0).
+  if (designWarningsMountEl) {
+    renderWarnings(designWarningsMountEl, { violations });
+  }
+
+  if (newOrphans.length === 0 && newCrossGroup.length === 0 && newViolations.length === 0) return;
 
   const parts = [];
   if (newOrphans.length > 0) {
@@ -897,6 +934,7 @@ function checkJointWarnings(resolvedPanels) {
     const pairs = newCrossGroup.map((j) => `${nameById.get(j.panelA) ?? '?'} ↔ ${nameById.get(j.panelB) ?? '?'}`);
     parts.push(`Cross-group contact: ${pairs.join(', ')}`);
   }
+  newViolations.forEach((v) => parts.push(v.message));
   showToast(parts.join('  •  '));
 }
 
