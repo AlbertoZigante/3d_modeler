@@ -25,6 +25,8 @@
  */
 
 import { getDisplayName, MATERIAL_CATALOG } from '../modeller/modules.js';
+import { renderDoorSchema } from './doorSchema.js';
+import { renderDrawerSchema } from './drawerSchema.js';
 
 const DIM_FIELDS = ['width', 'height']; // thickness is derived from material — see below, never a typed field
 
@@ -50,6 +52,8 @@ export function renderProperties(
     onEdgeFitChange,
     onToggleDoorOpen,
     onDoorHingeChange,
+    onDrawerFrontEdgeFitChange,
+    onDrawerFrontCountChange,
   }
 ) {
   if (selectedGroupId && !selectedPanel) {
@@ -136,8 +140,9 @@ export function renderProperties(
     ${numberFieldHTML('Quantity', 'quantity', selectedPanel.quantity, 'pc', { min: 1 })}
     <button class="remove-btn" id="remove-btn">Remove panel</button>
 
-    ${selectedPanel.edgeFit ? edgeFitSectionHTML(selectedPanel.edgeFit) : ''}
+    ${selectedPanel.edgeFit && !selectedPanel.isDoor && !selectedPanel.isDrawerFront ? edgeFitSectionHTML(selectedPanel.edgeFit) : ''}
     ${selectedPanel.isDoor ? doorSectionHTML(selectedPanel, hiddenGroupMembers || [], restoreError) : ''}
+    ${selectedPanel.isDrawerFront ? drawerSectionHTML(selectedPanel, hiddenGroupMembers || [], restoreError) : ''}
 
     ${transformLocked ? '' : `
       <div class="divider"></div>
@@ -227,13 +232,54 @@ export function renderProperties(
     onEdgeFitChange();
   });
 
-  // ---- door (hinge + open/close — only present for a door, see the
-  // `selectedPanel.isDoor` check above) ----
-  container.querySelector('#door-hinge-field')?.addEventListener('change', (event) => {
-    onDoorHingeChange(event.target.value);
+  // ---- door (edge fit + hinge live, via the shared door schema; open/
+  // close — only present for a door, see the `selectedPanel.isDoor`
+  // check above). Each edge-arrow click commits immediately (edge fit
+  // + Apply in the same click, unlike a box wall's batched selects
+  // above) since the schema itself is a single click = single change
+  // control, not a multi-field form.
+  container.querySelectorAll('.door-edge-arrow').forEach((g) => {
+    g.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const edge = g.dataset.edge;
+      const current = (selectedPanel.edgeFit || {})[edge] === 'out' ? 'out' : 'in';
+      onEdgeFitFieldChange(edge, current === 'out' ? 'in' : 'out');
+      onEdgeFitChange();
+    });
+  });
+  container.querySelector('.door-hinge-swap')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onDoorHingeChange(selectedPanel.hinge === 'right' ? 'left' : 'right');
   });
   container.querySelector('#toggle-door-open-btn')?.addEventListener('click', () => {
     onToggleDoorOpen();
+  });
+
+  // ---- drawer front (edge fit only — count/hinge don't apply here;
+  // see the `selectedPanel.isDrawerFront` check above). NOT the
+  // generic onEdgeFitFieldChange/onEdgeFitChange the door arrows
+  // above use — a drawer stack's N fronts all share one edgeFit, so
+  // this goes through its own onDrawerFrontEdgeFitChange, which
+  // updates every front in the stack at once (see
+  // modeller-main.js#updateSelectedDrawerFrontEdgeFit for why a
+  // single-node patch isn't enough here).
+  container.querySelectorAll('.drawer-edge-arrow').forEach((g) => {
+    g.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const edge = g.dataset.edge;
+      const current = (selectedPanel.edgeFit || {})[edge] === 'out' ? 'out' : 'in';
+      onDrawerFrontEdgeFitChange(edge, current === 'out' ? 'in' : 'out');
+    });
+  });
+  // 'change' (fires on blur/Enter), not 'input' — same reasoning as
+  // the old confirm-phase count field: this rebuilds+re-renders the
+  // whole stack/panel, which would otherwise fight an in-progress
+  // keystroke.
+  container.querySelector('#drawer-front-count-field')?.addEventListener('change', (event) => {
+    onDrawerFrontCountChange(event.target.value);
   });
   wireRestoreFaceButtons(container, onRestoreFace);
 }
@@ -291,19 +337,16 @@ function wireRestoreFaceButtons(container, onRestoreFace) {
   });
 }
 
-// Hinge is a design choice (which side the actual hardware goes on),
-// so changing it here goes straight through — one field, no need for
-// edgeFit's own batched Apply pattern. Open/Close is the opposite: a
-// purely visual toggle (see features/door.js#computeDoorOpenTransform
-// and modeller-main.js#toggleSelectedDoorOpen), swinging the door 90°
-// about its hinge edge in the 3D view without changing anything
-// BOM/cut-list reads — normalAxis === 'y' (a door replacing a
-// Top/Bottom wall, lying flat like a lid) has no vertical edge to
-// hinge on, so that case hides the Open/Close button entirely rather
-// than showing a button that would silently do nothing.
+// A door's edge fit + hinge both apply live here, one click = one
+// change — unlike a box wall's edgeFitSectionHTML (batched Apply,
+// above), there's no multi-field form to hold pending state for: the
+// schema below (ui/doorSchema.js, shared with the confirm-phase form
+// in ui/toolbar.js) IS the whole control, so each click just commits
+// immediately via onEdgeFitFieldChange+onEdgeFitChange (edges) or
+// onDoorHingeChange (hinge) — see the wiring below.
 //
 // The hidden-face Restore list is repeated here (see
-// restoreFaceListHTML above) right next to Open/Close: drilling into
+// restoreFaceListHTML above) right next to the schema: drilling into
 // an individual door panel switches the WHOLE inspector away from the
 // group-level view where Restore normally lives (see the
 // `selectedGroupId && !selectedPanel` branch up top), so without this
@@ -316,14 +359,32 @@ function doorSectionHTML(door, hiddenGroupMembers, restoreError) {
   return `
     <div class="divider"></div>
     <div class="section-title">Door</div>
-    <div class="field-row">
-      <label>Hinge side</label>
-      <select class="field-input" id="door-hinge-field">
-        <option value="left" ${door.hinge !== 'right' ? 'selected' : ''}>Left</option>
-        <option value="right" ${door.hinge === 'right' ? 'selected' : ''}>Right</option>
-      </select>
+    <div class="properties-hint">
+      Click an edge's arrow to flip it in/out. Click the dotted line to swap the hinge side.
     </div>
+    ${renderDoorSchema(door.edgeFit, door.hinge)}
     ${canOpen ? `<button class="add-btn" id="toggle-door-open-btn">${door.doorOpen ? 'Close door' : 'Open door'}</button>` : ''}
+    ${restoreFaceListHTML(hiddenGroupMembers, restoreError)}
+  `;
+}
+
+// Same "edge fit only, applies live" reasoning as doorSectionHTML
+// above for the schema; count is its own field (see
+// modeller-main.js#updateSelectedDrawerFrontCount — changing it tears
+// down and rebuilds the whole stack, unlike edge fit, so it isn't
+// something the schema itself can represent as a click).
+function drawerSectionHTML(front, hiddenGroupMembers, restoreError) {
+  return `
+    <div class="divider"></div>
+    <div class="section-title">Drawer</div>
+    <div class="properties-hint">
+      Click an edge's arrow to flip it in/out.
+    </div>
+    ${renderDrawerSchema(front.edgeFit, front.drawerCount)}
+    <div class="field-row">
+      <label>Number of drawers</label>
+      <input type="number" class="field-input" id="drawer-front-count-field" min="1" max="10" step="1" value="${Number(front.drawerCount ?? 1)}" />
+    </div>
     ${restoreFaceListHTML(hiddenGroupMembers, restoreError)}
   `;
 }

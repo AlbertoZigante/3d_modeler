@@ -8,6 +8,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         modeller: resolve(__dirname, 'modeller.html'),
+        dashboard: resolve(__dirname, 'dashboard.html'),
       },
     },
   },

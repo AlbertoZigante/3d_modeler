@@ -70,35 +70,24 @@ import {
   HORIZONTAL_ROTATION,
   PARALLEL_ROTATION,
   MIN_WALL_GAP_MM,
+  computeBoundaryRectangle,
 } from './shared/geometry.js';
 import { addBox, relayoutBox } from './features/box.js';
 import { isShelf } from './features/shelf.js';
-import { createDoorNode, computeDoorOpenTransform, applyDoorAdjustmentsForGroup, applyPanelPatch } from './features/door.js';
-import { createDrawerFrontNodes, createDrawerBoxNodes, computeDrawerBoxPlacement, applyDrawerAdjustmentsForGroup } from './features/drawer.js';
+import { createDoorNode, computeDoorOpenTransform, applyDoorAdjustmentsForGroup, applyPanelPatch, computeDoorPlacement, DEFAULT_DOOR_EDGE_FIT, DEFAULT_DOOR_HINGE } from './features/door.js';
+import { createDrawerFrontNodes, createDrawerBoxNodes, computeDrawerBoxPlacement, applyDrawerAdjustmentsForGroup, computeDrawerFrontsPlacement, DEFAULT_DRAWER_EDGE_FIT, DEFAULT_DRAWER_COUNT, MAX_DRAWER_COUNT } from './features/drawer.js';
 import { startShelfMode, cancelShelfMode, getShelfMode, setShelfToolContext } from './tools/shelfTool.js';
 import { setBoundaryRectToolContext } from './tools/boundaryRectTool.js';
 import {
   startDoorMode,
   cancelDoorMode,
-  confirmDoorMode,
-  setDoorEdgeFitField,
-  setDoorHinge,
   isDoorPickActive,
-  isDoorConfirmActive,
-  getDoorEdgeFit,
-  getDoorHinge,
   setDoorToolContext,
 } from './tools/doorTool.js';
 import {
   startDrawerMode,
   cancelDrawerMode,
-  confirmDrawerMode,
-  setDrawerEdgeFitField,
-  setDrawerCount,
   isDrawerPickActive,
-  isDrawerConfirmActive,
-  getDrawerEdgeFit,
-  getDrawerCount,
   setDrawerToolContext,
 } from './tools/drawerTool.js';
 import {
@@ -199,6 +188,22 @@ const printHistoryBtn = document.getElementById('print-history-btn');
 const printJointsBtn = document.getElementById('print-joints-btn');
 const exportJointsJsonBtn = document.getElementById('export-joints-json-btn');
 const printAssemblyBtn = document.getElementById('print-assembly-btn');
+// Cut list / nesting — moved here from the Elements panel (left
+// toolbar no longer has these buttons).
+const topbarOpenCutlistBtn = document.getElementById('topbar-open-cutlist-btn');
+const topbarNestCutlistBtn = document.getElementById('topbar-nest-cutlist-btn');
+// Render / Validate: placeholders only, not wired to anything yet.
+const renderBtn = document.getElementById('render-btn');
+const validateBtn = document.getElementById('validate-btn');
+
+validateBtn?.addEventListener('click', () => {
+  // Prototype hand-off to the dashboard: mark the 3D-model step
+  // confirmed for the current project (no per-project persistence
+  // in the modeller yet, so this always targets 'default' unless
+  // ?project= is already in the URL — see dashboard.html).
+  const projectId = new URLSearchParams(window.location.search).get('project') || 'default';
+  window.location.href = `./dashboard.html?project=${encodeURIComponent(projectId)}&confirm=model`;
+});
 
 function syncHistoryButtons() {
   if (undoBtn) undoBtn.disabled = !history.canUndo();
@@ -207,15 +212,27 @@ function syncHistoryButtons() {
 history.setOnChange(syncHistoryButtons);
 undoBtn?.addEventListener('click', () => history.undo());
 redoBtn?.addEventListener('click', () => history.redo());
-// mode:'open' (not the default 'save') — same convention as
-// #open-cutlist-btn below: opens straight in a new tab so the person
-// sees it immediately, no download prompt. Deliberately synchronous
+// mode:'open' (not the default 'save') — same convention as the
+// top-bar cut-list/nesting buttons: opens straight in a new tab so
+// the person sees it immediately, no download prompt. Deliberately synchronous
 // within this click handler (no await before window.open) — see
 // engine/pdfExport.js's own doc comment on why an async gap here
 // would get the popup silently blocked by most browsers.
-printHistoryBtn?.addEventListener('click', () => {
+const actionToastEl = document.getElementById('action-toast');
+let actionToastTimer = null;
+
+function showActionToast(message) {
+  if (!actionToastEl) return;
+  actionToastEl.textContent = message;
+  actionToastEl.classList.add('visible');
+  clearTimeout(actionToastTimer);
+  actionToastTimer = setTimeout(() => actionToastEl.classList.remove('visible'), 1600);
+}
+
+printHistoryBtn?.addEventListener('click', (event) => {
+  showActionToast('Generating PDF…');
   const lines = history.getActivityLogText().split('\n').filter(Boolean);
-  exportHistoryPdf(lines, { projectName: 'Activity History', mode: 'open' });
+  exportHistoryPdf(lines, { projectName: 'Activity History', mode: 'open', newWindow: event.ctrlKey || event.metaKey });
 });
 // Same "resolve, then read" pattern as the BOM/nesting buttons below —
 // this always reflects the CURRENT design, never a stale snapshot, and
@@ -223,7 +240,8 @@ printHistoryBtn?.addEventListener('click', () => {
 // anywhere, for the same reason computeBom() isn't cached (see
 // engine/bom.js's own header note: cheap, pure, and any staleness bug
 // would be worse than the recompute cost).
-printJointsBtn?.addEventListener('click', () => {
+printJointsBtn?.addEventListener('click', (event) => {
+  showActionToast('Generating PDF…');
   const resolved = resolveConstraints(panels);
   const { joints, collisions } = detectJoints(resolved);
   // Door hinges / drawer slides aren't AABB-contact joints (see
@@ -244,7 +262,7 @@ printJointsBtn?.addEventListener('click', () => {
   // already make elsewhere (cheap and pure beats caching and risking
   // staleness — see engine/hardware.js's own doc comment).
   const hardwarePlan = buildHardwarePlan(panels);
-  exportJointsPdf(report, hardwarePlan, { projectName: 'Joint Report', mode: 'open' });
+  exportJointsPdf(report, hardwarePlan, { projectName: 'Joint Report', mode: 'open', newWindow: event.ctrlKey || event.metaKey });
 });
 // JSON sibling of the button above — same underlying data
 // (buildJointsReport is the single source both formats read from, see
@@ -255,6 +273,7 @@ printJointsBtn?.addEventListener('click', () => {
 // directly, so this bypasses pdfExport.js entirely: a plain Blob
 // download, no PDF library involved.
 exportJointsJsonBtn?.addEventListener('click', () => {
+  showActionToast('Exporting JSON…');
   const resolved = resolveConstraints(panels);
   const { joints, collisions } = detectJoints(resolved);
   const featureJoints = detectFeatureJoints(panels);
@@ -275,16 +294,26 @@ exportJointsJsonBtn?.addEventListener('click', () => {
 // `resolved` directly (not just the plan) since the schematic
 // diagrams draw real panel geometry, which the plan's own step
 // objects reference only by id.
-printAssemblyBtn?.addEventListener('click', () => {
+printAssemblyBtn?.addEventListener('click', (event) => {
+  showActionToast('Generating PDF…');
   const resolved = resolveConstraints(panels);
   const plan = buildAssemblyPlan(panels);
-  exportAssemblyPlanPdf(plan, resolved, { projectName: 'Assembly Instructions', mode: 'open' });
+  exportAssemblyPlanPdf(plan, resolved, { projectName: 'Assembly Instructions', mode: 'open', newWindow: event.ctrlKey || event.metaKey });
+});
+topbarOpenCutlistBtn?.addEventListener('click', (event) => {
+  showActionToast('Generating PDF…');
+  openCutListWindow(event.ctrlKey || event.metaKey);
+});
+topbarNestCutlistBtn?.addEventListener('click', (event) => {
+  showActionToast('Generating PDF…');
+  openNestingPlan(event.ctrlKey || event.metaKey);
 });
 syncHistoryButtons();
 
 document.getElementById('export-bom-pdf-btn')?.addEventListener('click', () => {
   const rows = getLastBomRows();
   if (rows.length === 0) return;
+  showActionToast('Generating PDF…');
   exportCutListPdf(rows, { projectName: 'Cut List' });
 });
 
@@ -539,8 +568,40 @@ setShelfToolContext(toolContext);
 setCollinearToolContext(toolContext);
 setAttachToolContext(toolContext);
 setBoundaryRectToolContext(toolContext);
-setDoorToolContext({ getPanels: () => panels, renderAll: () => renderAll() });
-setDrawerToolContext({ getPanels: () => panels, renderAll: () => renderAll() });
+setDoorToolContext({
+  renderAll: () => renderAll(),
+  onBoundaryPicked: (boundaryResult) => {
+    const catalogEntry = MATERIAL_CATALOG[0];
+    const placement = computeDoorPlacement(panels, boundaryResult, DEFAULT_DOOR_EDGE_FIT, {
+      material: catalogEntry?.name,
+      thicknessMm: catalogEntry?.thicknessMm ?? 18,
+      hinge: DEFAULT_DOOR_HINGE,
+    });
+    if (!placement.ok) {
+      showToast("Couldn't place a door there — try a different boundary");
+      renderAll();
+      return;
+    }
+    handleDoorConfirmed(placement);
+  },
+});
+setDrawerToolContext({
+  renderAll: () => renderAll(),
+  onBoundaryPicked: (boundaryResult) => {
+    const catalogEntry = MATERIAL_CATALOG[0];
+    const placement = computeDrawerFrontsPlacement(panels, boundaryResult, DEFAULT_DRAWER_EDGE_FIT, {
+      material: catalogEntry?.name,
+      thicknessMm: catalogEntry?.thicknessMm ?? 18,
+      count: DEFAULT_DRAWER_COUNT,
+    });
+    if (!placement.ok) {
+      showToast("Couldn't place drawer fronts there — try a different boundary");
+      renderAll();
+      return;
+    }
+    handleDrawerConfirmed(placement);
+  },
+});
 
 // The 4 boundary panels adapt to the confirmed door exactly the way
 // features/box.js's Left/Right/Top/Bottom already adapt to Front's/
@@ -562,11 +623,6 @@ function handleDoorConfirmed(placement) {
   recordHistoryCommand(AddDoorCommand, before, after);
   setSelectedId(doorNode.id);
   renderAll();
-}
-
-function confirmSelectedDoor() {
-  const catalogEntry = MATERIAL_CATALOG[0];
-  confirmDoorMode({ material: catalogEntry?.name, thicknessMm: catalogEntry?.thicknessMm ?? 18 }, handleDoorConfirmed);
 }
 
 // Same shape as handleDoorConfirmed above, N nodes instead of 1 — see
@@ -610,11 +666,6 @@ function handleDrawerConfirmed(placement) {
   recordHistoryCommand(AddDrawerCommand, before, after);
   setSelectedId(drawerNodes[0].id);
   renderAll();
-}
-
-function confirmSelectedDrawer() {
-  const catalogEntry = MATERIAL_CATALOG[0];
-  confirmDrawerMode({ material: catalogEntry?.name, thicknessMm: catalogEntry?.thicknessMm ?? 18 }, handleDrawerConfirmed);
 }
 
 // Maps a relayoutBox() result (see features/box.js) to the exact same
@@ -665,8 +716,8 @@ window.addEventListener('keydown', (e) => {
 
   if (e.key === 'Escape' && isCollinearActive()) cancelCollinearMode();
   if (e.key === 'Escape' && getShelfMode()) cancelShelfMode();
-  if (e.key === 'Escape' && (isDoorPickActive() || isDoorConfirmActive())) cancelDoorMode();
-  if (e.key === 'Escape' && (isDrawerPickActive() || isDrawerConfirmActive())) cancelDrawerMode();
+  if (e.key === 'Escape' && isDoorPickActive()) cancelDoorMode();
+  if (e.key === 'Escape' && isDrawerPickActive()) cancelDrawerMode();
 
   if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
     e.preventDefault();
@@ -689,6 +740,8 @@ const view3dBtn = document.getElementById('view-3d-btn');
 const view2dBtn = document.getElementById('view-2d-btn');
 const hintBar3d = document.getElementById('hint-bar-3d');
 const hintBar2d = document.getElementById('hint-bar-2d');
+const hintBarTool = document.getElementById('hint-bar-tool');
+const bottomHintBarEl = document.getElementById('bottom-hint-bar');
 
 function switchView(mode) {
   setSelectedId(null); // deselect on every mode switch — no gizmo/handle can be left stuck
@@ -696,13 +749,56 @@ function switchView(mode) {
   const is3d = mode === '3d';
   view3dBtn.classList.toggle('active', is3d);
   view2dBtn.classList.toggle('active', !is3d);
-  hintBar3d.style.display = is3d ? '' : 'none';
-  hintBar2d.style.display = is3d ? 'none' : '';
+  currentViewIs3d = is3d;
+  updateToolHint();
   renderAll();
 }
 
 view3dBtn.addEventListener('click', () => switchView('3d'));
 view2dBtn.addEventListener('click', () => switchView('2d'));
+
+// -------------------------------------------------------------
+// BOTTOM HINT BAR. Default state (no tool running) shows the
+// move/pan/select hints for whichever view is active — same
+// content hint-bar-3d/2d always had, just relocated to the
+// bottom bar. The moment a tool starts, its own instructions
+// replace them there; cancelling/confirming reverts to the
+// default. Driven entirely off each tool's own isXActive()/
+// getXMode() getters, so it can't drift out of sync — see the
+// bottom of renderAll(), which every start/cancel/confirm call
+// already runs via each tool's context.renderAll().
+// -------------------------------------------------------------
+let currentViewIs3d = true;
+
+const TOOL_HINTS = {
+  collinear: 'Collinear: click a face/edge on one panel, then a parallel face/edge on another panel to align them · Esc: cancel',
+  shelfHorizontal: 'Horizontal shelf: pick one boundary of the box, then the opposite boundary, to span a shelf between them · Esc: cancel',
+  shelfVertical: 'Vertical shelf: pick one boundary of the box, then the opposite boundary, to span a shelf between them · Esc: cancel',
+  doorPick: 'Add door: pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or a shelf) to place the door — it\'s added immediately, in/in/in/in · Esc: cancel',
+  drawerPick: 'Add drawer: pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or a shelf) to place the drawers — added immediately, in/in/in/in · Esc: cancel',
+};
+
+function updateToolHint() {
+  let hint = null;
+  if (isCollinearActive()) hint = TOOL_HINTS.collinear;
+  else if (getShelfMode() === 'horizontal') hint = TOOL_HINTS.shelfHorizontal;
+  else if (getShelfMode() === 'vertical') hint = TOOL_HINTS.shelfVertical;
+  else if (isDoorPickActive()) hint = TOOL_HINTS.doorPick;
+  else if (isDrawerPickActive()) hint = TOOL_HINTS.drawerPick;
+
+  if (hint) {
+    hintBarTool.textContent = hint;
+    hintBarTool.style.display = '';
+    hintBar3d.style.display = 'none';
+    hintBar2d.style.display = 'none';
+    bottomHintBarEl?.classList.add('tool-active');
+  } else {
+    hintBarTool.style.display = 'none';
+    hintBar3d.style.display = currentViewIs3d ? '' : 'none';
+    hintBar2d.style.display = currentViewIs3d ? 'none' : '';
+    bottomHintBarEl?.classList.remove('tool-active');
+  }
+}
 
 // 'Delete' is what a browser reports for the key regardless of
 // keyboard layout label — French AZERTY's "Suppr" key is the same
@@ -1032,26 +1128,10 @@ function renderAll() {
     onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), startShelfMode('horizontal'))),
     onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), startShelfMode('vertical'))),
     shelfMode: getShelfMode(),
-    onAddDoor: () => ((isDoorPickActive() || isDoorConfirmActive()) ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDrawerMode(), startDoorMode())),
-    doorToolActive: isDoorPickActive() || isDoorConfirmActive(),
-    doorConfirmActive: isDoorConfirmActive(),
-    doorEdgeFit: getDoorEdgeFit(),
-    onDoorEdgeFitChange: setDoorEdgeFitField,
-    doorHinge: getDoorHinge(),
-    onDoorHingeSelect: setDoorHinge,
-    onDoorConfirm: confirmSelectedDoor,
-    onDoorCancel: cancelDoorMode,
-    onAddDrawer: () => ((isDrawerPickActive() || isDrawerConfirmActive()) ? cancelDrawerMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), startDrawerMode())),
-    drawerToolActive: isDrawerPickActive() || isDrawerConfirmActive(),
-    drawerConfirmActive: isDrawerConfirmActive(),
-    drawerEdgeFit: getDrawerEdgeFit(),
-    onDrawerEdgeFitChange: setDrawerEdgeFitField,
-    drawerCount: getDrawerCount(),
-    onDrawerCountChange: setDrawerCount,
-    onDrawerConfirm: confirmSelectedDrawer,
-    onDrawerCancel: cancelDrawerMode,
-    onOpenCutList: openCutListWindow,
-    onNestCutList: openNestingPlan,
+    onAddDoor: () => (isDoorPickActive() ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDrawerMode(), startDoorMode())),
+    doorToolActive: isDoorPickActive(),
+    onAddDrawer: () => (isDrawerPickActive() ? cancelDrawerMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), startDrawerMode())),
+    drawerToolActive: isDrawerPickActive(),
   });
 
   renderInspectorOnly();
@@ -1062,6 +1142,8 @@ function renderAll() {
   stageLabelEl.textContent = `${visiblePanels.length} node(s) · constraints active`;
 
   checkJointWarnings(resolvedWithCodes);
+
+  updateToolHint();
 }
 
 function renderInspectorOnly() {
@@ -1133,6 +1215,8 @@ function renderInspectorOnly() {
       onEdgeFitChange: applyPendingEdgeFit,
       onToggleDoorOpen: toggleSelectedDoorOpen,
       onDoorHingeChange: updateSelectedDoorHinge,
+      onDrawerFrontEdgeFitChange: updateSelectedDrawerFrontEdgeFit,
+      onDrawerFrontCountChange: updateSelectedDrawerFrontCount,
     });
   }
 
@@ -1643,6 +1727,107 @@ function updateSelectedDoorHinge(hinge) {
   renderAll();
 }
 
+// A door's edgeFit edit reuses the generic updatePendingEdgeFit/
+// applyPendingEdgeFit (relayoutBox -> applyDoorAdjustmentsForGroup)
+// fine, because a door is the only front on its boundary. A drawer
+// stack is N fronts that all share ONE edgeFit (see
+// features/drawer.js#computeDrawerRecompute, which reads it off
+// whichever front happens to be picked as "any" representative of the
+// stack) — patching only the clicked front through that same generic
+// path would leave its siblings holding the OLD edgeFit, and the next
+// recompute could pick one of those and silently discard the edit.
+// So this writes the new value to every front in the stack up front,
+// then recomputes once — no relayoutBox involved, since the boundary
+// itself hasn't changed, only the stack's own fit.
+function updateSelectedDrawerFrontEdgeFit(edge, value) {
+  const selectedId = getSelectedId();
+  const node = panels.find((p) => p.id === selectedId);
+  if (!node || !node.isDrawerFront || node.edgeFit?.[edge] === value) return;
+
+  const newEdgeFit = { ...node.edgeFit, [edge]: value };
+  const before = panels;
+  panels = panels.map((p) =>
+    p.isDrawerFront && p.drawerStackId === node.drawerStackId
+      ? { ...p, edgeFit: newEdgeFit }
+      : p
+  );
+  panels = applyDrawerAdjustmentsForGroup(panels, node.groupId);
+  const after = panels;
+  recordHistoryCommand(ChangeEdgeFitCommand, before, after);
+  renderAll();
+}
+
+// Changing how many drawers a stack has, unlike edge fit above, isn't
+// a matter of recomputing the EXISTING fronts in place — equal
+// subdivision at a different count means a different number of front
+// nodes entirely, and features/drawer.js#computeDrawerRecompute
+// deliberately refuses to touch a stack at all once drawerCount and
+// the actual sibling count disagree (see its 'stack-incomplete'
+// check), so there's no patch-in-place path here. Instead this tears
+// down every front (and drawer box) in the stack and rebuilds it from
+// scratch at the new count, reusing the OLD front's boundaryIds/
+// edgeFit/material/thickness/drawerBoxSpec — same shape
+// handleDrawerConfirmed uses to build a stack the first time.
+function updateSelectedDrawerFrontCount(count) {
+  const selectedId = getSelectedId();
+  const node = panels.find((p) => p.id === selectedId);
+  if (!node || !node.isDrawerFront) return;
+
+  const newCount = Math.round(Number(count));
+  if (!Number.isFinite(newCount) || newCount < 1 || newCount > MAX_DRAWER_COUNT || newCount === node.drawerCount) return;
+
+  const boundaryNodes = Object.values(node.boundaryIds || {}).map((id) => panels.find((p) => p.id === id));
+  if (boundaryNodes.some((n) => !n)) {
+    showToast("Can't resize this drawer stack — one of its boundary panels is gone");
+    return;
+  }
+  const boundaryResult = computeBoundaryRectangle(panels, boundaryNodes);
+  if (!boundaryResult.ok) {
+    showToast("Can't resize this drawer stack right now");
+    return;
+  }
+
+  const placement = computeDrawerFrontsPlacement(panels, boundaryResult, node.edgeFit, {
+    material: node.material,
+    thicknessMm: node.thickness,
+    count: newCount,
+  });
+  if (!placement.ok) {
+    showToast(placement.reason === 'panel-too-short'
+      ? "Too many drawers for this opening's height"
+      : "Can't resize this drawer stack right now");
+    return;
+  }
+
+  const before = panels;
+
+  const oldFrontIds = panels
+    .filter((p) => p.isDrawerFront && p.drawerStackId === node.drawerStackId)
+    .map((p) => p.id);
+  panels = panels.filter((p) =>
+    !oldFrontIds.includes(p.id) && !(p.isDrawerBoxPanel && oldFrontIds.includes(p.drawerBoxFrontId))
+  );
+
+  placement.panelPatches.forEach((patch) => {
+    panels = applyPanelPatch(panels, patch, placement.normalAxis);
+  });
+
+  const newFronts = createDrawerFrontNodes(panels, placement, node.drawerBoxSpec);
+  panels = [...panels, ...newFronts];
+
+  newFronts.forEach((front) => {
+    const boxPlacement = computeDrawerBoxPlacement(panels, front, front.drawerBoxSpec);
+    if (boxPlacement.ok) {
+      panels = [...panels, ...createDrawerBoxNodes(panels, boxPlacement)];
+    }
+  });
+
+  const after = panels;
+  recordHistoryCommand(AddDrawerCommand, before, after); // rebuilding the stack is closer to "add" than any edit command
+  setSelectedId(newFronts[0].id);
+  renderAll();
+}
+
 // -------------------------------------------------------------
 // Relation (constraint) CRUD — manual spansBetween/attachedTo
 // creation now happens via the collinear tool and the shelf tool,
@@ -1713,4 +1898,84 @@ async function bootstrap() {
   handleAddBox();
   history.clear();
 }
-bootstrap();
+
+// Coming back from the dashboard's "Get PDF" buttons: ?exportPdf=cutlist|bom|assembly
+// fires the matching real export from here — the same code the topbar
+// buttons run, on whatever panels this modeller session currently has.
+// NOTE: the modeller doesn't persist a design across page loads (bootstrap()
+// above always starts from a fresh default box) so this only reproduces the
+// dashboard's confirmed PDF if the design is still the one built in this
+// same session — real per-project persistence would need to fix that first.
+// First-visit walkthrough: Add Box → Attach → Cut List. Shown once
+// per browser (localStorage 'dm_onboarding_seen'), and skipped when
+// arriving here for a dashboard PDF export — that's a returning user
+// mid-task, not someone who needs the tour.
+const ONBOARDING_STEPS = [
+  {
+    title: 'Start with a box',
+    text: 'Every design begins with a box — the base shape for a piece of furniture. Add one from the Building Components panel on the left.',
+  },
+  {
+    title: 'Join panels together',
+    text: 'Use Attach to connect two panels into a joint — the modeller detects the contact and lets you confirm the type.',
+  },
+  {
+    title: 'Get your cut list',
+    text: 'Once the design looks right, open the Cut List from the top bar to see it broken into ready-to-cut panels.',
+  },
+];
+
+function runOnboarding() {
+  if (localStorage.getItem('dm_onboarding_seen')) return;
+
+  let step = 0;
+  const overlay = document.getElementById('onboarding-overlay');
+  const titleEl = document.getElementById('onboarding-title');
+  const textEl = document.getElementById('onboarding-text');
+  const dotsEl = document.getElementById('onboarding-step-dots');
+  const nextBtn = document.getElementById('onboarding-next');
+  const skipBtn = document.getElementById('onboarding-skip');
+  if (!overlay) return;
+
+  function render() {
+    titleEl.textContent = ONBOARDING_STEPS[step].title;
+    textEl.textContent = ONBOARDING_STEPS[step].text;
+    dotsEl.innerHTML = ONBOARDING_STEPS
+      .map((_, i) => `<span class="${i === step ? 'active' : ''}"></span>`)
+      .join('');
+    nextBtn.textContent = step === ONBOARDING_STEPS.length - 1 ? 'Got it' : 'Next';
+  }
+
+  function close() {
+    overlay.classList.remove('open');
+    localStorage.setItem('dm_onboarding_seen', '1');
+  }
+
+  nextBtn.addEventListener('click', () => {
+    if (step === ONBOARDING_STEPS.length - 1) { close(); return; }
+    step += 1;
+    render();
+  });
+  skipBtn.addEventListener('click', close);
+
+  render();
+  overlay.classList.add('open');
+}
+
+bootstrap().then(() => {
+  const exportPdf = new URLSearchParams(window.location.search).get('exportPdf');
+  if (exportPdf === 'cutlist') {
+    openCutListWindow();
+  } else if (exportPdf === 'nesting') {
+    openNestingPlan();
+  } else if (exportPdf === 'bom') {
+    const rows = getLastBomRows();
+    if (rows.length > 0) exportCutListPdf(rows, { projectName: 'Cut List' });
+  } else if (exportPdf === 'assembly') {
+    const resolved = resolveConstraints(panels);
+    const plan = buildAssemblyPlan(panels);
+    exportAssemblyPlanPdf(plan, resolved, { projectName: 'Assembly Instructions', mode: 'open' });
+  } else {
+    runOnboarding();
+  }
+});

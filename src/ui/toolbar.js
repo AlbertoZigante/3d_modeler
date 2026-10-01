@@ -15,16 +15,21 @@
  *      the Elements section to reach it, since that section already
  *      scrolls independently (overflow-y: auto).
  *
- *   Building Components
+ *   Components
  *      + Vertical panel
  *      + Horizontal panel
  *      + Parallel panel
  *      + Box
  *      + Horizontal shelf
  *      + Vertical shelf
+ *      + Add Door
+ *      + Add Drawer
+ *      + Add Plinth (placeholder — not wired yet)
  *
- *   Building Tools
+ *   Tools
  *      Collinear
+ *      Dimension (placeholder — not wired yet; for imposing a
+ *      distance between elements and/or a panel's size)
  *
  *   Properties (conditional)
  *      Only rendered while a Building Tool is active — shows
@@ -172,6 +177,30 @@ const COMPONENT_ICONS = {
       <rect x="3" y="3" width="10" height="8" />
       <rect x="13" y="3" width="8" height="5" />
       <rect x="3" y="11" width="6" height="10" />
+    </svg>
+  `,
+  // A dashed box (the cabinet body, de-emphasized — context, not the
+  // point) sitting on a solid base strip — the plinth/kick being
+  // added underneath it. Same dashed-for-context convention as
+  // `vertical`/`horizontal` above.
+  plinth: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="5" y="3" width="14" height="12" stroke-dasharray="1.6 2.2" opacity="0.6" />
+      <rect x="4" y="17" width="16" height="4" />
+    </svg>
+  `,
+  // Standard CAD dimension annotation — two extension lines (the
+  // edges being measured) joined by a line with arrowheads pointing
+  // out to each one. Reads as "the distance/size between these two
+  // things is called out here", distinct from every other icon above
+  // (none of which are about measurement).
+  dimension: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="4" y1="5" x2="4" y2="19" />
+      <line x1="20" y1="5" x2="20" y2="19" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <path d="M4 12 L7.2 9.3 M4 12 L7.2 14.7" />
+      <path d="M20 12 L16.8 9.3 M20 12 L16.8 14.7" />
     </svg>
   `,
 };
@@ -341,26 +370,10 @@ export function renderPanelList(
 
     onAddDoor,
     doorToolActive,
-    doorConfirmActive,
-    doorEdgeFit,
-    doorHinge,
-    onDoorHingeSelect,
-    onDoorEdgeFitChange,
-    onDoorConfirm,
-    onDoorCancel,
 
     onAddDrawer,
     drawerToolActive,
-    drawerConfirmActive,
-    drawerEdgeFit,
-    drawerCount,
-    onDrawerEdgeFitChange,
-    onDrawerCountChange,
-    onDrawerConfirm,
-    onDrawerCancel,
 
-    onOpenCutList,
-    onNestCutList,
   }
 ) {
 
@@ -426,13 +439,7 @@ export function renderPanelList(
             collinearGapMm,
             shelfMode,
             doorToolActive,
-            doorConfirmActive,
-            doorEdgeFit,
-            doorHinge,
             drawerToolActive,
-            drawerConfirmActive,
-            drawerEdgeFit,
-            drawerCount,
           })}
         </div>
 
@@ -483,29 +490,6 @@ export function renderPanelList(
             style="display:none;"
           ></button>
 
-
-          <!-- Always the last items in Elements, after every
-               panel/group row however many there are. -->
-          <button
-            type="button"
-            class="cutlist-btn"
-            id="open-cutlist-btn"
-            title="Open the current cut list as a PDF in a new tab"
-          >
-            ${COMPONENT_ICONS.cutlist}
-            <span>Open Cut List (PDF)</span>
-          </button>
-
-          <button
-            type="button"
-            class="cutlist-btn"
-            id="nest-cutlist-btn"
-            title="Pack the current cut list onto stock sheets and open the layout as a PDF"
-          >
-            ${COMPONENT_ICONS.nestingPlan}
-            <span>Nest Cut List (PDF)</span>
-          </button>
-
         </div>
 
       </section>
@@ -530,7 +514,7 @@ export function renderPanelList(
         <div class="toolbar-section-header">
 
           <div class="section-title">
-            Building Components
+            Components
           </div>
 
         </div>
@@ -600,8 +584,35 @@ export function renderPanelList(
               <span class="icon-label">${shelfMode === 'vertical' ? 'Cancel' : 'V. Shelf'}</span>
             </button>
 
-            <div class="component-icon-empty"></div>
-            <div class="component-icon-empty"></div>
+            <button
+              type="button"
+              class="component-icon-btn ${doorToolActive ? 'active' : ''}"
+              id="add-door-btn"
+              title="${doorToolActive ? 'Cancel Add Door (Esc)' : 'Add Door — pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or shelves) to place a door, in/in/in/in — fine-tune the fit and hinge after, by selecting it'}"
+            >
+              ${COMPONENT_ICONS.door}
+              <span class="icon-label">${doorToolActive ? 'Cancel' : 'Add Door'}</span>
+            </button>
+
+            <button
+              type="button"
+              class="component-icon-btn ${drawerToolActive ? 'active' : ''}"
+              id="add-drawer-btn"
+              title="${drawerToolActive ? 'Cancel Add Drawer (Esc)' : 'Add Drawer — pick 4 boundary panels to place 2 stacked drawer fronts, in/in/in/in — fine-tune the fit after, by selecting one'}"
+            >
+              ${COMPONENT_ICONS.drawer}
+              <span class="icon-label">${drawerToolActive ? 'Cancel' : 'Add Drawer'}</span>
+            </button>
+
+            <button
+              type="button"
+              class="component-icon-btn"
+              id="add-plinth-btn"
+              title="Add Plinth — not wired yet"
+            >
+              ${COMPONENT_ICONS.plinth}
+              <span class="icon-label">Plinth</span>
+            </button>
 
           </div>
 
@@ -613,12 +624,12 @@ export function renderPanelList(
       <div
         class="toolbar-section-resizer"
         data-resizer-after="components"
-        title="Drag to resize Building Components"
+        title="Drag to resize Components"
       ></div>
 
 
       <!-- ====================================================
-           BUILDING TOOLS
+           TOOLS
            ==================================================== -->
 
       <section
@@ -629,7 +640,7 @@ export function renderPanelList(
         <div class="toolbar-section-header">
 
           <div class="section-title">
-            Building Tools
+            Tools
           </div>
 
         </div>
@@ -651,22 +662,12 @@ export function renderPanelList(
 
             <button
               type="button"
-              class="component-icon-btn ${doorToolActive ? 'active' : ''}"
-              id="add-door-btn"
-              title="${doorToolActive ? 'Cancel Add Door (Esc)' : 'Add Door — pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or shelves), then set in/out per edge to place a new door/front'}"
+              class="component-icon-btn"
+              id="add-dimension-btn"
+              title="Dimension — set a distance between two elements, or a panel's size — not wired yet"
             >
-              ${COMPONENT_ICONS.door}
-              <span class="icon-label">${doorToolActive ? 'Cancel' : 'Add Door'}</span>
-            </button>
-
-            <button
-              type="button"
-              class="component-icon-btn ${drawerToolActive ? 'active' : ''}"
-              id="add-drawer-btn"
-              title="${drawerToolActive ? 'Cancel Add Drawer (Esc)' : 'Add Drawer — pick 4 boundary panels, set in/out per edge and how many drawers, to place stacked drawer front panels (see the drawer feature — front panels only for now)'}"
-            >
-              ${COMPONENT_ICONS.drawer}
-              <span class="icon-label">${drawerToolActive ? 'Cancel' : 'Add Drawer'}</span>
+              ${COMPONENT_ICONS.dimension}
+              <span class="icon-label">Dimension</span>
             </button>
 
           </div>
@@ -820,27 +821,6 @@ export function renderPanelList(
 
 
   /* ==========================================================
-     CUT LIST (PDF) — always last in Elements
-     ========================================================== */
-
-  container
-    .querySelector('#open-cutlist-btn')
-    ?.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onOpenCutList?.();
-    });
-
-  container
-    .querySelector('#nest-cutlist-btn')
-    ?.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onNestCutList?.();
-    });
-
-
-  /* ==========================================================
      BUILDING COMPONENT BUTTONS
      ========================================================== */
 
@@ -979,41 +959,8 @@ export function renderPanelList(
       }
     );
 
-  // The 4 edge-fit selects + hinge select + Confirm/Cancel only exist
-  // in the DOM while doorConfirmActive is true (see
-  // renderPropertiesContent above) — querySelectorAll/querySelector
-  // harmlessly find nothing otherwise.
-  container.querySelectorAll('.door-edge-fit-field').forEach((select) => {
-    select.addEventListener('change', () => {
-      onDoorEdgeFitChange?.(select.dataset.edge, select.value);
-    });
-  });
-
-  container
-    .querySelector('#door-hinge-select')
-    ?.addEventListener('change', (event) => {
-      onDoorHingeSelect?.(event.target.value);
-    });
-
-  container
-    .querySelector('#door-confirm-btn')
-    ?.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onDoorConfirm?.();
-    });
-
-  container
-    .querySelector('#door-confirm-cancel-btn')
-    ?.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onDoorCancel?.();
-    });
-
-
   /* ==========================================================
-     ADD DRAWER (pick 4 boundary panels, set in/out + count, place N stacked fronts)
+     ADD DRAWER (pick 4 boundary panels, place N stacked fronts)
      ========================================================== */
 
   container
@@ -1030,47 +977,6 @@ export function renderPanelList(
         onAddDrawer?.();
       }
     );
-
-  // Same "only exists while confirming" reasoning as the door block
-  // above — querySelectorAll/querySelector harmlessly find nothing
-  // otherwise.
-  container.querySelectorAll('.drawer-edge-fit-field').forEach((select) => {
-    select.addEventListener('change', () => {
-      onDrawerEdgeFitChange?.(select.dataset.edge, select.value);
-    });
-  });
-
-  // 'change' (fires on blur/Enter), not 'input' (fires per keystroke)
-  // — this field re-renders the WHOLE toolbar on every call (same as
-  // the edge-fit selects above), which overwrites the input's own
-  // value attribute from the just-clamped state. On 'input' that fight
-  // happens on every keystroke: clearing the field to type a fresh
-  // "10" hits an empty string first, which parses to 0, clamps to 1,
-  // and re-renders the field back to "1" before the second digit can
-  // ever be typed. 'change' only commits once the person is done
-  // typing (leaves the field or presses Enter), so mid-typing states
-  // are never fought.
-  container
-    .querySelector('#drawer-count-input')
-    ?.addEventListener('change', (event) => {
-      onDrawerCountChange?.(event.target.value);
-    });
-
-  container
-    .querySelector('#drawer-confirm-btn')
-    ?.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onDrawerConfirm?.();
-    });
-
-  container
-    .querySelector('#drawer-confirm-cancel-btn')
-    ?.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onDrawerCancel?.();
-    });
 
 
   const gapInput =
@@ -1121,13 +1027,7 @@ function renderPropertiesContent({
   collinearGapMm,
   shelfMode,
   doorToolActive,
-  doorConfirmActive,
-  doorEdgeFit,
-  doorHinge,
   drawerToolActive,
-  drawerConfirmActive,
-  drawerEdgeFit,
-  drawerCount,
 }) {
 
   if (collinearActive) {
@@ -1183,69 +1083,13 @@ function renderPropertiesContent({
     `;
   }
 
-  if (doorConfirmActive) {
-    return `
-      <div class="properties-section-content">
-        <div class="properties-hint">
-          Set in/out per edge and pick a hinge side, then Confirm to place the door — the 4 boundary panels adjust automatically to avoid penetrating it.
-        </div>
-        ${EDGE_FIT_ROWS.map(([edge, label]) => `
-          <div class="field-row">
-            <label>${label}</label>
-            <select class="field-input door-edge-fit-field" data-edge="${edge}">
-              <option value="in" ${(doorEdgeFit || {})[edge] !== 'out' ? 'selected' : ''}>In (inset)</option>
-              <option value="out" ${(doorEdgeFit || {})[edge] === 'out' ? 'selected' : ''}>Out (overlay)</option>
-            </select>
-          </div>
-        `).join('')}
-        <div class="field-row">
-          <label>Hinge side</label>
-          <select class="field-input" id="door-hinge-select">
-            <option value="left" ${doorHinge !== 'right' ? 'selected' : ''}>Left</option>
-            <option value="right" ${doorHinge === 'right' ? 'selected' : ''}>Right</option>
-          </select>
-        </div>
-        <div class="properties-gap-row">
-          <button type="button" class="add-btn" id="door-confirm-btn">Confirm</button>
-          <button type="button" class="remove-btn" id="door-confirm-cancel-btn">Cancel</button>
-        </div>
-      </div>
-    `;
-  }
-
   if (doorToolActive) {
     return `
       <div class="properties-section-content">
         <div class="properties-hint">
           Pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or shelves) to place a door into.
           Two of one boundary type + two of another; whichever axis is left over becomes the door's facing direction.
-        </div>
-      </div>
-    `;
-  }
-
-  if (drawerConfirmActive) {
-    return `
-      <div class="properties-section-content">
-        <div class="properties-hint">
-          Set in/out per edge and how many drawers, then Confirm to place the front panels — the 4 boundary panels adjust automatically to avoid penetrating them, same as a door.
-        </div>
-        ${EDGE_FIT_ROWS.map(([edge, label]) => `
-          <div class="field-row">
-            <label>${label}</label>
-            <select class="field-input drawer-edge-fit-field" data-edge="${edge}">
-              <option value="in" ${(drawerEdgeFit || {})[edge] !== 'out' ? 'selected' : ''}>In (inset)</option>
-              <option value="out" ${(drawerEdgeFit || {})[edge] === 'out' ? 'selected' : ''}>Out (overlay)</option>
-            </select>
-          </div>
-        `).join('')}
-        <div class="field-row">
-          <label>Number of drawers</label>
-          <input type="number" class="field-input" id="drawer-count-input" min="1" max="10" step="1" value="${escapeAttribute(Number(drawerCount ?? 1))}" />
-        </div>
-        <div class="properties-gap-row">
-          <button type="button" class="add-btn" id="drawer-confirm-btn">Confirm</button>
-          <button type="button" class="remove-btn" id="drawer-confirm-cancel-btn">Cancel</button>
+          The door is placed immediately, in/in/in/in with the handle on the left — select it afterward to fine-tune the fit and hinge side.
         </div>
       </div>
     `;
@@ -1257,6 +1101,7 @@ function renderPropertiesContent({
         <div class="properties-hint">
           Pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or shelves) to place drawer front(s) into.
           Two of one boundary type + two of another; whichever axis is left over becomes the front's facing direction.
+          2 drawers are placed immediately, in/in/in/in — select one afterward to fine-tune the fit.
         </div>
       </div>
     `;
@@ -1264,18 +1109,6 @@ function renderPropertiesContent({
 
   return '';
 }
-
-// Same left/right/bottom/top labels features/box.js's own edgeFit
-// uses (ui/properties.js#EDGE_FIT_ROWS) — kept as a second literal
-// here rather than importing across the toolbar/properties module
-// boundary, since both are small, static, and unlikely to diverge;
-// if they ever need to, that's the sign to actually share a module.
-const EDGE_FIT_ROWS = [
-  ['left', 'Left edge'],
-  ['right', 'Right edge'],
-  ['bottom', 'Bottom edge'],
-  ['top', 'Top edge'],
-];
 
 
 /* ============================================================
@@ -1598,11 +1431,18 @@ function appendPanelRow(
 
 
   item.innerHTML = `
-    <span class="id">
-      ${escapeHtml(
-        prefix +
-        getDisplayName(panel)
-      )}
+    <span class="item-label">
+      <span class="id">
+        ${escapeHtml(
+          prefix +
+          getDisplayName(panel)
+        )}
+      </span>
+      ${
+        panel.pieceCode
+          ? `<span class="piece-code">${escapeHtml(panel.pieceCode)}</span>`
+          : ''
+      }
     </span>
   `;
 

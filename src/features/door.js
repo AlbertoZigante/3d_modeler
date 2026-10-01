@@ -30,7 +30,7 @@ import { computeBoundaryRectangle } from '../shared/geometry.js';
 import { computeFrontFit, dimFieldForAxis, ROTATION_FOR_NORMAL_AXIS } from '../shared/frontFit.js';
 
 export const DEFAULT_DOOR_EDGE_FIT = { left: 'in', right: 'in', bottom: 'in', top: 'in' };
-export const DEFAULT_DOOR_HINGE = 'left';
+export const DEFAULT_DOOR_HINGE = 'right';
 
 export { ROTATION_FOR_NORMAL_AXIS };
 
@@ -63,7 +63,16 @@ export function computeDoorPlacement(panels, boundaryResult, edgeFit, doorSpec) 
       centerN: front.centerN,
       thicknessMm: doorSpec.thicknessMm,
       material: doorSpec.material,
-      hinge: doorSpec.hinge === 'right' ? 'right' : DEFAULT_DOOR_HINGE,
+      // Was `doorSpec.hinge === 'right' ? 'right' : DEFAULT_DOOR_HINGE` —
+      // silently correct only by coincidence while DEFAULT_DOOR_HINGE
+      // was 'left' (the same value any non-'right' input fell back
+      // to). Now that the default is 'right', that same fallback
+      // clobbered an explicit 'left' choice back to 'right' — a door
+      // confirmed with its handle set to the right (hinge:'left')
+      // was actually being stored as hinge:'right', so its open
+      // animation swung from the wrong edge. This only treats a truly
+      // missing/invalid value as "use the default".
+      hinge: doorSpec.hinge === 'left' || doorSpec.hinge === 'right' ? doorSpec.hinge : DEFAULT_DOOR_HINGE,
       doorSign: front.sign, // which way the door's own outer face points — see computeDoorOpenTransform below, which reuses this instead of re-deriving it
       edgeFit: front.edgeFit, // the fully-defaulted fit actually used — createDoorNode stores this on the node so a later recompute reuses the SAME fit rather than falling back to DEFAULT_DOOR_EDGE_FIT
       // The 4 boundary panels' own ids, keyed the same way

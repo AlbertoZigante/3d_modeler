@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard — Furniture Modeller</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #faf3e6;
+    color: #3a3126;
+  }
+
+  body {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* =========================================================
+     MOBILE SIDEBAR TOGGLE
+     ========================================================= */
+
+  #sidebar-toggle {
+    display: none;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 30;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid #e6dcc9;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+  #sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.35);
+    z-index: 19;
+  }
+
+  @media (max-width: 768px) {
+    #sidebar-toggle { display: block; }
+
+    #sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: 20;
+      transform: translateX(-100%);
+      transition: transform .2s ease;
+      box-shadow: 4px 0 20px rgba(0,0,0,.15);
+    }
+
+    #sidebar.open { transform: translateX(0); }
+
+    #sidebar.open ~ #sidebar-backdrop { display: block; }
+
+    #main { padding-top: 64px; }
+  }
+
+  /* =========================================================
+     LEFT SIDEBAR — user info + project list
+     ========================================================= */
+
+  #sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: #fbf3e6;
+    border-right: 1px solid #e6dcc9;
+    display: flex;
+    flex-direction: column;
+    padding: 24px 18px;
+    gap: 26px;
+  }
+
+  .user-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .user-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #d97742;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .user-name {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .user-email {
+    font-size: 11px;
+    color: #a4977f;
+  }
+
+  .account-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .account-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11.5px;
+  }
+
+  .account-row-label {
+    color: #a4977f;
+  }
+
+  .account-row-value {
+    font-weight: 600;
+    text-align: right;
+  }
+
+  .plan-badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #ece0cc;
+    color: #a4977f;
+  }
+
+  .plan-badge.pro {
+    background: #d97742;
+    color: #fff;
+  }
+
+  #manage-billing-btn {
+    padding: 7px 8px;
+    font-size: 11.5px;
+    border-radius: 6px;
+    border: 1px solid #e6dcc9;
+    background: #fbf3e6;
+    color: #3a3126;
+    cursor: pointer;
+  }
+
+  .sidebar-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #a4977f;
+    margin-bottom: 8px;
+  }
+
+  #project-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+  }
+
+  .project-item {
+    text-align: left;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid #e6dcc9;
+    background: #fff;
+    font-size: 12px;
+    color: #3a3126;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,.03);
+    transition: box-shadow .15s, border-color .15s;
+  }
+
+  .project-item:hover {
+    border-color: #d5c5a8;
+    box-shadow: 0 3px 10px rgba(0,0,0,.06);
+  }
+
+  .project-item.active {
+    border-color: #d97742;
+    background: #fce6d2;
+    font-weight: 600;
+  }
+
+  .project-progress {
+    display: block;
+    margin-top: 3px;
+    font-size: 10px;
+    font-weight: 400;
+    color: #a4977f;
+  }
+
+  .project-item.active .project-progress { color: #b5601f; }
+
+  #new-project-btn {
+    margin-top: 4px;
+    padding: 8px 10px;
+    font-size: 12px;
+    border-radius: 6px;
+    border: 1px dashed #c9b998;
+    background: transparent;
+    color: #a4977f;
+    cursor: pointer;
+  }
+
+  /* =========================================================
+     MAIN AREA
+     ========================================================= */
+
+  #main {
+    flex: 1;
+    padding: 36px 40px;
+    overflow-y: auto;
+  }
+
+  #project-title {
+    font-size: 21px;
+    font-weight: 700;
+    margin-bottom: 28px;
+  }
+
+  #pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex-wrap: wrap;
+  }
+
+  .step-card {
+    width: 240px;
+    background: #fff;
+    border: 1px solid #e6dcc9;
+    border-radius: 12px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    transition: box-shadow .15s;
+  }
+
+  .step-card:hover {
+    box-shadow: 0 6px 18px rgba(0,0,0,.08);
+  }
+
+  .step-card.confirmed {
+    border-color: #4a9a68;
+    background: #eef8f0;
+  }
+
+  .step-connector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  .step-connector .line {
+    height: 2px;
+    width: 100%;
+    background: #e6dcc9;
+    transition: background .2s;
+  }
+
+  .step-connector.filled .line { background: #4a9a68; }
+
+  .step-connector .chevron {
+    position: absolute;
+    color: #c9b998;
+    font-size: 13px;
+    background: #faf3e6;
+    padding: 0 2px;
+  }
+
+  .step-connector.filled .chevron { color: #4a9a68; }
+
+  .step-badge {
+    align-self: flex-start;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 10px;
+    background: #ece0cc;
+    color: #a4977f;
+  }
+
+  .step-card.confirmed .step-badge {
+    background: #4a9a68;
+    color: #fff;
+  }
+
+  .step-title {
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .step-description {
+    font-size: 11.5px;
+    color: #6b6560;
+    line-height: 1.4;
+    flex: 1;
+  }
+
+  .step-price {
+    font-size: 15px;
+    font-weight: 700;
+    color: #d97742;
+  }
+
+  .step-preview {
+    height: 70px;
+    border: 1px dashed #d5c5a8;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #a4977f;
+    text-align: center;
+    padding: 4px;
+    background: #fbf7ee;
+  }
+
+  .step-card.confirmed .step-preview {
+    border-style: solid;
+    border-color: #bfe0cb;
+    color: #4a9a68;
+    background: #fff;
+  }
+
+  .doc-mock {
+    width: 44px;
+    height: 56px;
+    background: #fff;
+    border: 1px solid #d5c5a8;
+    border-radius: 3px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.08);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 6px 5px;
+  }
+
+  .doc-mock span {
+    display: block;
+    height: 2px;
+    background: #e6dcc9;
+    border-radius: 1px;
+  }
+
+  .doc-mock span:nth-child(1) { width: 70%; }
+  .doc-mock span:nth-child(2) { width: 90%; }
+  .doc-mock span:nth-child(3) { width: 55%; }
+
+  .step-card.confirmed .doc-mock span { background: #bfe0cb; }
+
+  .step-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .step-btn {
+    flex: 1;
+    padding: 7px 8px;
+    font-size: 11.5px;
+    border-radius: 6px;
+    border: 1px solid #e6dcc9;
+    background: #fbf3e6;
+    color: #3a3126;
+    cursor: pointer;
+  }
+
+  .step-btn.primary {
+    background: #d97742;
+    border-color: #d97742;
+    color: #fff;
+  }
+
+  .step-btn:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+  }
+
+  /* generic modal, shared by preview / payment / billing */
+
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.4);
+    align-items: center;
+    justify-content: center;
+    z-index: 40;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 22px;
+    width: 360px;
+    max-width: 90vw;
+    box-shadow: 0 16px 44px rgba(0,0,0,.2);
+  }
+
+  .modal-card h3 { font-size: 15px; margin-bottom: 12px; }
+
+  .modal-card .step-preview { height: 220px; font-size: 12px; }
+
+  .modal-close,
+  .modal-primary {
+    margin-top: 14px;
+    width: 100%;
+    padding: 9px;
+    border-radius: 7px;
+    border: 1px solid #e6dcc9;
+    background: #fbf3e6;
+    cursor: pointer;
+    font-size: 12.5px;
+  }
+
+  .modal-primary {
+    background: #d97742;
+    border-color: #d97742;
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .modal-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+
+  .modal-field label {
+    font-size: 11px;
+    color: #a4977f;
+  }
+
+  .modal-field input {
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid #e6dcc9;
+    font-size: 13px;
+  }
+
+  .modal-field-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .modal-field-row .modal-field { flex: 1; }
+
+  .modal-note {
+    font-size: 11px;
+    color: #a4977f;
+    line-height: 1.4;
+  }
+</style>
+</head>
+<body>
+
+  <button type="button" id="sidebar-toggle" aria-label="Toggle menu">☰</button>
+
+  <div id="sidebar">
+
+    <a href="./index.html" style="font-size:11px;color:#a4977f;text-decoration:none;">← Home</a>
+
+    <div class="account-card">
+      <div class="user-card">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div>
+          <div class="user-name" id="user-name">—</div>
+          <div class="user-email" id="user-email">—</div>
+        </div>
+      </div>
+
+      <div class="account-row">
+        <span class="account-row-label">Plan</span>
+        <span class="plan-badge" id="user-plan">—</span>
+      </div>
+
+      <div class="account-row">
+        <span class="account-row-label">Projects</span>
+        <span class="account-row-value" id="user-project-count">—</span>
+      </div>
+
+      <div class="account-row">
+        <span class="account-row-label">Payment method</span>
+        <span class="account-row-value" id="user-payment-method">—</span>
+      </div>
+
+      <div class="account-row">
+        <span class="account-row-label">Member since</span>
+        <span class="account-row-value" id="user-member-since">—</span>
+      </div>
+
+      <button type="button" id="manage-billing-btn">Manage billing</button>
+    </div>
+
+    <div>
+      <div class="sidebar-section-title">Projects</div>
+      <div id="project-list"></div>
+      <button type="button" id="new-project-btn">+ New project</button>
+    </div>
+
+  </div>
+
+  <div id="sidebar-backdrop"></div>
+
+  <div id="main">
+    <div id="project-title">—</div>
+    <div id="pipeline"></div>
+  </div>
+
+  <div class="modal-overlay" id="preview-overlay">
+    <div class="modal-card">
+      <h3 id="preview-modal-title"></h3>
+      <div class="step-preview" id="preview-modal-body"></div>
+      <button type="button" class="modal-close" id="preview-close">Close</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="pay-overlay">
+    <div class="modal-card">
+      <h3 id="pay-modal-title"></h3>
+      <p class="modal-note" id="pay-modal-note" style="margin-bottom:12px;"></p>
+      <div class="modal-field">
+        <label for="pay-card-number">Card number</label>
+        <input id="pay-card-number" type="text" placeholder="4242 4242 4242 4242" />
+      </div>
+      <div class="modal-field-row">
+        <div class="modal-field">
+          <label for="pay-expiry">Expiry</label>
+          <input id="pay-expiry" type="text" placeholder="MM / YY" />
+        </div>
+        <div class="modal-field">
+          <label for="pay-cvc">CVC</label>
+          <input id="pay-cvc" type="text" placeholder="123" />
+        </div>
+      </div>
+      <p class="modal-note">Test mode — no card is charged, this only marks the step as confirmed.</p>
+      <button type="button" class="modal-primary" id="pay-confirm-btn"></button>
+      <button type="button" class="modal-close" id="pay-cancel-btn">Cancel</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="billing-overlay">
+    <div class="modal-card">
+      <h3>Manage billing</h3>
+      <p class="modal-note" style="margin-bottom:14px;">Billing management is coming soon — you'll be able to update your plan and payment method here.</p>
+      <button type="button" class="modal-close" id="billing-close-btn">Close</button>
+    </div>
+  </div>
+
+<script type="module">
+
+  /*
+   * Prototype dashboard: user + projects and their per-project
+   * document pipeline. There's no backend yet, so everything is
+   * kept in localStorage under 'dm_user' / 'dm_projects' /
+   * 'dm_current_project'. The 3D modeller (modeller.html) hands
+   * off here via the Validate button, which marks the '3d-model'
+   * step of the current project as confirmed before navigating —
+   * see modeller-main.js's validate-btn listener.
+   */
+
+  const STEP_DEFS = [
+    {
+      key: 'model',
+      label: '3D Model',
+      description: 'Full parametric 3D model of your furniture piece, ready for review.',
+      price: '€9',
+      exportPdf: null, // no standalone PDF for this step — it's the design itself
+    },
+    {
+      key: 'cutlist',
+      label: 'Cut List + Nesting',
+      description: 'Optimised cut list with panel nesting layout, ready to send to your supplier.',
+      price: '€6',
+      exportPdf: 'cutlist',
+    },
+    {
+      key: 'bom',
+      label: 'Bill of Materials',
+      description: 'Complete parts, hardware and fastener list with quantities.',
+      price: '€4',
+      exportPdf: 'bom',
+    },
+    {
+      key: 'assembly',
+      label: 'Assembly Instructions',
+      description: 'Step-by-step illustrated guide for putting the piece together.',
+      price: '€7',
+      exportPdf: 'assembly',
+    },
+  ];
+
+  function loadUser() {
+    let user = null;
+    try { user = JSON.parse(localStorage.getItem('dm_user')); } catch {}
+    if (!user) {
+      user = {
+        name: 'Alberto',
+        email: 'alberto@example.com',
+        plan: 'Free',
+        paymentMethod: null, // e.g. { brand: 'Visa', last4: '4242' } once billing is wired
+        memberSince: new Date().toISOString().slice(0, 10),
+      };
+      localStorage.setItem('dm_user', JSON.stringify(user));
+    }
+    return user;
+  }
+
+  function emptySteps() {
+    const steps = {};
+    STEP_DEFS.forEach((s) => { steps[s.key] = { status: 'pending' }; });
+    return steps;
+  }
+
+  function loadProjects() {
+    let projects = null;
+    try { projects = JSON.parse(localStorage.getItem('dm_projects')); } catch {}
+    if (!projects || !projects.length) {
+      projects = [{ id: 'default', name: 'My Project', steps: emptySteps() }];
+      localStorage.setItem('dm_projects', JSON.stringify(projects));
+    }
+    return projects;
+  }
+
+  function saveProjects(projects) {
+    localStorage.setItem('dm_projects', JSON.stringify(projects));
+  }
+
+  const user = loadUser();
+  let projects = loadProjects();
+
+  const params = new URLSearchParams(window.location.search);
+  let currentProjectId =
+    params.get('project') ||
+    localStorage.getItem('dm_current_project') ||
+    projects[0].id;
+
+  // Hand-off from the modeller's Validate button.
+  if (params.get('confirm')) {
+    const project = projects.find((p) => p.id === currentProjectId);
+    if (project && project.steps[params.get('confirm')]) {
+      project.steps[params.get('confirm')].status = 'confirmed';
+      saveProjects(projects);
+    }
+  }
+
+  localStorage.setItem('dm_current_project', currentProjectId);
+
+  // ---- Mobile sidebar toggle ----
+  const sidebarEl = document.getElementById('sidebar');
+  const sidebarToggleBtn = document.getElementById('sidebar-toggle');
+  const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+  sidebarToggleBtn.addEventListener('click', () => sidebarEl.classList.toggle('open'));
+  sidebarBackdrop.addEventListener('click', () => sidebarEl.classList.remove('open'));
+
+  document.getElementById('user-name').textContent = user.name;
+  document.getElementById('user-email').textContent = user.email;
+  document.getElementById('user-avatar').textContent = user.name.charAt(0).toUpperCase();
+
+  const planBadge = document.getElementById('user-plan');
+  planBadge.textContent = user.plan;
+  planBadge.classList.toggle('pro', user.plan !== 'Free');
+
+  document.getElementById('user-project-count').textContent = projects.length;
+
+  document.getElementById('user-payment-method').textContent = user.paymentMethod
+    ? `${user.paymentMethod.brand} •••• ${user.paymentMethod.last4}`
+    : 'Not added';
+
+  document.getElementById('user-member-since').textContent = user.memberSince;
+
+  // "Manage billing" — no real billing flow yet, so this just explains that.
+  document.getElementById('manage-billing-btn').addEventListener('click', () => {
+    document.getElementById('billing-overlay').classList.add('open');
+  });
+  document.getElementById('billing-close-btn').addEventListener('click', () => {
+    document.getElementById('billing-overlay').classList.remove('open');
+  });
+
+  function confirmedCount(project) {
+    return STEP_DEFS.filter((s) => project.steps[s.key]?.status === 'confirmed').length;
+  }
+
+  function renderProjectList() {
+    const listEl = document.getElementById('project-list');
+    listEl.innerHTML = '';
+    projects.forEach((project) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'project-item' + (project.id === currentProjectId ? ' active' : '');
+      btn.innerHTML = `
+        ${project.name}
+        <span class="project-progress">${confirmedCount(project)}/${STEP_DEFS.length} confirmed</span>
+      `;
+      btn.addEventListener('click', () => {
+        currentProjectId = project.id;
+        localStorage.setItem('dm_current_project', currentProjectId);
+        sidebarEl.classList.remove('open');
+        renderProjectList();
+        renderPipeline();
+      });
+      listEl.appendChild(btn);
+    });
+  }
+
+  function openPreview(step, hasDoc) {
+    document.getElementById('preview-modal-title').textContent = step.label + ' — preview';
+    document.getElementById('preview-modal-body').textContent = hasDoc
+      ? 'PDF preview placeholder — a real rendered first page will replace this once the modeller can hand off the generated PDF bytes here.'
+      : 'No document yet — confirm this step to generate one.';
+    document.getElementById('preview-overlay').classList.add('open');
+  }
+
+  document.getElementById('preview-close').addEventListener('click', () => {
+    document.getElementById('preview-overlay').classList.remove('open');
+  });
+
+  // ---- Confirm & Pay (mock — Stripe test mode would replace this) ----
+  let pendingPayStep = null;
+
+  function openPayModal(step) {
+    pendingPayStep = step;
+    document.getElementById('pay-modal-title').textContent = `Confirm ${step.label}`;
+    document.getElementById('pay-modal-note').textContent =
+      `Confirming generates the final ${step.label.toLowerCase()} PDF for this project.`;
+    document.getElementById('pay-confirm-btn').textContent = `Pay ${step.price} & Confirm`;
+    document.getElementById('pay-overlay').classList.add('open');
+  }
+
+  function closePayModal() {
+    pendingPayStep = null;
+    document.getElementById('pay-overlay').classList.remove('open');
+  }
+
+  document.getElementById('pay-cancel-btn').addEventListener('click', closePayModal);
+
+  document.getElementById('pay-confirm-btn').addEventListener('click', () => {
+    if (!pendingPayStep) return;
+    const project = projects.find((p) => p.id === currentProjectId);
+    project.steps[pendingPayStep.key].status = 'confirmed';
+    saveProjects(projects);
+    closePayModal();
+    renderProjectList();
+    renderPipeline();
+  });
+
+  function renderPipeline() {
+    const project = projects.find((p) => p.id === currentProjectId);
+    document.getElementById('project-title').textContent = project.name;
+
+    const pipelineEl = document.getElementById('pipeline');
+    pipelineEl.innerHTML = '';
+
+    STEP_DEFS.forEach((step, index) => {
+      const state = project.steps[step.key] || { status: 'pending' };
+      const confirmed = state.status === 'confirmed';
+      const hasDoc = Boolean(step.exportPdf) || confirmed;
+
+      if (index > 0) {
+        const prevConfirmed = project.steps[STEP_DEFS[index - 1].key]?.status === 'confirmed';
+        const connector = document.createElement('div');
+        connector.className = 'step-connector' + (prevConfirmed ? ' filled' : '');
+        connector.innerHTML = '<div class="line"></div><span class="chevron">›</span>';
+        pipelineEl.appendChild(connector);
+      }
+
+      const card = document.createElement('div');
+      card.className = 'step-card' + (confirmed ? ' confirmed' : '');
+
+      card.innerHTML = `
+        <span class="step-badge">${confirmed ? '✓ Confirmed' : 'Pending'}</span>
+        <div class="step-title">${step.label}</div>
+        <div class="step-description">${step.description}</div>
+        <div class="step-preview" data-role="preview">
+          ${hasDoc ? '<div class="doc-mock"><span></span><span></span><span></span></div>' : 'No document yet'}
+        </div>
+        <div class="step-price">${step.price}</div>
+        <div class="step-actions" data-role="actions"></div>
+      `;
+
+      const actions = card.querySelector('[data-role="actions"]');
+
+      if (step.key === 'model' && confirmed) {
+        const modifyBtn = document.createElement('button');
+        modifyBtn.type = 'button';
+        modifyBtn.className = 'step-btn';
+        modifyBtn.textContent = 'Modify';
+        modifyBtn.addEventListener('click', () => {
+          window.location.href = `./modeller.html?project=${encodeURIComponent(project.id)}`;
+        });
+        actions.appendChild(modifyBtn);
+      }
+
+      if (step.exportPdf && !confirmed) {
+        const confirmBtn = document.createElement('button');
+        confirmBtn.type = 'button';
+        confirmBtn.className = 'step-btn primary';
+        confirmBtn.textContent = 'Confirm & Pay';
+        confirmBtn.addEventListener('click', () => openPayModal(step));
+        actions.appendChild(confirmBtn);
+      }
+
+      const pdfBtn = document.createElement('button');
+      pdfBtn.type = 'button';
+      pdfBtn.className = 'step-btn primary';
+      pdfBtn.textContent = 'Get PDF';
+      // Locked until there's a real export for this step AND it's
+      // confirmed & paid — see the "Confirm & Pay" button above.
+      pdfBtn.disabled = !step.exportPdf || !confirmed;
+      if (step.exportPdf) {
+        pdfBtn.addEventListener('click', () => {
+          if (pdfBtn.disabled) return;
+          // Runs the modeller invisibly in a hidden iframe just long
+          // enough to generate and open the PDF (its own bootstrap()
+          // still does window.open(blobUrl) for the actual PDF tab) —
+          // no visible modeller window/tab, only the PDF appears.
+          const frame = document.createElement('iframe');
+          frame.style.display = 'none';
+          frame.src = `./modeller.html?project=${encodeURIComponent(project.id)}&exportPdf=${step.exportPdf}`;
+          document.body.appendChild(frame);
+          setTimeout(() => frame.remove(), 6000);
+        });
+      }
+      actions.appendChild(pdfBtn);
+
+      card.querySelector('[data-role="preview"]').addEventListener('click', () => {
+        openPreview(step, hasDoc);
+      });
+
+      pipelineEl.appendChild(card);
+    });
+  }
+
+  document.getElementById('new-project-btn').addEventListener('click', () => {
+    const name = window.prompt('Project name');
+    if (!name) return;
+    const project = { id: 'p' + Date.now(), name, steps: emptySteps() };
+    projects.push(project);
+    saveProjects(projects);
+    currentProjectId = project.id;
+    localStorage.setItem('dm_current_project', currentProjectId);
+    document.getElementById('user-project-count').textContent = projects.length;
+    renderProjectList();
+    renderPipeline();
+  });
+
+  renderProjectList();
+  renderPipeline();
+
+</script>
+</body>
+</html>

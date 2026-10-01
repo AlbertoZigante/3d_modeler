@@ -7,6 +7,20 @@ const PAGE_MARGIN_MM = 15;
 const ROW_HEIGHT_MM = 7;
 const HEADER_BLOCK_HEIGHT_MM = 18;
 
+// Shared by every export* function's `mode: 'open'` branch. `newWindow`
+// (passed by the topbar's Ctrl/Cmd-click handling — see modeller-main.js)
+// gives the popup explicit size/chrome features, which is what actually
+// makes browsers spawn a separate window instead of reusing/opening a tab;
+// a plain window.open(url, '_blank') with no features is tab behaviour.
+function openPdfBlob(doc, newWindow) {
+  const url = doc.output('bloburl');
+  if (newWindow) {
+    window.open(url, '_blank', 'noopener,noreferrer,width=1000,height=800');
+  } else {
+    window.open(url, '_blank');
+  }
+}
+
 const COLUMNS = [
   { key: 'label', header: 'Piece', widthMm: 34 },
   { key: 'ids', header: 'ID', widthMm: 20 },
@@ -56,7 +70,7 @@ function drawRow(doc, startX, y, cells) {
  * because window.open() called asynchronously (e.g. after an await)
  * gets silently blocked as a popup by most browsers.
  */
-export function exportCutListPdf(rows, { projectName = 'Cut List', fileName = 'cut-list.pdf', mode = 'save' } = {}) {
+export function exportCutListPdf(rows, { projectName = 'Cut List', fileName = 'cut-list.pdf', mode = 'save', newWindow = false } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageHeight = doc.internal.pageSize.getHeight();
   const usableWidth = COLUMNS.reduce((sum, c) => sum + c.widthMm, 0);
@@ -107,7 +121,7 @@ export function exportCutListPdf(rows, { projectName = 'Cut List', fileName = 'c
   doc.text(`Total area: ${totalAreaM2.toFixed(3)} m²`, startX, y);
 
   if (mode === 'open') {
-    window.open(doc.output('bloburl'), '_blank');
+    openPdfBlob(doc, newWindow);
   } else {
     doc.save(fileName);
   }
@@ -128,7 +142,7 @@ export function exportCutListPdf(rows, { projectName = 'Cut List', fileName = 'c
 
 const TEXT_LINE_HEIGHT_MM = 6;
 
-function renderLinesPdf(lines, { projectName, fileName, mode, countLabel, emptyMessage }) {
+function renderLinesPdf(lines, { projectName, fileName, mode, newWindow, countLabel, emptyMessage }) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageHeight = doc.internal.pageSize.getHeight();
   const startX = PAGE_MARGIN_MM;
@@ -169,7 +183,7 @@ function renderLinesPdf(lines, { projectName, fileName, mode, countLabel, emptyM
   }
 
   if (mode === 'open') {
-    window.open(doc.output('bloburl'), '_blank');
+    openPdfBlob(doc, newWindow);
   } else {
     doc.save(fileName);
   }
@@ -181,9 +195,9 @@ function renderLinesPdf(lines, { projectName, fileName, mode, countLabel, emptyM
  *   intended source (split on '\n' before calling this).
  * @param {{projectName?:string, fileName?:string, mode?:'save'|'open'}} [options]
  */
-export function exportHistoryPdf(lines, { projectName = 'Activity History', fileName = 'activity-history.pdf', mode = 'save' } = {}) {
+export function exportHistoryPdf(lines, { projectName = 'Activity History', fileName = 'activity-history.pdf', mode = 'save', newWindow = false } = {}) {
   renderLinesPdf(lines, {
-    projectName, fileName, mode,
+    projectName, fileName, mode, newWindow,
     countLabel: `${lines.length} action(s)`,
     emptyMessage: 'No actions recorded yet this session.',
   });
@@ -242,7 +256,7 @@ const TABLE_ROW_HEIGHT_MM = 6;
  * @param {ReturnType<typeof import('./hardware.js').buildHardwarePlan>} [hardwarePlan] - optional third table (hinges/runners/fasteners); omitted entirely when not supplied
  * @param {{projectName?:string, fileName?:string, mode?:'save'|'open'}} [options]
  */
-export function exportJointsPdf(report, hardwarePlan, { projectName = 'Joint Report', fileName = 'joint-report.pdf', mode = 'save' } = {}) {
+export function exportJointsPdf(report, hardwarePlan, { projectName = 'Joint Report', fileName = 'joint-report.pdf', mode = 'save', newWindow = false } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageHeight = doc.internal.pageSize.getHeight();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -395,7 +409,7 @@ export function exportJointsPdf(report, hardwarePlan, { projectName = 'Joint Rep
   }
 
   if (mode === 'open') {
-    window.open(doc.output('bloburl'), '_blank');
+    openPdfBlob(doc, newWindow);
   } else {
     doc.save(fileName);
   }
@@ -641,7 +655,7 @@ function drawSheetPage(doc, materialLabel, sheet, sheetNumber, totalSheets) {
  * @param {ReturnType<typeof import('../modeller/nesting.js').summarizeNestingResult>} summary
  * @param {{projectName?:string, fileName?:string, mode?:'save'|'open'}} [options]
  */
-export function exportNestingPdf(nestResults, summary, { projectName = 'Nesting Plan', fileName = 'nesting-plan.pdf', mode = 'save' } = {}) {
+export function exportNestingPdf(nestResults, summary, { projectName = 'Nesting Plan', fileName = 'nesting-plan.pdf', mode = 'save', newWindow = false } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   drawNestingSummaryPage(doc, summary, projectName);
 
@@ -654,7 +668,7 @@ export function exportNestingPdf(nestResults, summary, { projectName = 'Nesting 
   });
 
   if (mode === 'open') {
-    window.open(doc.output('bloburl'), '_blank');
+    openPdfBlob(doc, newWindow);
   } else {
     doc.save(fileName);
   }
@@ -844,7 +858,7 @@ function drawStepDiagram(doc, step, resolvedById, placedIdsSoFar, bounds, box) {
  * @param {Array} resolvedPanels - resolved (not raw) panels, same array the plan's own panel ids resolve against
  * @param {{projectName?:string, fileName?:string, mode?:'save'|'open'}} [options]
  */
-export function exportAssemblyPlanPdf(plan, resolvedPanels, { projectName = 'Assembly Instructions', fileName = 'assembly-instructions.pdf', mode = 'save' } = {}) {
+export function exportAssemblyPlanPdf(plan, resolvedPanels, { projectName = 'Assembly Instructions', fileName = 'assembly-instructions.pdf', mode = 'save', newWindow = false } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const startX = PAGE_MARGIN_MM;
@@ -935,7 +949,7 @@ export function exportAssemblyPlanPdf(plan, resolvedPanels, { projectName = 'Ass
   });
 
   if (mode === 'open') {
-    window.open(doc.output('bloburl'), '_blank');
+    openPdfBlob(doc, newWindow);
   } else {
     doc.save(fileName);
   }

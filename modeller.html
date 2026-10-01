@@ -148,6 +148,41 @@
 
 
     /* =========================================================
+       BOTTOM HINT BAR
+       ========================================================= */
+
+    #bottom-hint-bar {
+      height: 28px;
+
+      background: #f3e8d8;
+
+      border-top:
+        1px solid #e3d3ba;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      padding: 0 16px;
+
+      flex-shrink: 0;
+
+      transition: background .15s, border-color .15s;
+    }
+
+    #bottom-hint-bar.tool-active {
+      background: #fdece0;
+      border-top-color: #d97742;
+    }
+
+    #hint-bar-tool {
+      font-size: 11px;
+      color: #3a3126;
+      font-weight: 600;
+    }
+
+
+    /* =========================================================
        MODE TOGGLE
        ========================================================= */
 
@@ -209,9 +244,71 @@
 
       display: flex;
 
+      align-items: center;
+
       gap: 3px;
 
       margin-left: 4px;
+    }
+
+
+    .btn-cluster {
+
+      display: flex;
+
+      gap: 3px;
+    }
+
+
+    .topbar-divider {
+
+      width: 1px;
+
+      height: 20px;
+
+      background: #e3d3ba;
+
+      margin: 0 8px;
+    }
+
+
+    .history-btn svg {
+
+      width: 15px;
+
+      height: 15px;
+
+      display: block;
+    }
+
+
+    .history-btn.validate-btn {
+
+      width: auto;
+
+      padding: 0 10px;
+
+      gap: 6px;
+
+      background: #3f9142;
+
+      border-color: #3f9142;
+
+      color: #fff;
+
+      font-size: 12px;
+
+      font-weight: 600;
+    }
+
+
+    .history-btn.validate-btn:hover:not(:disabled) {
+
+      background: #357a38;
+
+      border-color: #357a38;
+
+      color: #fff;
     }
 
 
@@ -749,13 +846,45 @@
 
     .list-item .id {
 
-      font-weight: 600;
+      font-weight: 400;
 
       overflow: hidden;
 
       text-overflow: ellipsis;
 
       white-space: nowrap;
+    }
+
+
+    .list-item.selected .id {
+
+      font-weight: 700;
+    }
+
+
+    .list-item .item-label {
+
+      display: flex;
+
+      align-items: baseline;
+
+      gap: 6px;
+
+      overflow: hidden;
+
+      min-width: 0;
+    }
+
+
+    .list-item .piece-code {
+
+      font-size: 10px;
+
+      font-weight: 300;
+
+      color: #a4977f;
+
+      flex-shrink: 0;
     }
 
 
@@ -766,6 +895,12 @@
 
       background:
         #e6edfc;
+    }
+
+
+    .list-item.multi-selected .id {
+
+      font-weight: 700;
     }
 
 
@@ -1791,6 +1926,136 @@
         #3a3126;
     }
 
+
+    /* =========================================================
+       ACTION TOAST (neutral, transient — e.g. "Generating PDF…")
+       ========================================================= */
+
+    #action-toast {
+
+      position: fixed;
+
+      bottom: 40px;
+      right: 20px;
+
+      z-index: 900;
+
+      background: #3a3126;
+
+      color: #fbf3e6;
+
+      border-radius: 8px;
+
+      padding: 9px 16px;
+
+      font-size: 12px;
+      font-weight: 600;
+
+      box-shadow: 0 6px 20px rgba(0,0,0,.25);
+
+      opacity: 0;
+
+      transform: translateY(6px);
+
+      pointer-events: none;
+
+      transition: opacity .15s ease, transform .15s ease;
+    }
+
+    #action-toast.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+
+    /* =========================================================
+       ONBOARDING TOUR
+       ========================================================= */
+
+    #onboarding-overlay {
+
+      display: none;
+
+      position: fixed;
+      inset: 0;
+
+      background: rgba(20,16,10,.55);
+
+      z-index: 950;
+
+      align-items: center;
+      justify-content: center;
+    }
+
+    #onboarding-overlay.open { display: flex; }
+
+    #onboarding-card {
+
+      background: #fbf3e6;
+
+      border-radius: 12px;
+
+      padding: 22px 24px;
+
+      width: 320px;
+
+      max-width: 90vw;
+
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+
+    #onboarding-card h3 {
+      font-size: 15px;
+      margin-bottom: 6px;
+    }
+
+    #onboarding-card p {
+      font-size: 12.5px;
+      color: #6b6560;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    #onboarding-step-dots {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 16px;
+    }
+
+    #onboarding-step-dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #e3d3ba;
+    }
+
+    #onboarding-step-dots span.active { background: #d97742; }
+
+    #onboarding-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    #onboarding-skip {
+      background: none;
+      border: none;
+      color: #a4977f;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    #onboarding-next {
+      background: #d97742;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
   </style>
 
 </head>
@@ -1849,122 +2114,168 @@
     </div>
 
 
+    <div class="spacer"></div>
+
+
     <div
       class="history-controls"
       id="history-controls"
     >
 
-      <button
-        type="button"
-        class="history-btn"
-        id="undo-btn"
-        title="Undo"
-        aria-label="Undo"
-        disabled
-      >
-        ↶
-      </button>
+      <div class="btn-cluster">
+
+        <button
+          type="button"
+          class="history-btn"
+          id="undo-btn"
+          title="Undo"
+          aria-label="Undo"
+          disabled
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9.3L2.7 6L6 2.7" />
+            <path d="M13.3 13.3V8.7a2.7 2.7 0 00-2.7-2.7H2.7" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          class="history-btn"
+          id="redo-btn"
+          title="Redo"
+          aria-label="Redo"
+          disabled
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 9.3L13.3 6L10 2.7" />
+            <path d="M2.7 13.3V8.7a2.7 2.7 0 012.7-2.7H10.7" />
+          </svg>
+        </button>
+
+      </div>
 
 
-      <button
-        type="button"
-        class="history-btn"
-        id="redo-btn"
-        title="Redo"
-        aria-label="Redo"
-        disabled
-      >
-        ↷
-      </button>
+      <div class="topbar-divider"></div>
 
 
-      <button
-        type="button"
-        class="history-btn"
-        id="print-history-btn"
-        title="Print History — opens a PDF listing every action taken this session"
-        aria-label="Print History"
-      >
-        🖨
-      </button>
+      <div class="btn-cluster">
+
+        <button
+          type="button"
+          class="history-btn"
+          id="print-history-btn"
+          title="Print History — opens a PDF listing every action taken this session"
+          aria-label="Print History"
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="8" cy="8.5" r="6" />
+            <path d="M8 5v3.5l2.4 1.4" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          class="history-btn"
+          id="print-joints-btn"
+          title="Print Joints — opens a PDF listing every detected joint (and any collisions) in the current design"
+          aria-label="Print Joints"
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6.3 9.7a2.6 2.6 0 010-3.7l1.2-1.2a2.6 2.6 0 013.7 3.7" />
+            <path d="M9.7 6.3a2.6 2.6 0 010 3.7L8.5 11.2a2.6 2.6 0 01-3.7-3.7" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          class="history-btn"
+          id="export-joints-json-btn"
+          title="Export Joints JSON — downloads the same joint report as structured JSON, for scripting or diffing between designs"
+          aria-label="Export Joints JSON"
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 4.5L2 8.5l4 4" />
+            <path d="M10 4.5l4 4-4 4" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          class="history-btn"
+          id="print-assembly-btn"
+          title="Print Assembly Instructions — opens a PDF with step-by-step schematic diagrams, tools, and hardware for the current design"
+          aria-label="Print Assembly Instructions"
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 5c-1.5-1-4-1.2-6-.7v9c2-.5 4.5-.3 6 .7 1.5-1 4-1.2 6-.7v-9c-2-.5-4.5-.3-6 .7z" />
+            <path d="M8 5v9" />
+          </svg>
+        </button>
+
+      </div>
 
 
-      <button
-        type="button"
-        class="history-btn"
-        id="print-joints-btn"
-        title="Print Joints — opens a PDF listing every detected joint (and any collisions) in the current design"
-        aria-label="Print Joints"
-      >
-        🔗
-      </button>
-
-      <button
-        type="button"
-        class="history-btn"
-        id="export-joints-json-btn"
-        title="Export Joints JSON — downloads the same joint report as structured JSON, for scripting or diffing between designs"
-        aria-label="Export Joints JSON"
-      >
-        {}
-      </button>
-
-      <button
-        type="button"
-        class="history-btn"
-        id="print-assembly-btn"
-        title="Print Assembly Instructions — opens a PDF with step-by-step schematic diagrams, tools, and hardware for the current design"
-        aria-label="Print Assembly Instructions"
-      >
-        📖
-      </button>
-
-    </div>
+      <div class="topbar-divider"></div>
 
 
-    <div class="spacer"></div>
+      <div class="btn-cluster">
 
+        <button
+          type="button"
+          class="history-btn"
+          id="topbar-open-cutlist-btn"
+          title="Open Cut List — opens the full cut list for the current design"
+          aria-label="Open Cut List"
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="2" width="10" height="12" rx="1.2" />
+            <path d="M5.5 6h5M5.5 8.5h5M5.5 11h3" />
+          </svg>
+        </button>
 
-    <div
-      class="hint-bar"
-      id="hint-bar-3d"
-    >
-      Drag empty space: orbit
-      &nbsp;·&nbsp;
-      Right-drag: pan
-      &nbsp;·&nbsp;
-      Scroll: zoom
-      &nbsp;·&nbsp;
-      Click panel: select
-      &nbsp;·&nbsp;
-      Ctrl/Cmd-click: multi-select
-      &nbsp;·&nbsp;
-      Click empty space: deselect
-      &nbsp;·&nbsp;
-      Arrow: move
-      &nbsp;·&nbsp;
-      Drag a face dot: resize
-      &nbsp;·&nbsp;
-      Click cube face: snap view
-    </div>
+        <button
+          type="button"
+          class="history-btn"
+          id="topbar-nest-cutlist-btn"
+          title="Nesting Cut List — computes and opens the panel nesting/packing layout"
+          aria-label="Nesting Cut List"
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="5" height="5" />
+            <rect x="9" y="2" width="5" height="8" />
+            <rect x="2" y="9" width="5" height="5" />
+          </svg>
+        </button>
 
+        <button
+          type="button"
+          class="history-btn"
+          id="render-btn"
+          title="Render"
+          aria-label="Render"
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1.5 8.5S4 4 8 4s6.5 4.5 6.5 4.5-2.5 4.5-6.5 4.5S1.5 8.5 1.5 8.5z" />
+            <circle cx="8" cy="8.5" r="2" />
+          </svg>
+        </button>
 
-    <div
-      class="hint-bar"
-      id="hint-bar-2d"
-      style="display:none;"
-    >
-      Drag a panel: move
-      &nbsp;·&nbsp;
-      Ctrl/Cmd-click: multi-select
-      &nbsp;·&nbsp;
-      Drag an edge handle: resize
-      &nbsp;·&nbsp;
-      Drag empty space: pan
-      &nbsp;·&nbsp;
-      Scroll: zoom
-      &nbsp;·&nbsp;
-      Click empty space: deselect
+        <button
+          type="button"
+          class="history-btn validate-btn"
+          id="validate-btn"
+          title="Validate"
+          aria-label="Validate"
+        >
+          <span>Validate</span>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="8" cy="8.5" r="6" />
+            <path d="M5.2 8.6l1.8 1.8 3.6-4.2" />
+          </svg>
+        </button>
+
+      </div>
+
     </div>
 
   </div>
@@ -2129,12 +2440,93 @@
 
 
   <!-- =======================================================
+       BOTTOM HINT BAR — default move/pan hints until a tool
+       is started; swapped for that tool's own instructions
+       while it's active (see modeller-main.js#updateToolHint).
+       ======================================================= -->
+
+  <div id="bottom-hint-bar">
+
+    <div
+      class="hint-bar"
+      id="hint-bar-3d"
+    >
+      Drag empty space: orbit
+      &nbsp;·&nbsp;
+      Right-drag: pan
+      &nbsp;·&nbsp;
+      Scroll: zoom
+      &nbsp;·&nbsp;
+      Click panel: select
+      &nbsp;·&nbsp;
+      Ctrl/Cmd-click: multi-select
+      &nbsp;·&nbsp;
+      Click empty space: deselect
+      &nbsp;·&nbsp;
+      Arrow: move
+      &nbsp;·&nbsp;
+      Drag a face dot: resize
+      &nbsp;·&nbsp;
+      Click cube face: snap view
+    </div>
+
+    <div
+      class="hint-bar"
+      id="hint-bar-2d"
+      style="display:none;"
+    >
+      Drag a panel: move
+      &nbsp;·&nbsp;
+      Ctrl/Cmd-click: multi-select
+      &nbsp;·&nbsp;
+      Drag an edge handle: resize
+      &nbsp;·&nbsp;
+      Drag empty space: pan
+      &nbsp;·&nbsp;
+      Scroll: zoom
+      &nbsp;·&nbsp;
+      Click empty space: deselect
+    </div>
+
+    <div
+      id="hint-bar-tool"
+      style="display:none;"
+    ></div>
+
+  </div>
+
+
+  <!-- =======================================================
        DESIGN LIMIT TOAST
        ======================================================= -->
 
   <div
     id="design-limit-toast"
   ></div>
+
+
+  <!-- =======================================================
+       ACTION TOAST
+       ======================================================= -->
+
+  <div id="action-toast"></div>
+
+
+  <!-- =======================================================
+       ONBOARDING TOUR
+       ======================================================= -->
+
+  <div id="onboarding-overlay">
+    <div id="onboarding-card">
+      <h3 id="onboarding-title"></h3>
+      <p id="onboarding-text"></p>
+      <div id="onboarding-step-dots"></div>
+      <div id="onboarding-actions">
+        <button type="button" id="onboarding-skip">Skip</button>
+        <button type="button" id="onboarding-next">Next</button>
+      </div>
+    </div>
+  </div>
 
 
   <!-- =======================================================

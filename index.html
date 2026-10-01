@@ -82,6 +82,25 @@
       transform: translateY(0);
     }
 
+    .cta-group {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: #2D5A3D;
+      border: 1.5px solid #2D5A3D;
+      box-shadow: none;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(45,90,61,.08);
+      transform: translateY(-1px);
+    }
+
     .arrow {
       font-size: 20px;
       transition: transform .15s;
@@ -136,10 +155,17 @@
       From design to assembly the limit is your immagination!!
     </p>
 
-    <a href="./modeller.html" class="btn">
-      Go to 3D Modeller
-      <span class="arrow">→</span>
-    </a>
+    <div class="cta-group">
+      <a href="./modeller.html" class="btn">
+        Go to 3D Modeller
+        <span class="arrow">→</span>
+      </a>
+
+      <a href="./dashboard.html" class="btn btn-secondary">
+        My Dashboard
+        <span class="arrow">→</span>
+      </a>
+    </div>
 
     <div class="features">
       <div class="feature">

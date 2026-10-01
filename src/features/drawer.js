@@ -40,7 +40,7 @@ import { findBoxSibling } from './box.js';
 import { applyPanelPatch } from './door.js';
 
 export const DEFAULT_DRAWER_EDGE_FIT = { left: 'in', right: 'in', bottom: 'in', top: 'in' };
-export const DEFAULT_DRAWER_COUNT = 1;
+export const DEFAULT_DRAWER_COUNT = 2;
 export const MAX_DRAWER_COUNT = 10; // no structural reason beyond this — just a guard against a fat-fingered huge count producing degenerate slivers (see the panel-too-short check below, which would catch it anyway, but failing fast on the count itself gives a clearer reason)
 
 /**

@@ -40,18 +40,18 @@ export function getLastBomRows() {
   return lastBomRows;
 }
 
-export function openCutListWindow() {
+export function openCutListWindow(newWindow = false) {
   if (lastBomRows.length === 0) return;
-  exportCutListPdf(lastBomRows, { projectName: 'Cut List', mode: 'open' });
+  exportCutListPdf(lastBomRows, { projectName: 'Cut List', mode: 'open', newWindow });
 }
 
-export function openNestingPlan() {
+export function openNestingPlan(newWindow = false) {
   if (lastBomRows.length === 0) return;
   const nestResults = nestCutList(lastBomRows, MATERIAL_CATALOG, {});
   const summary = summarizeNestingResult(nestResults, MATERIAL_CATALOG);
   lastNestingResult = { nestResults, summary, signature: bomRowsSignature(lastBomRows) };
   renderNestingSummary();
-  exportNestingPdf(nestResults, summary, { projectName: 'Nesting Plan', mode: 'open' });
+  exportNestingPdf(nestResults, summary, { projectName: 'Nesting Plan', mode: 'open', newWindow });
 }
 
 export function renderNestingSummary() {
