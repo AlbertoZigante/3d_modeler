@@ -95,22 +95,11 @@ export function renderProperties(
   }
 
   const locked = resolvedPanel.lockedFields || {};
-  // A panel whose position is fully derived (a door or drawer front —
-  // see features/door.js#createDoorNode's/features/drawer.js#createDrawerFrontNodes's
-  // own lockedMoveAxes) has ALL 3 position axes locked together, never
-  // a mix — nothing else currently locks all 3 at once, which is what
-  // makes this a safe stand-in for "is this a door or drawer front"
-  // without importing either feature's own flag here. The whole
-  // Transform section below is skipped entirely in that case (not
-  // just disabled) — a gizmo/gizmo-driven section is meaningless for a
-  // position nothing ever drags, so showing it read-only was just
-  // noise pushing everything else down.
-  const transformLocked = !!(locked.positionX && locked.positionY && locked.positionZ);
   const displayName = getDisplayName(selectedPanel);
 
   container.innerHTML = `
     <div class="node-header-row">
-      <span class="section-title" id="node-name-label">Node: ${escapeHtml(displayName)}</span>
+      <span class="section-title" id="node-name-label">Node: ${escapeHtml(displayName)}${selectedPanel.pieceCode ? ` <span class="node-id-inline">${escapeHtml(selectedPanel.pieceCode)}</span>` : ''}</span>
       <button class="rename-btn" id="rename-node-btn" title="Rename this panel">✏️</button>
     </div>
 
@@ -121,14 +110,13 @@ export function renderProperties(
         ${resolvedPanel.warnings.map((w) => `⚠ ${escapeHtml(w)}`).join('<br/>')}
       </div>` : ''}
 
-    <div class="dims-row">
-      ${DIM_FIELDS.map((f) => dimFieldHTML(f, selectedPanel, resolvedPanel, locked[f], selectedPanel.isDoor)).join('')}
-    </div>
-    <div class="field-row">
-      <label>Thickness 🔒</label>
-      <div class="field-input-wrap locked">
-        <input type="text" value="${resolvedPanel.thickness.toFixed(1)}" disabled class="field-input" title="Set by Material, below — not directly editable" />
-        <span class="field-unit">mm</span>
+    <div class="dims-row dims-row-compact">
+      ${DIM_FIELDS.map((f) => dimFieldHTML(f, selectedPanel, resolvedPanel, locked[f], selectedPanel.isDoor, true)).join('')}
+      <div class="field-row">
+        <label title="Thickness — set by Material, below">T 🔒</label>
+        <div class="field-input-wrap locked">
+          <input type="text" value="${resolvedPanel.thickness.toFixed(1)}" disabled class="field-input" title="Set by Material, below — not directly editable" />
+        </div>
       </div>
     </div>
     <div class="field-row">
@@ -137,23 +125,11 @@ export function renderProperties(
         ${MATERIAL_CATALOG.map((m) => `<option value="${escapeHtml(m.name)}" ${m.name === selectedPanel.material ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
       </select>
     </div>
-    ${numberFieldHTML('Quantity', 'quantity', selectedPanel.quantity, 'pc', { min: 1 })}
     <button class="remove-btn" id="remove-btn">Remove panel</button>
 
     ${selectedPanel.edgeFit && !selectedPanel.isDoor && !selectedPanel.isDrawerFront ? edgeFitSectionHTML(selectedPanel.edgeFit) : ''}
     ${selectedPanel.isDoor ? doorSectionHTML(selectedPanel, hiddenGroupMembers || [], restoreError) : ''}
     ${selectedPanel.isDrawerFront ? drawerSectionHTML(selectedPanel, hiddenGroupMembers || [], restoreError) : ''}
-
-    ${transformLocked ? '' : `
-      <div class="divider"></div>
-      <div class="section-title">Transform (from gizmo)</div>
-      <div class="transform-grid">
-        ${axisFieldHTML('offset', 'x', selectedPanel.offset.x, false)}
-        ${axisFieldHTML('offset', 'y', selectedPanel.offset.y, false)}
-        ${axisFieldHTML('offset', 'z', selectedPanel.offset.z, false)}
-      </div>
-      <div class="transform-label">Position offset (mm)</div>
-    `}
   `;
 
   // ---- rename (pencil icon) ----
@@ -182,7 +158,7 @@ export function renderProperties(
     input.addEventListener('blur', commit);
   });
 
-  // ---- dimension / material / quantity ----
+  // ---- dimension / material ----
   container.querySelectorAll('.dim-field').forEach((input) => {
     input.addEventListener('change', (e) => {
       const field = e.target.dataset.field;
@@ -196,17 +172,6 @@ export function renderProperties(
   });
   container.querySelectorAll('.unlink-btn').forEach((btn) => {
     btn.addEventListener('click', () => onUnlinkConstraint(btn.dataset.field));
-  });
-
-  // ---- transform ----
-  container.querySelectorAll('.transform-field').forEach((input) => {
-    input.addEventListener('change', (e) => {
-      const group = e.target.dataset.group;
-      const axis = e.target.dataset.axis;
-      const v = Number(e.target.value);
-      if (Number.isFinite(v)) onTransformFieldChange(group, axis, v);
-      else e.target.value = selectedPanel[group][axis];
-    });
   });
 
   // ---- presets ----
@@ -389,8 +354,14 @@ function drawerSectionHTML(front, hiddenGroupMembers, restoreError) {
   `;
 }
 
-function dimFieldHTML(field, selectedPanel, resolvedPanel, isLocked, isStructuralLock = false) {
-  const label = field[0].toUpperCase() + field.slice(1);
+function dimFieldHTML(field, selectedPanel, resolvedPanel, isLocked, isStructuralLock = false, compact = false) {
+  const fullLabel = field[0].toUpperCase() + field.slice(1);
+  // Compact mode (the W/H/T single-line row): a single-letter label
+  // with the full word as a tooltip, and no inline "mm" unit (the row
+  // has one unit for all three, implied rather than repeated) — the
+  // same three visual states (plain / 🔗 unlink / 🔒 structural) as
+  // the full-width version, just tighter.
+  const label = compact ? `<span title="${fullLabel}">${fullLabel[0]}</span>` : fullLabel;
   if (isLocked && isStructuralLock) {
     // A door's width/height come from its boundary panels, not a
     // removable relation (see features/door.js#createDoorNode) — same
@@ -402,7 +373,7 @@ function dimFieldHTML(field, selectedPanel, resolvedPanel, isLocked, isStructura
         <label>${label} 🔒</label>
         <div class="field-input-wrap locked">
           <input type="text" value="${resolvedPanel[field].toFixed(1)}" disabled class="field-input" title="Derived from its boundary panels — not directly editable" />
-          <span class="field-unit">mm</span>
+          ${compact ? '' : '<span class="field-unit">mm</span>'}
         </div>
       </div>`;
   }
@@ -412,12 +383,12 @@ function dimFieldHTML(field, selectedPanel, resolvedPanel, isLocked, isStructura
         <label>${label} 🔗</label>
         <div class="field-input-wrap locked">
           <input type="text" value="${resolvedPanel[field].toFixed(1)}" disabled class="field-input" />
-          <span class="field-unit">mm</span>
+          ${compact ? '' : '<span class="field-unit">mm</span>'}
         </div>
         <button class="unlink-btn" data-field="${field}">Unlink</button>
       </div>`;
   }
-  return numberFieldHTML(label, field, selectedPanel[field], 'mm', { min: 1 }, 'dim-field');
+  return numberFieldHTML(label, field, selectedPanel[field], compact ? '' : 'mm', { min: 1 }, 'dim-field');
 }
 
 function numberFieldHTML(label, field, value, unit = 'mm', { min } = {}, extraClass = 'dim-field') {
@@ -426,7 +397,7 @@ function numberFieldHTML(label, field, value, unit = 'mm', { min } = {}, extraCl
       <label>${label}</label>
       <div class="field-input-wrap">
         <input type="number" ${min != null ? `min="${min}"` : ''} value="${value}" data-field="${field}" class="field-input ${extraClass}" />
-        <span class="field-unit">${unit}</span>
+        ${unit ? `<span class="field-unit">${unit}</span>` : ''}
       </div>
     </div>`;
 }
