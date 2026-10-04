@@ -271,12 +271,19 @@ exportJointsJsonBtn?.addEventListener('click', () => {
 // diagrams draw real panel geometry, which the plan's own step
 // objects reference only by id.
 printAssemblyBtn?.addEventListener('click', () => {
-  // const resolved = resolveConstraints(panels);
-  // const plan = buildAssemblyPlan(panels);
-  // exportAssemblyPlanPdf(plan, resolved, { projectName: 'Assembly Instructions', mode: 'open' });
+  const resolved = resolveConstraints(panels);
+
   const sequence = buildAssemblySequence(panels);
 
-  exportAssemblyManualPdf(sequence,{projectName: 'Assembly Instructions',mode: 'open'});
+  exportAssemblyManualPdf(
+    sequence,
+    {
+      projectName: 'Assembly Instructions',
+      mode: 'open',
+      panels,
+      resolvedPanels: resolved,
+    }
+  );
 });
 syncHistoryButtons();
 

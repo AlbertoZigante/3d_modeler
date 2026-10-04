@@ -945,11 +945,15 @@ export function exportAssemblyManualPdf(
   {
     projectName = 'Assembly Instructions',
     mode = 'open',
+    panels = [],
+    resolvedPanels = [],
   } = {}
 ) {
   const html = buildAssemblyManualHtml(sequence, {
     title: projectName,
     subtitle: 'Human-first assembly instructions',
+    panels,
+    resolvedPanels,
   });
 
   if (mode === 'open') {
@@ -973,7 +977,6 @@ export function exportAssemblyManualPdf(
     return;
   }
 
-  // Fallback: open the printable manual if another mode is requested.
   const printWindow = window.open('', '_blank');
 
   if (!printWindow) {

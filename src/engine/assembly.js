@@ -1022,6 +1022,588 @@ function phase4ErgonomicLabel(score) {
   return 'Difficult';
 }
 
+function phase4BuildVisualParts(
+  options = {}
+) {
+  const rawPanels =
+    phase4Array(
+      options.panels
+    );
+
+  const resolvedPanels =
+    phase4Array(
+      options.resolvedPanels
+    );
+
+  const resolvedById =
+    new Map(
+      resolvedPanels.map(
+        (panel) => [
+          panel.id,
+          panel,
+        ]
+      )
+    );
+
+  return rawPanels.map(
+    (panel) => {
+
+      const resolved =
+        resolvedById.get(
+          panel.id
+        );
+
+      const dimensions =
+        phase4PanelDimensions(
+          panel,
+          resolved
+        );
+
+      const role =
+        panelRole(panel);
+
+      return {
+        id: panel.id,
+
+        code:
+          panel.pieceCode ??
+          panel.code ??
+          resolved?.pieceCode ??
+          panel.id,
+
+        name:
+          panel.name ??
+          resolved?.name ??
+          panel.id,
+
+        role,
+
+        roleLabel:
+          phase4RoleLabel(role),
+
+        width:
+          dimensions.width,
+
+        height:
+          dimensions.height,
+
+        thickness:
+          dimensions.thickness,
+      };
+    }
+  );
+}
+
+function phase4BuildAssemblyStateSvg(
+  step,
+  allParts
+) {
+  const parts =
+    phase4Array(allParts);
+
+  if (parts.length === 0) {
+    return '';
+  }
+
+  const placedIds =
+    new Set(
+      phase4Array(
+        step.placedPanelIds
+      )
+    );
+
+  const newIds =
+    new Set(
+      phase4Array(
+        step.panelIds
+      )
+    );
+
+  /*
+   * Determine a common furniture envelope.
+   * Dimensions are kept in the model's native units.
+   */
+  const carcass =
+    parts.filter(
+      (part) =>
+        ![
+          'door',
+          'drawer_box',
+          'drawer_front',
+        ].includes(part.role)
+    );
+
+  const widths =
+    carcass
+      .map((p) => p.width)
+      .filter((v) => v > 0);
+
+  const heights =
+    carcass
+      .map((p) => p.height)
+      .filter((v) => v > 0);
+
+  const furnitureWidth =
+    Math.max(
+      ...widths,
+      1000
+    );
+
+  const furnitureHeight =
+    Math.max(
+      ...heights,
+      1000
+    );
+
+  const viewWidth = 700;
+  const viewHeight = 500;
+
+  const margin = 55;
+
+  const scale =
+    Math.min(
+      (viewWidth - margin * 2) /
+        furnitureWidth,
+
+      (viewHeight - margin * 2) /
+        furnitureHeight
+    );
+
+  const cabinetWidth =
+    furnitureWidth * scale;
+
+  const cabinetHeight =
+    furnitureHeight * scale;
+
+  const cabinetX =
+    (viewWidth - cabinetWidth) / 2;
+
+  const cabinetY =
+    (viewHeight - cabinetHeight) / 2;
+
+  const placed =
+    parts.filter(
+      (part) =>
+        placedIds.has(part.id)
+    );
+
+  const svgParts = [];
+
+  /*
+   * Draw the carcass envelope first.
+   */
+  svgParts.push(`
+    <rect
+      x="${cabinetX.toFixed(2)}"
+      y="${cabinetY.toFixed(2)}"
+      width="${cabinetWidth.toFixed(2)}"
+      height="${cabinetHeight.toFixed(2)}"
+      fill="none"
+      stroke="#b8b8b8"
+      stroke-width="1"
+      stroke-dasharray="5 5"
+    />
+  `);
+
+  /*
+   * Assign furniture positions by semantic role.
+   *
+   * The panel's OWN dimensions are always used
+   * for its rectangle, so relative proportions
+   * remain correct.
+   */
+  const bottomParts =
+    placed.filter(
+      (p) => p.role === 'bottom'
+    );
+
+  const topParts =
+    placed.filter(
+      (p) => p.role === 'top'
+    );
+
+  const verticalParts =
+    placed.filter(
+      (p) => p.role === 'vertical'
+    );
+
+  const shelfParts =
+    placed.filter(
+      (p) => p.role === 'horizontal'
+    );
+
+  const backParts =
+    placed.filter(
+      (p) => p.role === 'back'
+    );
+
+  const doors =
+    placed.filter(
+      (p) =>
+        p.role === 'door'
+    );
+
+  const drawers =
+    placed.filter(
+      (p) =>
+        p.role === 'drawer_box' ||
+        p.role === 'drawer_front'
+    );
+
+  const drawPanel = (
+    part,
+    x,
+    y,
+    width,
+    height,
+    extraClass = ''
+  ) => {
+
+    const isNew =
+      newIds.has(part.id);
+
+    const fill =
+      isNew
+        ? '#d9d9d9'
+        : '#eeeeea';
+
+    const stroke =
+      isNew
+        ? '#111'
+        : '#777';
+
+    const strokeWidth =
+      isNew
+        ? 3
+        : 1.5;
+
+    const label =
+      phase4EscapeHtml(
+        part.code
+      );
+
+    svgParts.push(`
+      <g class="p4-assembly-panel ${extraClass}">
+        <rect
+          x="${x.toFixed(2)}"
+          y="${y.toFixed(2)}"
+          width="${Math.max(width, 3).toFixed(2)}"
+          height="${Math.max(height, 3).toFixed(2)}"
+          fill="${fill}"
+          stroke="${stroke}"
+          stroke-width="${strokeWidth}"
+          rx="1"
+        />
+
+        <text
+          x="${(x + width / 2).toFixed(2)}"
+          y="${(y + height / 2 + 3).toFixed(2)}"
+          text-anchor="middle"
+          font-size="11"
+          font-weight="700"
+          fill="#111"
+        >
+          ${label}
+        </text>
+      </g>
+    `);
+  };
+
+  /*
+   * Bottom.
+   */
+  bottomParts.forEach(
+    (part) => {
+      const width =
+        Math.min(
+          cabinetWidth,
+          part.width * scale
+        );
+
+      const height =
+        Math.max(
+          6,
+          part.height * scale
+        );
+
+      drawPanel(
+        part,
+        cabinetX,
+        cabinetY +
+          cabinetHeight -
+          height,
+        width,
+        height,
+        'bottom'
+      );
+    }
+  );
+
+  /*
+   * Top.
+   */
+  topParts.forEach(
+    (part) => {
+      const width =
+        Math.min(
+          cabinetWidth,
+          part.width * scale
+        );
+
+      const height =
+        Math.max(
+          6,
+          part.height * scale
+        );
+
+      drawPanel(
+        part,
+        cabinetX,
+        cabinetY,
+        width,
+        height,
+        'top'
+      );
+    }
+  );
+
+  /*
+   * Vertical dividers.
+   */
+  verticalParts.forEach(
+    (part, index) => {
+
+      const width =
+        Math.max(
+          5,
+          part.width * scale
+        );
+
+      const height =
+        Math.min(
+          cabinetHeight,
+          part.height * scale
+        );
+
+      const usable =
+        cabinetWidth - width;
+
+      const x =
+        cabinetX +
+        (
+          usable *
+          ((index + 1) /
+            (verticalParts.length + 1))
+        );
+
+      const y =
+        cabinetY +
+        (cabinetHeight - height) / 2;
+
+      drawPanel(
+        part,
+        x,
+        y,
+        width,
+        height,
+        'vertical'
+      );
+    }
+  );
+
+  /*
+   * Shelves.
+   */
+  shelfParts.forEach(
+    (part, index) => {
+
+      const width =
+        Math.min(
+          cabinetWidth,
+          part.width * scale
+        );
+
+      const height =
+        Math.max(
+          5,
+          part.height * scale
+        );
+
+      const usable =
+        cabinetHeight -
+        height;
+
+      const y =
+        cabinetY +
+        usable *
+        (
+          (index + 1) /
+          (shelfParts.length + 1)
+        );
+
+      drawPanel(
+        part,
+        cabinetX,
+        y,
+        width,
+        height,
+        'shelf'
+      );
+    }
+  );
+
+  /*
+   * Back panel.
+   *
+   * Drawn behind the internal parts.
+   */
+  backParts.forEach(
+    (part) => {
+
+      const width =
+        Math.min(
+          cabinetWidth,
+          part.width * scale
+        );
+
+      const height =
+        Math.min(
+          cabinetHeight,
+          part.height * scale
+        );
+
+      drawPanel(
+        part,
+        cabinetX,
+        cabinetY,
+        width,
+        height,
+        'back'
+      );
+    }
+  );
+
+  /*
+   * Doors.
+   */
+  doors.forEach(
+    (part, index) => {
+
+      const width =
+        Math.max(
+          8,
+          part.width * scale
+        );
+
+      const height =
+        Math.max(
+          10,
+          part.height * scale
+        );
+
+      const x =
+        cabinetX +
+        cabinetWidth +
+        18 +
+        index *
+        (width + 8);
+
+      const y =
+        cabinetY +
+        (
+          cabinetHeight -
+          height
+        ) / 2;
+
+      drawPanel(
+        part,
+        x,
+        y,
+        width,
+        height,
+        'door'
+      );
+    }
+  );
+
+  /*
+   * Drawers.
+   */
+  drawers.forEach(
+    (part, index) => {
+
+      const width =
+        Math.max(
+          20,
+          part.width * scale
+        );
+
+      const height =
+        Math.max(
+          10,
+          part.height * scale
+        );
+
+      const x =
+        cabinetX +
+        (
+          cabinetWidth -
+          width
+        ) / 2;
+
+      const y =
+        cabinetY +
+        cabinetHeight +
+        15 +
+        index *
+        (height + 7);
+
+      drawPanel(
+        part,
+        x,
+        y,
+        width,
+        height,
+        'drawer'
+      );
+    }
+  );
+
+  return `
+    <svg
+      class="p4-assembly-state"
+      viewBox="0 0 ${viewWidth} ${viewHeight}"
+      xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid meet"
+      role="img"
+      aria-label="Assembly state at this step"
+    >
+      ${svgParts.join('')}
+
+      <text
+        x="${viewWidth / 2}"
+        y="25"
+        text-anchor="middle"
+        font-size="13"
+        font-weight="800"
+        fill="#666"
+      >
+        ASSEMBLY STATE
+      </text>
+
+      <text
+        x="${viewWidth / 2}"
+        y="${viewHeight - 12}"
+        text-anchor="middle"
+        font-size="10"
+        fill="#777"
+      >
+        New panels are emphasized
+      </text>
+    </svg>
+  `;
+}
+
 function phase4StepDiagram(step) {
   if (step.diagramHtml) {
     return step.diagramHtml;
@@ -1163,33 +1745,205 @@ function phase4BuildSubassemblySummary(sequence) {
   }));
 }
 
-function phase4BuildPartsSummary(sequence) {
+function phase4NumericDimension(
+  value
+) {
+  const n = Number(value);
+
+  return Number.isFinite(n) && n > 0
+    ? n
+    : 0;
+}
+
+
+function phase4PanelDimensions(
+  panel,
+  resolved
+) {
+  const width =
+    phase4NumericDimension(
+      panel?.width
+    ) ||
+    phase4NumericDimension(
+      panel?.w
+    ) ||
+    phase4NumericDimension(
+      panel?.lengthX
+    ) ||
+    phase4NumericDimension(
+      resolved?.width
+    );
+
+  const height =
+    phase4NumericDimension(
+      panel?.height
+    ) ||
+    phase4NumericDimension(
+      panel?.h
+    ) ||
+    phase4NumericDimension(
+      panel?.lengthY
+    ) ||
+    phase4NumericDimension(
+      resolved?.height
+    );
+
+  const thickness =
+    phase4NumericDimension(
+      panel?.thickness
+    ) ||
+    phase4NumericDimension(
+      panel?.depth
+    ) ||
+    phase4NumericDimension(
+      panel?.d
+    ) ||
+    phase4NumericDimension(
+      resolved?.thickness
+    );
+
+  return {
+    width,
+    height,
+    thickness,
+  };
+}
+
+
+function phase4RoleLabel(
+  role
+) {
+  return ({
+    bottom: 'Bottom',
+    vertical: 'Vertical divider',
+    horizontal: 'Shelf',
+    back: 'Back',
+    top: 'Top',
+    door: 'Door',
+    drawer_box: 'Drawer box',
+    drawer_front: 'Drawer front',
+    unknown: 'Panel',
+  })[role] || 'Panel';
+}
+
+function phase4BuildPartsSummary(
+  sequence,
+  options = {}
+) {
   const parts = new Map();
 
-  phase4Array(sequence?.steps).forEach(
-    (step) => {
-      phase4Array(step.panelIds).forEach(
-        (id, index) => {
-          const code =
-            step.panelCodes?.[index] || id;
-
-          if (!parts.has(id)) {
-            parts.set(id, {
-              id,
-              code,
-              name:
-                step.panelNames?.[index] ||
-                code,
-              firstStep: step.stepId,
-              subassembly:
-                step.subassemblyName ||
-                null,
-            });
-          }
-        }
-      );
-    }
+  const rawPanels = phase4Array(
+    options.panels
   );
+
+  const resolvedPanels = phase4Array(
+    options.resolvedPanels
+  );
+
+  const resolvedById =
+    new Map(
+      resolvedPanels.map(
+        (panel) => [panel.id, panel]
+      )
+    );
+
+  const steps =
+    phase4Array(sequence?.steps);
+
+  /*
+   * First source of truth:
+   * the actual model panels.
+   *
+   * This ensures that EVERY panel appears,
+   * even if a panel does not happen to be
+   * represented by a structural assembly step.
+   */
+  rawPanels.forEach((panel) => {
+    if (!panel?.id) return;
+
+    const resolved =
+      resolvedById.get(panel.id);
+
+    const role =
+      panelRole(panel);
+
+    const dimensions =
+      phase4PanelDimensions(
+        panel,
+        resolved
+      );
+
+    parts.set(panel.id, {
+      id: panel.id,
+
+      code:
+        panel.pieceCode ??
+        panel.code ??
+        resolved?.pieceCode ??
+        panel.id,
+
+      name:
+        panel.name ??
+        resolved?.name ??
+        panel.id,
+
+      role,
+
+      roleLabel:
+        phase4RoleLabel(role),
+
+      subassembly:
+        null,
+
+      width:
+        dimensions.width,
+
+      height:
+        dimensions.height,
+
+      thickness:
+        dimensions.thickness,
+
+      area:
+        dimensions.width *
+        dimensions.height,
+
+      aspectRatio:
+        dimensions.height > 0
+          ? dimensions.width /
+            dimensions.height
+          : 1,
+    });
+  });
+
+  /*
+   * Add subassembly information from the
+   * actual assembly sequence.
+   */
+  steps.forEach((step) => {
+
+    const subassembly =
+      step.subassemblyName ||
+      null;
+
+    phase4Array(
+      step.panelIds
+    ).forEach((id) => {
+
+      const part =
+        parts.get(id);
+
+      if (!part) return;
+
+      if (
+        !part.subassembly &&
+        subassembly
+      ) {
+        part.subassembly =
+          subassembly;
+      }
+    });
+  });
 
   return [...parts.values()];
 }
@@ -1256,8 +2010,50 @@ export function buildAssemblyManualModel(
     ]
   );
 
+  const placedPanelIds = new Set();
   const stepModels = steps.map(
     (step, index) => {
+
+      const currentPanelIds =
+        phase4Unique(
+          step.panelIds
+        );
+
+      /*
+      * Snapshot of the furniture immediately
+      * AFTER this step.
+      */
+      const placedAfterStep = [
+        ...new Set([
+          ...placedPanelIds,
+          ...currentPanelIds,
+        ]),
+      ];
+
+      const visualParts =
+        phase4BuildVisualParts(
+          options
+        );
+
+      const assemblyStateSvg =
+        phase4BuildAssemblyStateSvg(
+          {
+            ...step,
+            placedPanelIds:
+              placedAfterStep,
+          },
+          visualParts
+        );
+
+      /*
+      * Update only after taking the snapshot,
+      * so the step can still distinguish the
+      * newly added panel(s).
+      */
+      currentPanelIds.forEach(
+        (id) =>
+          placedPanelIds.add(id)
+      );
       const warnings =
         phase4Warnings(step);
 
@@ -1354,15 +2150,21 @@ export function buildAssemblyManualModel(
 
   return {
     version: 'phase4',
+
     title,
+
     subtitle,
 
     metadata: {
       estimatedTime:
         options.estimatedTime || null,
+
       people:
         options.people || '1–2',
-      tools: toolNames,
+
+      tools:
+        toolNames,
+
       safety:
         options.safety ||
         'Assemble on a stable, protected surface. Support large panels when required.',
@@ -1373,7 +2175,8 @@ export function buildAssemblyManualModel(
 
     parts:
       phase4BuildPartsSummary(
-        sequence
+        sequence,
+        options
       ),
 
     hardware:
@@ -1386,7 +2189,18 @@ export function buildAssemblyManualModel(
         sequence
       ),
 
-    steps: stepModels,
+    visualPanels:
+      phase4Array(
+        options.panels
+      ),
+
+    resolvedPanels:
+      phase4Array(
+        options.resolvedPanels
+      ),
+
+    steps:
+      stepModels,
 
     finalChecklist: [
       'Check that all structural fasteners are tightened.',
@@ -1648,49 +2462,235 @@ function phase4RenderCover(model) {
 }
 
 function phase4RenderPartsPage(model) {
+
+  const maxWidth =
+    Math.max(
+      ...model.parts.map(
+        (part) =>
+          Number(part.width) || 0
+      ),
+      1
+    );
+
+  const maxHeight =
+    Math.max(
+      ...model.parts.map(
+        (part) =>
+          Number(part.height) || 0
+      ),
+      1
+    );
+
+  const sheetWidth = 760;
+  const sheetHeight = 500;
+
+  const padding = 35;
+
+  const columns =
+    Math.min(
+      5,
+      Math.max(
+        1,
+        model.parts.length
+      )
+    );
+
+  const rows =
+    Math.ceil(
+      model.parts.length /
+      columns
+    );
+
+  const cellWidth =
+    (sheetWidth - padding * 2) /
+    columns;
+
+  const cellHeight =
+    (sheetHeight - padding * 2) /
+    Math.max(rows, 1);
+
+  const svgItems =
+    model.parts.map(
+      (part, index) => {
+
+        const col =
+          index % columns;
+
+        const row =
+          Math.floor(
+            index / columns
+          );
+
+        const cellX =
+          padding +
+          col * cellWidth;
+
+        const cellY =
+          padding +
+          row * cellHeight;
+
+        const availableWidth =
+          cellWidth - 20;
+
+        const availableHeight =
+          cellHeight - 38;
+
+        const pw =
+          Number(part.width) ||
+          1;
+
+        const ph =
+          Number(part.height) ||
+          1;
+
+        const scale =
+          Math.min(
+            availableWidth / pw,
+            availableHeight / ph
+          );
+
+        const shapeWidth =
+          Math.max(
+            8,
+            pw * scale
+          );
+
+        const shapeHeight =
+          Math.max(
+            8,
+            ph * scale
+          );
+
+        const x =
+          cellX +
+          (
+            cellWidth -
+            shapeWidth
+          ) / 2;
+
+        const y =
+          cellY + 4;
+
+        const role =
+          phase4EscapeHtml(
+            part.roleLabel
+          );
+
+        const code =
+          phase4EscapeHtml(
+            part.code
+          );
+
+        const name =
+          phase4EscapeHtml(
+            part.name
+          );
+
+        const subassembly =
+          phase4EscapeHtml(
+            part.subassembly ||
+            'Main carcass'
+          );
+
+        const dimensions =
+          [
+            part.width,
+            part.height,
+            part.thickness,
+          ]
+            .map(
+              (value) =>
+                Number(value) > 0
+                  ? Math.round(
+                      Number(value) * 1000
+                    )
+                  : '—'
+            )
+            .join(' × ');
+
+        return `
+          <g>
+
+            <rect
+              x="${cellX.toFixed(2)}"
+              y="${cellY.toFixed(2)}"
+              width="${cellWidth.toFixed(2)}"
+              height="${cellHeight.toFixed(2)}"
+              fill="#fff"
+              stroke="#d0d0cc"
+              stroke-width="1"
+            />
+
+            <rect
+              x="${x.toFixed(2)}"
+              y="${y.toFixed(2)}"
+              width="${shapeWidth.toFixed(2)}"
+              height="${shapeHeight.toFixed(2)}"
+              fill="#eeeeea"
+              stroke="#222"
+              stroke-width="1.5"
+            />
+
+            <text
+              x="${cellX + 5}"
+              y="${cellY + cellHeight - 23}"
+              font-size="10"
+              font-weight="900"
+              fill="#111"
+            >
+              ${code}
+            </text>
+
+            <text
+              x="${cellX + 5}"
+              y="${cellY + cellHeight - 12}"
+              font-size="7.5"
+              font-weight="700"
+              fill="#222"
+            >
+              ${role} · ${name}
+            </text>
+
+            <text
+              x="${cellX + 5}"
+              y="${cellY + cellHeight - 3}"
+              font-size="6.5"
+              fill="#666"
+            >
+              ${dimensions} mm · ${subassembly}
+            </text>
+
+          </g>
+        `;
+      }
+    ).join('');
+
   return `
-    <section class="p4-reference-page">
-      <div class="p4-reference-kicker">REFERENCE</div>
-      <h1>Parts & sub-assemblies</h1>
+    <section class="p4-reference-page p4-parts-sheet">
+
+      <div class="p4-reference-kicker">
+        REFERENCE
+      </div>
+
+      <h1>
+        Parts & sub-assemblies
+      </h1>
+
       <p class="p4-reference-intro">
-        Identify the parts before starting. The manual refers to these
-        codes throughout the assembly.
+        Every panel is shown once, at proportional size.
+        Use the code and dimensions to identify each part
+        before assembly.
       </p>
 
-      <div class="p4-reference-grid">
-        ${model.parts.map((part) => `
-          <div class="p4-part-card">
-            <div class="p4-part-code">
-              ${phase4EscapeHtml(part.code)}
-            </div>
-            <div class="p4-part-name">
-              ${phase4EscapeHtml(part.name)}
-            </div>
-            <div class="p4-part-meta">
-              ${phase4EscapeHtml(part.subassembly || '—')}
-            </div>
-          </div>
-        `).join('')}
-      </div>
+      <svg
+        class="p4-parts-sheet-svg"
+        viewBox="0 0 ${sheetWidth} ${sheetHeight}"
+        xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="xMidYMid meet"
+      >
+        ${svgItems}
+      </svg>
 
-      <h2 class="p4-reference-heading">Sub-assemblies</h2>
-      <div class="p4-subassembly-list">
-        ${model.subassemblies.map((item) => `
-          <div class="p4-subassembly-row">
-            <div>
-              <strong>${phase4EscapeHtml(item.name)}</strong>
-              <span>${phase4EscapeHtml(item.role)}</span>
-            </div>
-            <div class="p4-chip-row">
-              ${item.panelCodes.map((code) => `
-                <span class="p4-chip">
-                  ${phase4EscapeHtml(code)}
-                </span>
-              `).join('')}
-            </div>
-          </div>
-        `).join('')}
-      </div>
     </section>
   `;
 }
@@ -1824,6 +2824,28 @@ export function renderAssemblyManualHtml(
     margin-top: 0;
   }
 
+  .p4-parts-sheet {
+    height: 277mm;
+    overflow: hidden;
+  }
+
+  .p4-parts-sheet-svg {
+    display: block;
+    width: 100%;
+    height: 220mm;
+    max-height: 220mm;
+  }
+
+  .p4-assembly-state {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-height: 158mm;
+  }
+
+  .p4-diagram-area {
+    overflow: hidden;
+  }
   .p4-cover,
   .p4-reference-page,
   .p4-checklist-page,
@@ -2159,6 +3181,7 @@ export function renderAssemblyManualHtml(
 
   .p4-diagram-area {
     min-height: 165mm;
+    overflow: hidden;
     border: 1px solid var(--p4-line);
     background: #fafaf8;
     padding: 7mm;
@@ -2417,12 +3440,21 @@ export function exportAssemblyManualPdf(
   {
     projectName = 'Assembly Instructions',
     mode = 'open',
+    panels = [],
+    resolvedPanels = [],
   } = {}
 ) {
-  const html = buildAssemblyManualHtml(sequence, {
-    title: projectName,
-    subtitle: 'Human-first assembly instructions',
-  });
+  const html = buildAssemblyManualHtml(
+    sequence,
+    {
+      title: projectName,
+      subtitle: 'Human-first assembly instructions',
+
+      panels,
+
+      resolvedPanels,
+    }
+  );
 
   if (mode === 'open') {
     const printWindow = window.open('', '_blank');
