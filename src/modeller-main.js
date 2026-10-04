@@ -46,6 +46,7 @@ import { computeBom } from './engine/bom.js';
 import { exportCutListPdf, exportHistoryPdf, exportJointsPdf, exportAssemblyPlanPdf } from './engine/pdfExport.js';
 import { detectJoints, detectFeatureJoints, buildJointsReport, findOrphanPanels, findCrossGroupJoints } from './engine/joints.js';
 import { buildHardwarePlan } from './engine/hardware.js';
+import {buildAssemblySequence,exportAssemblyManualPdf} from './engine/assembly.js';
 import { buildAssemblyPlan } from './engine/ergonomics.js';
 import { renderProperties } from './ui/properties.js';
 import { renderPanelList } from './ui/toolbar.js';
@@ -270,9 +271,12 @@ exportJointsJsonBtn?.addEventListener('click', () => {
 // diagrams draw real panel geometry, which the plan's own step
 // objects reference only by id.
 printAssemblyBtn?.addEventListener('click', () => {
-  const resolved = resolveConstraints(panels);
-  const plan = buildAssemblyPlan(panels);
-  exportAssemblyPlanPdf(plan, resolved, { projectName: 'Assembly Instructions', mode: 'open' });
+  // const resolved = resolveConstraints(panels);
+  // const plan = buildAssemblyPlan(panels);
+  // exportAssemblyPlanPdf(plan, resolved, { projectName: 'Assembly Instructions', mode: 'open' });
+  const sequence = buildAssemblySequence(panels);
+
+  exportAssemblyManualPdf(sequence,{projectName: 'Assembly Instructions',mode: 'open'});
 });
 syncHistoryButtons();
 

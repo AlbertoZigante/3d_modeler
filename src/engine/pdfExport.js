@@ -940,3 +940,49 @@ export function exportAssemblyPlanPdf(plan, resolvedPanels, { projectName = 'Ass
     doc.save(fileName);
   }
 }
+export function exportAssemblyManualPdf(
+  sequence,
+  {
+    projectName = 'Assembly Instructions',
+    mode = 'open',
+  } = {}
+) {
+  const html = buildAssemblyManualHtml(sequence, {
+    title: projectName,
+    subtitle: 'Human-first assembly instructions',
+  });
+
+  if (mode === 'open') {
+    const printWindow = window.open('', '_blank');
+
+    if (!printWindow) {
+      throw new Error(
+        'Unable to open the assembly manual. Please allow pop-ups for this application.'
+      );
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    printWindow.addEventListener('load', () => {
+      printWindow.focus();
+      printWindow.print();
+    });
+
+    return;
+  }
+
+  // Fallback: open the printable manual if another mode is requested.
+  const printWindow = window.open('', '_blank');
+
+  if (!printWindow) {
+    throw new Error(
+      'Unable to open the assembly manual. Please allow pop-ups for this application.'
+    );
+  }
+
+  printWindow.document.open();
+  printWindow.document.write(html);
+  printWindow.document.close();
+}
