@@ -129,6 +129,13 @@ export function createDrawerFrontNodes(panels, placement, drawerBoxSpec = {}) {
     thicknessMm: drawerBoxSpec.thicknessMm ?? DEFAULT_DRAWER_BOX_THICKNESS_MM,
     widthMarginMm: drawerBoxSpec.widthMarginMm ?? DEFAULT_DRAWER_BOX_WIDTH_MARGIN_MM,
     depthMarginMm: drawerBoxSpec.depthMarginMm ?? DEFAULT_DRAWER_BOX_DEPTH_MARGIN_MM,
+    // computeDrawerBoxPlacement re-clamps these to their own floor
+    // itself, so storing an under-floor value here is harmless — but
+    // storing the (already-floored) intended value is what lets a
+    // later recompute (applyDrawerAdjustmentsForGroup) reproduce THIS
+    // drawer's own choice rather than silently reverting to default.
+    topMarginMm: drawerBoxSpec.topMarginMm ?? DEFAULT_DRAWER_BOX_TOP_MARGIN_MM,
+    bottomMarginMm: drawerBoxSpec.bottomMarginMm ?? DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM,
   };
 
   // nextId() just needs to hand back something unique — reusing it
@@ -188,6 +195,49 @@ export function createDrawerFrontNodes(panels, placement, drawerBoxSpec = {}) {
 
     return node;
   });
+}
+
+// Same role as features/door.js#computeDoorOpenTransform — a purely
+// VISUAL, ephemeral representation for the inspector's Open/Close
+// button (see modeller-main.js#toggleSelectedDrawerOpen), never
+// written back into the drawer's own stored geometry. A drawer has no
+// hinge to swing about, so "open" means translated straight out along
+// its own normal axis instead of rotated.
+export const DRAWER_OPEN_FRACTION = 0.75; // "3/4 of its depth" per the ask that prompted this
+
+/**
+ * Computes the single world-space offset that opening THIS drawer
+ * applies to every one of its own panels at once (the front AND its
+ * left/right/bottom/back box — modeller-main.js is the one that
+ * actually applies it to all 5, since a drawer, unlike a door, is more
+ * than one panel). "Its depth" is read directly off one of the
+ * drawer's own already-built side panels (left or right) — the exact
+ * same number engine/clearance.js#computeDrawerTravelVolumes already
+ * treats as "the runner's own full-extension travel" — rather than a
+ * separately-maintained constant, so a deeper drawer box visibly opens
+ * further than a shallow one, matching its own actual box.
+ *
+ * @param {Object} frontRaw - RAW drawer-front node (needs normalAxis/sign/id — see
+ *   this module's own header comment on why these must come from the
+ *   RAW graph, not a resolved node)
+ * @param {Array} panels - RAW graph, to find this front's own box siblings by drawerBoxFrontId
+ * @param {Array} resolvedPanels - resolveConstraints(panels) output, to read the box's actual built depth
+ * @returns {{ offsetMm: {x:number,y:number,z:number} } | null} null if this front has no box built yet (nothing to open)
+ */
+export function computeDrawerOpenTransform(frontRaw, panels, resolvedPanels) {
+  if (!frontRaw?.isDrawerFront) return null;
+  const sideRaw = panels.find((p) => p.isDrawerBoxPanel && p.drawerBoxFrontId === frontRaw.id && (p.drawerBoxRole === 'left' || p.drawerBoxRole === 'right'));
+  if (!sideRaw) return null;
+  const sideResolved = resolvedPanels.find((r) => r.id === sideRaw.id);
+  if (!sideResolved) return null;
+
+  const depthField = dimFieldForAxis(sideResolved.rotation, frontRaw.normalAxis);
+  const boxDepthMm = sideResolved[depthField];
+  if (!Number.isFinite(boxDepthMm)) return null;
+
+  const offsetMm = { x: 0, y: 0, z: 0 };
+  offsetMm[frontRaw.normalAxis] = (frontRaw.sign || 1) * boxDepthMm * DRAWER_OPEN_FRACTION;
+  return { offsetMm };
 }
 
 /**
@@ -323,6 +373,26 @@ export function applyDrawerAdjustmentsForGroup(panels, groupId) {
 export const DEFAULT_DRAWER_BOX_WIDTH_MARGIN_MM = 21; // Blum TANDEM/LEGRABOX spec: inside drawer width = opening width - 42mm, i.e. 21mm clearance per side (see engine/hardware.js's RUNNER_CATALOG + REF 4) — kept in sync with that number on purpose, since a mismatch here would mean the drawer is built without enough room for the runner engine/hardware.js recommends for it
 export const DEFAULT_DRAWER_BOX_DEPTH_MARGIN_MM = 20; // clearance so the box doesn't strike the back wall when pushed fully in
 export const DEFAULT_DRAWER_BOX_THICKNESS_MM = 12; // drawer boxes conventionally use thinner material than the front/carcass
+// Left/right/back's own top and bottom edges are inset this far from the
+// FRONT's top and bottom edges, rather than running flush to them (how
+// this worked before this pair of margins existed) — rule-of-thumb
+// clearance so the box's own carcass doesn't ride right up against the
+// front's overlay/reveal at the top and bottom. These are FLOORS, not
+// just defaults: computeDrawerBoxPlacement clamps any caller-supplied
+// value back up to this minimum, never down — see MIN_DRAWER_BOX_CLEARANCE_MM
+// just below for the reason a floor exists at all, rather than letting a
+// caller dial the box arbitrarily close to the carcass Top/Bottom panels.
+export const DEFAULT_DRAWER_BOX_TOP_MARGIN_MM = 20;
+export const DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM = 20;
+// Even at the floor above, the margins are measured from the FRONT's own
+// edges, not from the carcass Top/Bottom panels the drawer actually has
+// to clear — the two only coincide exactly when the front's edgeFit is
+// 'in' and flush. computeDrawerBoxPlacement re-checks the box's real,
+// resolved top/bottom extent against boundaryResult.inner[axisB] (the
+// carcass opening's own inner faces) and refuses to build a box that
+// leaves less than this much real clearance, rather than trusting the
+// margin-from-front arithmetic alone.
+export const MIN_DRAWER_BOX_CLEARANCE_MM = 0.5;
 
 /**
  * Computes the left/right/bottom/back panels that turn ONE drawer
@@ -339,7 +409,7 @@ export const DEFAULT_DRAWER_BOX_THICKNESS_MM = 12; // drawer boxes conventionall
  * measured from the front's own inner face to features/box.js's
  * findBoxSibling(..., 'Back') instead.
  *
- * Two SEPARATE margins, per the ask that prompted this:
+ * FOUR separate margins, per the asks that prompted each:
  *   - widthMarginMm: subtracted from EACH side (left AND right) of the
  *     inner opening width — this is the pair of panels' OUTER-to-OUTER
  *     span, i.e. "how wide the whole box sits inside the opening", not
@@ -347,13 +417,27 @@ export const DEFAULT_DRAWER_BOX_THICKNESS_MM = 12; // drawer boxes conventionall
  *   - depthMarginMm: subtracted ONCE, only at the back (nothing needs
  *     inset at the front — the box's own front opening sits flush
  *     with the drawer front's inner face, touching it exactly).
+ *   - topMarginMm / bottomMarginMm: inset the box's own top and bottom
+ *     edges THIS FAR from the FRONT's own top and bottom edges — left/
+ *     right/back no longer run the front's full height flush to its
+ *     edges. Both are FLOORS (see DEFAULT_DRAWER_BOX_TOP_MARGIN_MM's own
+ *     comment): a caller-supplied value below the default is clamped
+ *     back up to it, never down, so a person adjusting these can only
+ *     shrink the box further, never push it closer to the carcass than
+ *     the shipped default already sits. Because the margin is measured
+ *     from the FRONT, not the carcass, a passing margin doesn't by
+ *     itself prove the box clears the carcass Top/Bottom panels — see
+ *     the real-clearance check against boundaryResult.inner[axisB]
+ *     further down, which is the thing that actually guards that.
  *
  * Left/right run the box's full computed depth; bottom and back then
  * fit INSIDE that (bottom stops depthMarginMm... no — stops
  * `thicknessMm` short of back's own inner face; back sits flush at
  * the sides' far end, recessed inward by its own half-thickness) —
  * see the inline math below for the exact butt-joint layout. No top:
- * a drawer box is open on top by construction.
+ * a drawer box is open on top by construction. Vertically (axisB),
+ * left/right/back now span only the margin-inset height described
+ * above, not the front's own full height.
  *
  * SCOPED to normalAxis 'z' only (a front replacing Front/Back) — the
  * only orientation where "the opposing wall to measure depth against"
@@ -368,20 +452,26 @@ export const DEFAULT_DRAWER_BOX_THICKNESS_MM = 12; // drawer boxes conventionall
  *   `panels` — needs boundaryIds/edgeFit/normalAxis/axisA/axisB/sign,
  *   none of which survive resolveConstraints; see
  *   modeller-main.js#renderAll's own drawerFrontFieldsById comment)
- * @param {{material:string, thicknessMm:number, widthMarginMm?:number, depthMarginMm?:number}} boxSpec
+ * @param {{material:string, thicknessMm:number, widthMarginMm?:number, depthMarginMm?:number, topMarginMm?:number, bottomMarginMm?:number}} boxSpec
  * @returns {{ ok:true, frontId:string, groupId:string, normalAxis:'z', axisA:string, axisB:string,
  *   material:string, thicknessMm:number,
  *   left:{center:{x,y,z}, dims:{width,height,thickness}},
  *   right:{center:{x,y,z}, dims:{width,height,thickness}},
  *   bottom:{center:{x,y,z}, dims:{width,height,thickness}},
  *   back:{center:{x,y,z}, dims:{width,height,thickness}} }
- *  | { ok:false, reason:'not-a-drawer-front'|'unsupported-normal-axis'|'no-back-wall'|'boundary-missing'|'panel-too-short' }}
+ *  | { ok:false, reason:'not-a-drawer-front'|'unsupported-normal-axis'|'no-back-wall'|'boundary-missing'|'panel-too-short'|'insufficient-clearance' }}
  */
 export function computeDrawerBoxPlacement(panels, frontNode, boxSpec) {
   if (!frontNode?.isDrawerFront) return { ok: false, reason: 'not-a-drawer-front' };
   if (frontNode.normalAxis !== 'z') return { ok: false, reason: 'unsupported-normal-axis' }; // see this function's own doc comment
 
   const { material, thicknessMm, widthMarginMm = DEFAULT_DRAWER_BOX_WIDTH_MARGIN_MM, depthMarginMm = DEFAULT_DRAWER_BOX_DEPTH_MARGIN_MM } = boxSpec;
+  // Floors, not just defaults — see DEFAULT_DRAWER_BOX_TOP_MARGIN_MM's
+  // own comment on why a caller can only ever push these UP from here,
+  // never down, however the value reaches this function (a future UI
+  // field, a stored drawerBoxSpec, a recompute replaying an old spec).
+  const topMarginMm = Math.max(DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, boxSpec.topMarginMm ?? DEFAULT_DRAWER_BOX_TOP_MARGIN_MM);
+  const bottomMarginMm = Math.max(DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM, boxSpec.bottomMarginMm ?? DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM);
   const N = frontNode.normalAxis;
   const axisA = frontNode.axisA;
   const axisB = frontNode.axisB;
@@ -419,8 +509,32 @@ export function computeDrawerBoxPlacement(panels, frontNode, boxSpec) {
   const innerAMax = boundaryResult.inner[axisA].max;
   const boxWidthMm = (innerAMax - innerAMin) - 2 * widthMarginMm; // outer-to-outer span of left+right, see doc comment above
 
-  if (boxDepthMm < MIN_PANEL_DIM_MM || boxWidthMm < MIN_PANEL_DIM_MM || (boxWidthMm - 2 * thicknessMm) < MIN_PANEL_DIM_MM || (boxDepthMm - thicknessMm) < MIN_PANEL_DIM_MM || (frontAxisBSize - thicknessMm) < MIN_PANEL_DIM_MM) {
+  // Box's own vertical (axisB) span: inset from the front's top/bottom
+  // edges by topMarginMm/bottomMarginMm instead of running flush to
+  // them — see this function's own doc comment and
+  // DEFAULT_DRAWER_BOX_TOP_MARGIN_MM's comment for why.
+  const boxLowB = frontCenterB - frontAxisBSize / 2 + bottomMarginMm;
+  const boxHighB = frontCenterB + frontAxisBSize / 2 - topMarginMm;
+  const boxAxisBSize = boxHighB - boxLowB;
+
+  if (boxDepthMm < MIN_PANEL_DIM_MM || boxWidthMm < MIN_PANEL_DIM_MM || boxAxisBSize < MIN_PANEL_DIM_MM || (boxWidthMm - 2 * thicknessMm) < MIN_PANEL_DIM_MM || (boxDepthMm - thicknessMm) < MIN_PANEL_DIM_MM || (boxAxisBSize - thicknessMm) < MIN_PANEL_DIM_MM) {
     return { ok: false, reason: 'panel-too-short' };
+  }
+
+  // Real-clearance guard: the margins above are measured from the
+  // FRONT, but what the box actually has to clear is the CARCASS
+  // Top/Bottom panels' own inner faces (boundaryResult.inner[axisB] —
+  // same inner rectangle innerAMin/innerAMax above already reads, just
+  // the other axis). The two only coincide exactly when the front's
+  // edgeFit is 'in' and flush; this re-derives the real gap rather than
+  // trusting that coincidence, and refuses to build a box that would
+  // leave less than MIN_DRAWER_BOX_CLEARANCE_MM on either end.
+  const innerBMin = boundaryResult.inner[axisB].min;
+  const innerBMax = boundaryResult.inner[axisB].max;
+  const topClearanceMm = innerBMax - boxHighB;
+  const bottomClearanceMm = boxLowB - innerBMin;
+  if (topClearanceMm < MIN_DRAWER_BOX_CLEARANCE_MM || bottomClearanceMm < MIN_DRAWER_BOX_CLEARANCE_MM) {
+    return { ok: false, reason: 'insufficient-clearance' };
   }
 
   const sideRotation = ROTATION_FOR_NORMAL_AXIS[axisA]; // left/right: thickness along axisA, same convention as box.js's own Left/Right
@@ -453,14 +567,18 @@ export function computeDrawerBoxPlacement(panels, frontNode, boxSpec) {
   const leftCenterA = innerAMin + widthMarginMm + thicknessMm / 2;
   const rightCenterA = innerAMax - widthMarginMm - thicknessMm / 2;
 
-  // Height layout (axisB): left/right run the front's FULL height;
-  // bottom sits flush at its lower edge; back sits on TOP of bottom
-  // (its own height is the front's height minus bottom's thickness),
-  // flush with the front's upper edge — same "no gap, no overlap"
-  // butt-joint reasoning as the depth layout above.
-  const bottomCenterB = frontCenterB - frontAxisBSize / 2 + thicknessMm / 2;
-  const backCenterB = frontCenterB + thicknessMm / 2;
-  const backHeightMm = frontAxisBSize - thicknessMm;
+  // Height layout (axisB): left/right run the box's own inset height
+  // (boxAxisBSize, NOT the front's full height — see topMarginMm/
+  // bottomMarginMm above); bottom sits flush at the box's own lower
+  // edge; back sits on TOP of bottom (its own height is the box's
+  // height minus bottom's thickness), flush with the box's own upper
+  // edge — same "no gap, no overlap" butt-joint reasoning as the depth
+  // layout above, just measured from boxLowB/boxHighB instead of the
+  // front's raw edges.
+  const boxCenterB = (boxLowB + boxHighB) / 2;
+  const bottomCenterB = boxLowB + thicknessMm / 2;
+  const backHeightMm = boxAxisBSize - thicknessMm;
+  const backCenterB = boxHighB - backHeightMm / 2;
 
   function centerFor(nAlongN, aAlongA, bAlongB) {
     const c = { x: 0, y: 0, z: 0 };
@@ -480,14 +598,14 @@ export function computeDrawerBoxPlacement(panels, frontNode, boxSpec) {
     material,
     thicknessMm,
     left: {
-      center: centerFor(sideCenterN, leftCenterA, frontCenterB),
+      center: centerFor(sideCenterN, leftCenterA, boxCenterB),
       rotation: sideRotation,
-      dims: { [sideDepthField]: boxDepthMm, [sideHeightField]: frontAxisBSize, thickness: thicknessMm },
+      dims: { [sideDepthField]: boxDepthMm, [sideHeightField]: boxAxisBSize, thickness: thicknessMm },
     },
     right: {
-      center: centerFor(sideCenterN, rightCenterA, frontCenterB),
+      center: centerFor(sideCenterN, rightCenterA, boxCenterB),
       rotation: sideRotation,
-      dims: { [sideDepthField]: boxDepthMm, [sideHeightField]: frontAxisBSize, thickness: thicknessMm },
+      dims: { [sideDepthField]: boxDepthMm, [sideHeightField]: boxAxisBSize, thickness: thicknessMm },
     },
     bottom: {
       center: centerFor(bottomCenterN, axisACenter, bottomCenterB),

@@ -116,7 +116,7 @@
  *   output.
  */
 import { computeWorldHalfExtents, getAlignedAxis, LOCAL_FACES } from '../modeller/modules.js';
-import { facingFace } from '../shared/geometry.js';
+import { facingFace, computeWorldAABB, boxesOverlap } from '../shared/geometry.js';
 import { resolveConstraints } from '../modeller/snap.js';
 import { dimFieldForAxis } from '../shared/frontFit.js';
 
@@ -162,18 +162,12 @@ const DEFAULT_OPTIONS = {
  * @property {{x:number,y:number,z:number}} overlapMm - real overlap length on every axis
  */
 
-// A resolved node's own world AABB, expressed as [min,max] per axis.
-// computeWorldHalfExtents already accounts for rotation (a Vertical
-// panel's `width` runs along world Z, not X, etc.) — this file never
-// re-derives that, it's the one source of truth (modules.js).
-function computeAABB(resolved) {
-  const half = computeWorldHalfExtents(resolved);
-  const box = {};
-  AXES.forEach((axis) => {
-    box[axis] = [resolved.position[axis] - half[axis], resolved.position[axis] + half[axis]];
-  });
-  return box;
-}
+// computeAABB used to be a private copy of this exact logic — moved to
+// shared/geometry.js#computeWorldAABB once engine/clearance.js needed
+// the identical AABB too (single source of truth, not a second copy
+// that could drift). Aliased locally so the rest of this file doesn't
+// change.
+const computeAABB = computeWorldAABB;
 
 // Positive => the two intervals overlap by this many mm.
 // Zero => they touch exactly, edge to edge.
@@ -306,7 +300,10 @@ export function detectJoints(resolvedPanels, options = {}) {
       // Real 3D interpenetration: positive overlap on every axis at
       // once. A modelling error, not a joint — see file-header note on
       // why this is routed to a separate channel instead of Joint[].
-      if (AXES.every((axis) => overlaps[axis] >= opts.collisionMinMm)) {
+      // boxesOverlap is the shared geometry.js primitive (also used by
+      // engine/clearance.js) — collisionMinMm is passed as its
+      // tolerance so this keeps its exact prior threshold semantics.
+      if (boxesOverlap(boxA, boxB, opts.collisionMinMm)) {
         collisions.push({
           panelA: A.id,
           panelB: B.id,

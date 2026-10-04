@@ -75,7 +75,7 @@ import {
 import { addBox, relayoutBox } from './features/box.js';
 import { isShelf } from './features/shelf.js';
 import { createDoorNode, computeDoorOpenTransform, applyDoorAdjustmentsForGroup, applyPanelPatch, computeDoorPlacement, DEFAULT_DOOR_EDGE_FIT, DEFAULT_DOOR_HINGE } from './features/door.js';
-import { createDrawerFrontNodes, createDrawerBoxNodes, computeDrawerBoxPlacement, applyDrawerAdjustmentsForGroup, computeDrawerFrontsPlacement, DEFAULT_DRAWER_EDGE_FIT, DEFAULT_DRAWER_COUNT, MAX_DRAWER_COUNT } from './features/drawer.js';
+import { createDrawerFrontNodes, createDrawerBoxNodes, computeDrawerBoxPlacement, computeDrawerOpenTransform, applyDrawerAdjustmentsForGroup, computeDrawerFrontsPlacement, DEFAULT_DRAWER_EDGE_FIT, DEFAULT_DRAWER_COUNT, MAX_DRAWER_COUNT, DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM } from './features/drawer.js';
 import { startShelfMode, cancelShelfMode, getShelfMode, setShelfToolContext } from './tools/shelfTool.js';
 import { setBoundaryRectToolContext } from './tools/boundaryRectTool.js';
 import {
@@ -105,7 +105,7 @@ import {
   DeleteBoxCommand, GroupPanelsCommand, UngroupPanelsCommand, DeleteShelfCommand,
   RemoveConstraintCommand, UnlinkConstraintCommand, HideBoxWallCommand, RestoreBoxWallCommand,
   ChangeEdgeFitCommand, AddDoorCommand, SetDoorHingeCommand, DeleteDoorCommand,
-  AddDrawerCommand, DeleteDrawerCommand,
+  AddDrawerCommand, DeleteDrawerCommand, SetDrawerBoxMarginCommand,
 } from './history/history.js';
 initResizableLayout();
 
@@ -1101,10 +1101,33 @@ function renderAll() {
   // at the door's real CLOSED position/rotation — doorOpen is a purely
   // visual toggle (see toggleSelectedDoorOpen), not a design change,
   // and must never affect what gets measured or cut.
+  // Same visual-only idea as the door case just above, but a drawer is
+  // FIVE panels (front + its own left/right/bottom/back box) that all
+  // have to shift together by the SAME offset, not one panel rotating
+  // about its own hinge — so this is built as an id -> offset map from
+  // the RAW graph first (drawerOpen only ever lives on the front;
+  // isDrawerFront/isDrawerBoxPanel/drawerBoxFrontId are read from
+  // `panels`, never trusted off a resolved node — see this file's own
+  // drawerFrontFieldsById/drawerBoxPanelFieldsById maps just above on
+  // why), then applied by id below rather than re-deriving per panel.
+  const openDrawerShiftByPanelId = new Map();
+  panels.filter((p) => p.isDrawerFront && p.drawerOpen).forEach((frontRaw) => {
+    const transform = computeDrawerOpenTransform(frontRaw, panels, resolved);
+    if (!transform) return;
+    openDrawerShiftByPanelId.set(frontRaw.id, transform.offsetMm);
+    panels
+      .filter((p) => p.isDrawerBoxPanel && p.drawerBoxFrontId === frontRaw.id)
+      .forEach((boxPanel) => openDrawerShiftByPanelId.set(boxPanel.id, transform.offsetMm));
+  });
+
   const sceneVisiblePanels = visiblePanels.map((p) => {
-    if (!p.isDoor || !p.doorOpen) return p;
-    const open = computeDoorOpenTransform(p);
-    return open ? { ...p, position: open.position, rotation: open.rotation } : p;
+    if (p.isDoor && p.doorOpen) {
+      const open = computeDoorOpenTransform(p);
+      return open ? { ...p, position: open.position, rotation: open.rotation } : p;
+    }
+    const shift = openDrawerShiftByPanelId.get(p.id);
+    if (!shift) return p;
+    return { ...p, position: { x: p.position.x + shift.x, y: p.position.y + shift.y, z: p.position.z + shift.z } };
   });
 
   reconcile(sceneVisiblePanels, selectedId, selectedGroupId, multiSelectedIds, boxWallIds, selectedBoxWallId);
@@ -1194,6 +1217,16 @@ function renderInspectorOnly() {
       ? groupMembers[0].material
       : null;
 
+  // A drawer front always carries drawerBoxSpec (createDrawerFrontNodes
+  // stores it unconditionally), even when its box failed to build
+  // (computeDrawerBoxPlacement returned ok:false — too little room, or
+  // too little real clearance). drawerBoxSpec truthiness alone can't
+  // tell margin fields / the Open button whether there's an actual box
+  // to adjust or open, so this checks for the box's own panels
+  // directly, same way applyDrawerAdjustmentsForGroup itself finds
+  // them.
+  const drawerHasBox = !!(selectedPanel?.isDrawerFront && panels.some((p) => p.isDrawerBoxPanel && p.drawerBoxFrontId === selectedPanel.id));
+
   if (inspectorEl) {
     renderProperties(inspectorEl, {
       selectedPanel,
@@ -1202,6 +1235,7 @@ function renderInspectorOnly() {
       groupMemberCount,
       groupMaterial,
       hiddenGroupMembers,
+      drawerHasBox,
       restoreError: restoreBlockedMessage,
       onFieldChange: updateSelectedField,
       onTransformFieldChange: updateSelectedTransformField,
@@ -1217,6 +1251,8 @@ function renderInspectorOnly() {
       onDoorHingeChange: updateSelectedDoorHinge,
       onDrawerFrontEdgeFitChange: updateSelectedDrawerFrontEdgeFit,
       onDrawerFrontCountChange: updateSelectedDrawerFrontCount,
+      onToggleDrawerOpen: toggleSelectedDrawerOpen,
+      onDrawerBoxMarginChange: updateSelectedDrawerBoxMargin,
     });
   }
 
@@ -1709,6 +1745,47 @@ function toggleSelectedDoorOpen() {
   if (!node || !node.isDoor) return;
 
   panels = panels.map((p) => (p.id === selectedId ? { ...p, doorOpen: !p.doorOpen } : p));
+  renderAll();
+}
+
+// Same ephemeral, non-history reasoning as toggleSelectedDoorOpen just
+// above — only `drawerOpen` on the front itself is toggled here; the
+// shift applied to all 5 of the drawer's own panels is computed fresh
+// every render (see renderAll()'s own openDrawerShiftByPanelId), never
+// stored.
+function toggleSelectedDrawerOpen() {
+  const selectedId = getSelectedId();
+  const node = panels.find((p) => p.id === selectedId);
+  if (!node || !node.isDrawerFront) return;
+
+  panels = panels.map((p) => (p.id === selectedId ? { ...p, drawerOpen: !p.drawerOpen } : p));
+  renderAll();
+}
+
+// Unlike drawerOpen above, the box's own top/bottom margins ARE a
+// design decision (they change the box's real built geometry), so this
+// goes through history like any other field edit. Clamped to its own
+// floor HERE, not just inside features/drawer.js#computeDrawerBoxPlacement,
+// so the field shown in the inspector never lies about what the box
+// actually built.
+function updateSelectedDrawerBoxMargin(field, rawValue) {
+  const selectedId = getSelectedId();
+  const node = panels.find((p) => p.id === selectedId);
+  if (!node || !node.isDrawerFront || !node.drawerBoxSpec) return;
+
+  const floor = field === 'topMarginMm' ? DEFAULT_DRAWER_BOX_TOP_MARGIN_MM : DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM;
+  const clamped = Math.max(floor, rawValue);
+  if (node.drawerBoxSpec[field] === clamped) return;
+
+  const before = panels;
+  panels = panels.map((p) => (p.id === selectedId ? { ...p, drawerBoxSpec: { ...p.drawerBoxSpec, [field]: clamped } } : p));
+  // Re-derives this front's own box (and only this front's — see
+  // applyDrawerAdjustmentsForGroup's own per-stack loop) against the
+  // just-updated spec, same recompute path a boundary-panel resize
+  // already drives.
+  panels = applyDrawerAdjustmentsForGroup(panels, node.groupId);
+  const after = panels;
+  recordHistoryCommand(SetDrawerBoxMarginCommand, before, after);
   renderAll();
 }
 

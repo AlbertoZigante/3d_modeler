@@ -17,10 +17,14 @@
  * post-creation control (see that file), so DEFAULT_DRAWER_COUNT is
  * effectively every drawer's count now, not just its starting point.
  *
- * The one real difference from doorTool.js: no hinge — drawer fronts
- * don't hinge/open in this codebase's model (see features/drawer.js's
- * own header comment on what's NOT built yet), they just fill the
- * opening as N stacked panels.
+ * The one real difference from doorTool.js: a count field instead of
+ * a hinge — a drawer front has no hinge to pick a side for, so this
+ * tool has nothing to ask about opening at all. It CAN still be
+ * opened after creation (features/drawer.js#computeDrawerOpenTransform,
+ * ui/properties.js's drawerSectionHTML Open/Close button) — a straight
+ * slide along its own normal axis, not a swing — but that's entirely a
+ * post-creation inspector concern, same as a door's own Open/Close
+ * button never appearing in doorTool.js's confirm form either.
  */
 import { startBoundaryRectMode, cancelBoundaryRectMode } from './boundaryRectTool.js';
 

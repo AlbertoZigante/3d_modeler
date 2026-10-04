@@ -29,6 +29,79 @@ export function rotationsMatch(a, b) {
   return a.x === b.x && a.y === b.y && a.z === b.z;
 }
 
+// A resolved node's own world AABB, expressed as [min,max] per axis —
+// SINGLE SOURCE OF TRUTH for "what box does this panel occupy in
+// world space", used by both engine/joints.js's own collision/contact
+// sweep and engine/clearance.js's volume-vs-panel sweep (see that
+// file's own header for why it needs the exact same AABB joints.js
+// already computes, rather than a second slightly-different one).
+// Moved here from joints.js (was a private, unexported function
+// there) once clearance.js needed it too.
+export function computeWorldAABB(resolved) {
+  const half = computeWorldHalfExtents(resolved);
+  const box = {};
+  ['x', 'y', 'z'].forEach((axis) => {
+    box[axis] = [resolved.position[axis] - half[axis], resolved.position[axis] + half[axis]];
+  });
+  return box;
+}
+
+// Generic 3-axis AABB overlap test — true 3D interpenetration, not
+// mere touching. `tolerance` (mm) lets a caller treat a graze of up
+// to that amount as "not really overlapping" (defaults to 0: any
+// positive overlap on every axis counts). This is the exact
+// overlaps.every(axis => ...) test engine/joints.js#detectJoints used
+// to run inline for its own collision detection — extracted here so
+// engine/clearance.js's volume-vs-panel and volume-vs-volume sweeps
+// can reuse the identical primitive instead of a second copy that
+// could quietly drift from this one.
+// `tolerance` is a MINIMUM required overlap, not a forgiveness margin
+// — overlap exactly equal to tolerance counts (matches
+// engine/joints.js's own prior collisionMinMm semantics: "real overlap
+// on every axis at [or beyond] this amount"). Callers that want to
+// ignore mere touching (0 overlap) — e.g. engine/clearance.js, where
+// two panels butted flush together is the NORMAL, intended state, not
+// a violation — pass a small positive tolerance (a fraction of a mm)
+// rather than relying on this function to guess what "just touching"
+// means for their use case.
+export function boxesOverlap(boxA, boxB, tolerance = 0) {
+  return ['x', 'y', 'z'].every((axis) => {
+    const overlap = Math.min(boxA[axis][1], boxB[axis][1]) - Math.max(boxA[axis][0], boxB[axis][0]);
+    return overlap >= tolerance;
+  });
+}
+
+// Maps a LOCAL offset vector — in a node's own width/height/thickness
+// axes, same convention shared/handle.js#computeHandlePlacement
+// returns its localOffset in (local x = width axis via the 'right'
+// face, local y = height axis via 'top', local z = thickness axis via
+// 'front') — into a WORLD offset vector, using the node's rotation.
+// Same three face probes modules.js#computeWorldHalfExtents uses, but
+// keeping the sign (needed for an offset — a half-extent has none).
+const LOCAL_AXIS_PROBE_FACE = { x: 'right', y: 'top', z: 'front' };
+export function localOffsetToWorld(rotation, local) {
+  const world = { x: 0, y: 0, z: 0 };
+  Object.entries(LOCAL_AXIS_PROBE_FACE).forEach(([localAxis, face]) => {
+    const aligned = getAlignedAxis(rotation, face);
+    if (aligned) world[aligned.axis] += aligned.sign * (local[localAxis] || 0);
+  });
+  return world;
+}
+
+// Same axis mapping as localOffsetToWorld, but for a HALF-EXTENT
+// triple (magnitude only, no sign) — the generic version of
+// modules.js#computeWorldHalfExtents for a LOCAL half-size that isn't
+// the node's own width/height/thickness (e.g. a handle's own
+// length/crossSection/protrusion, attached as a child of the panel).
+export function worldHalfExtentsForLocalDims(rotation, localHalf) {
+  const half = { x: 0, y: 0, z: 0 };
+  Object.entries(LOCAL_AXIS_PROBE_FACE).forEach(([localAxis, face]) => {
+    const aligned = getAlignedAxis(rotation, face);
+    if (aligned) half[aligned.axis] = Math.abs(localHalf[localAxis] || 0);
+  });
+  return half;
+}
+
 // Sorts a set of same-axis slabs (each { center, halfThickness,
 // label }) and checks every neighbor pair keeps at least
 // MIN_WALL_GAP_MM of clear space between them. Walls and shelves are

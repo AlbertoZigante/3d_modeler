@@ -200,6 +200,12 @@ export class DeleteDrawerCommand extends ModelCommand {
   }
 }
 
+export class SetDrawerBoxMarginCommand extends ModelCommand {
+  constructor(options) {
+    super({ ...options, label: 'Change drawer box margin' });
+  }
+}
+
 export class RenamePanelCommand extends ModelCommand {
   constructor(options) {
     super({ ...options, label: 'Rename panel' });

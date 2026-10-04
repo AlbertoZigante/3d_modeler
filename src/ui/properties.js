@@ -27,6 +27,7 @@
 import { getDisplayName, MATERIAL_CATALOG } from '../modeller/modules.js';
 import { renderDoorSchema } from './doorSchema.js';
 import { renderDrawerSchema } from './drawerSchema.js';
+import { DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM } from '../features/drawer.js';
 
 const DIM_FIELDS = ['width', 'height']; // thickness is derived from material — see below, never a typed field
 
@@ -54,6 +55,9 @@ export function renderProperties(
     onDoorHingeChange,
     onDrawerFrontEdgeFitChange,
     onDrawerFrontCountChange,
+    drawerHasBox,
+    onToggleDrawerOpen,
+    onDrawerBoxMarginChange,
   }
 ) {
   if (selectedGroupId && !selectedPanel) {
@@ -129,7 +133,7 @@ export function renderProperties(
 
     ${selectedPanel.edgeFit && !selectedPanel.isDoor && !selectedPanel.isDrawerFront ? edgeFitSectionHTML(selectedPanel.edgeFit) : ''}
     ${selectedPanel.isDoor ? doorSectionHTML(selectedPanel, hiddenGroupMembers || [], restoreError) : ''}
-    ${selectedPanel.isDrawerFront ? drawerSectionHTML(selectedPanel, hiddenGroupMembers || [], restoreError) : ''}
+    ${selectedPanel.isDrawerFront ? drawerSectionHTML(selectedPanel, hiddenGroupMembers || [], restoreError, !!drawerHasBox) : ''}
   `;
 
   // ---- rename (pencil icon) ----
@@ -246,6 +250,18 @@ export function renderProperties(
   container.querySelector('#drawer-front-count-field')?.addEventListener('change', (event) => {
     onDrawerFrontCountChange(event.target.value);
   });
+
+  // ---- drawer box (top/bottom margins + open/close — only present
+  // when hasBox, see drawerSectionHTML's own gate).
+  container.querySelectorAll('.drawer-margin-field').forEach((input) => {
+    input.addEventListener('change', () => {
+      onDrawerBoxMarginChange(input.dataset.field, Number(input.value));
+    });
+  });
+  container.querySelector('#toggle-drawer-open-btn')?.addEventListener('click', () => {
+    onToggleDrawerOpen();
+  });
+
   wireRestoreFaceButtons(container, onRestoreFace);
 }
 
@@ -338,7 +354,19 @@ function doorSectionHTML(door, hiddenGroupMembers, restoreError) {
 // modeller-main.js#updateSelectedDrawerFrontCount — changing it tears
 // down and rebuilds the whole stack, unlike edge fit, so it isn't
 // something the schema itself can represent as a click).
-function drawerSectionHTML(front, hiddenGroupMembers, restoreError) {
+//
+// Below the schema/count: the drawer's own BOX — top/bottom margin
+// fields and an Open/Close button, gated on `hasBox` (does this front
+// actually have its own left/right/bottom/back panels built right
+// now — drawerBoxSpec itself is always present on a front even when
+// the box failed to build, see modeller-main.js's own drawerHasBox
+// comment, so that alone can't gate this). The two margin inputs use
+// their OWN class (drawer-margin-field), deliberately not the generic
+// dim-field one wired to onFieldChange below — these live at
+// drawerBoxSpec.<field>, not on the panel directly, so writing
+// through the generic path would silently set the wrong property.
+function drawerSectionHTML(front, hiddenGroupMembers, restoreError, hasBox) {
+  const spec = front.drawerBoxSpec || {};
   return `
     <div class="divider"></div>
     <div class="section-title">Drawer</div>
@@ -350,6 +378,15 @@ function drawerSectionHTML(front, hiddenGroupMembers, restoreError) {
       <label>Number of drawers</label>
       <input type="number" class="field-input" id="drawer-front-count-field" min="1" max="10" step="1" value="${Number(front.drawerCount ?? 1)}" />
     </div>
+    ${hasBox ? `
+      <div class="divider"></div>
+      <div class="section-title">Drawer box</div>
+      ${numberFieldHTML('Top margin', 'topMarginMm', spec.topMarginMm ?? DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, 'mm', { min: DEFAULT_DRAWER_BOX_TOP_MARGIN_MM }, 'drawer-margin-field')}
+      ${numberFieldHTML('Bottom margin', 'bottomMarginMm', spec.bottomMarginMm ?? DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM, 'mm', { min: DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM }, 'drawer-margin-field')}
+      <button class="add-btn" id="toggle-drawer-open-btn">${front.drawerOpen ? 'Close drawer' : 'Open drawer'}</button>
+    ` : `
+      <div class="empty-state">This drawer has no box built yet — nothing here to adjust or open.</div>
+    `}
     ${restoreFaceListHTML(hiddenGroupMembers, restoreError)}
   `;
 }
