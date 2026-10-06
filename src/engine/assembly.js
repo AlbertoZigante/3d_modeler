@@ -1022,585 +1022,676 @@ function phase4ErgonomicLabel(score) {
   return 'Difficult';
 }
 
-function phase4BuildVisualParts(
-  options = {}
-) {
-  const rawPanels =
-    phase4Array(
-      options.panels
-    );
+function phase4BuildVisualParts(options = {}) {
+  const rawPanels = Array.isArray(options.panels)
+    ? options.panels
+    : [];
 
-  const resolvedPanels =
-    phase4Array(
-      options.resolvedPanels
-    );
+  const resolvedPanels = Array.isArray(options.resolvedPanels)
+    ? options.resolvedPanels
+    : [];
 
-  const resolvedById =
-    new Map(
-      resolvedPanels.map(
-        (panel) => [
-          panel.id,
-          panel,
-        ]
-      )
-    );
+  const resolvedById = new Map();
 
-  return rawPanels.map(
-    (panel) => {
-
-      const resolved =
-        resolvedById.get(
-          panel.id
-        );
-
-      const dimensions =
-        phase4PanelDimensions(
-          panel,
-          resolved
-        );
-
-      const role =
-        panelRole(panel);
-
-      return {
-        id: panel.id,
-
-        code:
-          panel.pieceCode ??
-          panel.code ??
-          resolved?.pieceCode ??
-          panel.id,
-
-        name:
-          panel.name ??
-          resolved?.name ??
-          panel.id,
-
-        role,
-
-        roleLabel:
-          phase4RoleLabel(role),
-
-        width:
-          dimensions.width,
-
-        height:
-          dimensions.height,
-
-        thickness:
-          dimensions.thickness,
-      };
+  resolvedPanels.forEach((panel, index) => {
+    if (!panel) {
+      return;
     }
+
+    const id =
+      panel.id ??
+      panel.panelId ??
+      panel.code ??
+      rawPanels[index]?.id ??
+      rawPanels[index]?.panelId ??
+      null;
+
+    if (id != null) {
+      resolvedById.set(String(id), panel);
+    }
+  });
+
+  return rawPanels.map((panel, index) => {
+    const id =
+      panel?.id ??
+      panel?.panelId ??
+      panel?.code ??
+      `panel-${index + 1}`;
+
+    const resolved =
+      resolvedById.get(String(id)) ??
+      resolvedPanels[index] ??
+      {};
+
+    const dimensions =
+      resolved.dimensions ??
+      resolved.size ??
+      panel.dimensions ??
+      panel.size ??
+      {};
+
+    const width = phase4PickNumber(
+      dimensions.width ??
+      resolved.width ??
+      panel.width ??
+      panel.w,
+      1
+    );
+
+    const height = phase4PickNumber(
+      dimensions.height ??
+      resolved.height ??
+      panel.height ??
+      panel.h,
+      1
+    );
+
+    const depth = phase4PickNumber(
+      dimensions.depth ??
+      dimensions.thickness ??
+      resolved.depth ??
+      resolved.thickness ??
+      panel.depth ??
+      panel.thickness ??
+      panel.t,
+      0.02
+    );
+
+    /*
+     * Prefer the resolved modeller position.
+     */
+    let position =
+      phase4PickVector(
+        resolved.position,
+        null
+      ) ??
+      phase4PickVector(
+        resolved.translation,
+        null
+      ) ??
+      phase4PickVector(
+        resolved.origin,
+        null
+      ) ??
+      phase4PickVector(
+        resolved.center,
+        null
+      ) ??
+      phase4PickVector(
+        panel.position,
+        null
+      ) ??
+      phase4PickVector(
+        panel.translation,
+        null
+      ) ??
+      phase4PickVector(
+        panel.origin,
+        null
+      ) ??
+      {
+        x: 0,
+        y: 0,
+        z: 0,
+      };
+
+    const rawMatrix =
+      resolved.matrix ??
+      resolved.transform ??
+      panel.matrix ??
+      panel.transform ??
+      null;
+
+    const matrix =
+      phase4MatrixFrom(rawMatrix);
+
+    /*
+     * If a 4x4 matrix already contains translation and no explicit
+     * position exists, use its translation.
+     */
+    if (
+      matrix &&
+      matrix.length === 16 &&
+      !phase4PickVector(resolved.position, null) &&
+      !phase4PickVector(resolved.translation, null) &&
+      !phase4PickVector(resolved.origin, null)
+    ) {
+      position =
+        phase4TranslationFromMatrix(matrix) ??
+        position;
+    }
+
+    const rotation =
+      resolved.rotation ??
+      resolved.orientation ??
+      panel.rotation ??
+      panel.orientation ??
+      null;
+
+    const rotationMatrix =
+      matrix ??
+      phase4RotationMatrix(rotation);
+
+    return {
+      id: String(id),
+
+      raw: panel,
+      resolved,
+
+      code:
+        panel.code ??
+        resolved.code ??
+        String(id),
+
+      name:
+        panel.name ??
+        resolved.name ??
+        String(id),
+
+      role:
+        panel.role ??
+        resolved.role ??
+        null,
+
+      width: Math.max(width, 0.000001),
+      height: Math.max(height, 0.000001),
+      depth: Math.max(depth, 0.000001),
+
+      position,
+
+      rotation,
+      matrix: rotationMatrix,
+
+      /*
+       * Keep original metadata available to the renderer.
+       */
+      thickness:
+        phase4PickNumber(
+          dimensions.thickness ??
+          resolved.thickness ??
+          panel.thickness,
+          depth
+        ),
+    };
+  });
+}
+
+function phase4ProjectPoint(point, camera) {
+  return {
+    x:
+      point.x * camera.rightX +
+      point.y * camera.rightY +
+      point.z * camera.rightZ,
+
+    y:
+      point.x * camera.upX +
+      point.y * camera.upY +
+      point.z * camera.upZ,
+
+    depth:
+      point.x * camera.depthX +
+      point.y * camera.depthY +
+      point.z * camera.depthZ,
+  };
+}
+
+function phase4BuildPanelCorners(part) {
+  const w = part.width;
+  const h = part.height;
+  const d = part.depth;
+
+  /*
+   * Local panel coordinate system:
+   *
+   * X = width
+   * Y = height
+   * Z = thickness/depth
+   */
+  const localCorners = [
+    { x: 0, y: 0, z: 0 },
+    { x: w, y: 0, z: 0 },
+    { x: w, y: h, z: 0 },
+    { x: 0, y: h, z: 0 },
+
+    { x: 0, y: 0, z: d },
+    { x: w, y: 0, z: d },
+    { x: w, y: h, z: d },
+    { x: 0, y: h, z: d },
+  ];
+
+  return localCorners.map(point =>
+    phase4TransformPoint(
+      point,
+      part.matrix,
+      part.position
+    )
   );
 }
 
 function phase4BuildAssemblyStateSvg(
   step,
-  allParts
+  allParts = []
 ) {
-  const parts =
-    phase4Array(allParts);
-
-  if (parts.length === 0) {
+  if (!step) {
     return '';
   }
 
-  const placedIds =
-    new Set(
-      phase4Array(
-        step.placedPanelIds
-      )
-    );
+  const parts = Array.isArray(allParts)
+    ? allParts
+    : [];
 
-  const newIds =
-    new Set(
-      phase4Array(
-        step.panelIds
-      )
-    );
+  if (!parts.length) {
+    return `
+      <div class="phase4-assembly-state empty">
+        <div class="phase4-assembly-state-title">
+          3D assembly state
+        </div>
+        <div class="phase4-assembly-state-empty">
+          Model coordinates unavailable
+        </div>
+      </div>
+    `;
+  }
+
+  const placedIds = new Set(
+    [
+      ...(Array.isArray(step.placedPanelIds)
+        ? step.placedPanelIds
+        : []),
+
+      ...(Array.isArray(step.assemblyPanelIds)
+        ? step.assemblyPanelIds
+        : []),
+
+      ...(Array.isArray(step.panelIds)
+        ? step.panelIds
+        : []),
+
+      ...(Array.isArray(step.otherPanelIds)
+        ? step.otherPanelIds
+        : []),
+    ].map(String)
+  );
 
   /*
-   * Determine a common furniture envelope.
-   * Dimensions are kept in the model's native units.
+   * If the step contains no explicit placement list,
+   * use its panel IDs.
    */
-  const carcass =
-    parts.filter(
-      (part) =>
-        ![
-          'door',
-          'drawer_box',
-          'drawer_front',
-        ].includes(part.role)
+  if (!placedIds.size && Array.isArray(step.panelIds)) {
+    step.panelIds.forEach(id =>
+      placedIds.add(String(id))
     );
+  }
 
-  const widths =
-    carcass
-      .map((p) => p.width)
-      .filter((v) => v > 0);
+  const visibleParts =
+    placedIds.size
+      ? parts.filter(part =>
+          placedIds.has(String(part.id))
+        )
+      : parts;
 
-  const heights =
-    carcass
-      .map((p) => p.height)
-      .filter((v) => v > 0);
+  if (!visibleParts.length) {
+    return `
+      <div class="phase4-assembly-state empty">
+        <div class="phase4-assembly-state-title">
+          3D assembly state
+        </div>
+        <div class="phase4-assembly-state-empty">
+          No panels placed in this step
+        </div>
+      </div>
+    `;
+  }
 
-  const furnitureWidth =
-    Math.max(
-      ...widths,
-      1000
-    );
-
-  const furnitureHeight =
-    Math.max(
-      ...heights,
-      1000
-    );
-
-  const viewWidth = 700;
-  const viewHeight = 500;
-
-  const margin = 55;
-
-  const scale =
-    Math.min(
-      (viewWidth - margin * 2) /
-        furnitureWidth,
-
-      (viewHeight - margin * 2) /
-        furnitureHeight
-    );
-
-  const cabinetWidth =
-    furnitureWidth * scale;
-
-  const cabinetHeight =
-    furnitureHeight * scale;
-
-  const cabinetX =
-    (viewWidth - cabinetWidth) / 2;
-
-  const cabinetY =
-    (viewHeight - cabinetHeight) / 2;
-
-  const placed =
-    parts.filter(
-      (part) =>
-        placedIds.has(part.id)
-    );
-
-  const svgParts = [];
+  const newIds = new Set(
+    Array.isArray(step.panelIds)
+      ? step.panelIds.map(String)
+      : []
+  );
 
   /*
-   * Draw the carcass envelope first.
+   * PDF drawing area.
    */
-  svgParts.push(`
-    <rect
-      x="${cabinetX.toFixed(2)}"
-      y="${cabinetY.toFixed(2)}"
-      width="${cabinetWidth.toFixed(2)}"
-      height="${cabinetHeight.toFixed(2)}"
-      fill="none"
-      stroke="#b8b8b8"
-      stroke-width="1"
-      stroke-dasharray="5 5"
-    />
-  `);
+  const viewWidth = 780;
+  const viewHeight = 430;
 
   /*
-   * Assign furniture positions by semantic role.
+   * Camera basis.
    *
-   * The panel's OWN dimensions are always used
-   * for its rectangle, so relative proportions
-   * remain correct.
+   * This is intentionally separate from the model coordinates.
+   * Model coordinates are NOT altered.
    */
-  const bottomParts =
-    placed.filter(
-      (p) => p.role === 'bottom'
-    );
+  const camera = {
+    rightX: 0.82,
+    rightY: 0.00,
+    rightZ: -0.42,
 
-  const topParts =
-    placed.filter(
-      (p) => p.role === 'top'
-    );
+    upX: -0.30,
+    upY: 0.86,
+    upZ: 0.36,
 
-  const verticalParts =
-    placed.filter(
-      (p) => p.role === 'vertical'
-    );
-
-  const shelfParts =
-    placed.filter(
-      (p) => p.role === 'horizontal'
-    );
-
-  const backParts =
-    placed.filter(
-      (p) => p.role === 'back'
-    );
-
-  const doors =
-    placed.filter(
-      (p) =>
-        p.role === 'door'
-    );
-
-  const drawers =
-    placed.filter(
-      (p) =>
-        p.role === 'drawer_box' ||
-        p.role === 'drawer_front'
-    );
-
-  const drawPanel = (
-    part,
-    x,
-    y,
-    width,
-    height,
-    extraClass = ''
-  ) => {
-
-    const isNew =
-      newIds.has(part.id);
-
-    const fill =
-      isNew
-        ? '#d9d9d9'
-        : '#eeeeea';
-
-    const stroke =
-      isNew
-        ? '#111'
-        : '#777';
-
-    const strokeWidth =
-      isNew
-        ? 3
-        : 1.5;
-
-    const label =
-      phase4EscapeHtml(
-        part.code
-      );
-
-    svgParts.push(`
-      <g class="p4-assembly-panel ${extraClass}">
-        <rect
-          x="${x.toFixed(2)}"
-          y="${y.toFixed(2)}"
-          width="${Math.max(width, 3).toFixed(2)}"
-          height="${Math.max(height, 3).toFixed(2)}"
-          fill="${fill}"
-          stroke="${stroke}"
-          stroke-width="${strokeWidth}"
-          rx="1"
-        />
-
-        <text
-          x="${(x + width / 2).toFixed(2)}"
-          y="${(y + height / 2 + 3).toFixed(2)}"
-          text-anchor="middle"
-          font-size="11"
-          font-weight="700"
-          fill="#111"
-        >
-          ${label}
-        </text>
-      </g>
-    `);
+    depthX: 0.42,
+    depthY: 0.42,
+    depthZ: 0.82,
   };
 
-  /*
-   * Bottom.
-   */
-  bottomParts.forEach(
-    (part) => {
-      const width =
-        Math.min(
-          cabinetWidth,
-          part.width * scale
-        );
+  const geometry = visibleParts.map(part => {
+    const corners =
+      phase4BuildPanelCorners(part);
 
-      const height =
-        Math.max(
-          6,
-          part.height * scale
-        );
-
-      drawPanel(
-        part,
-        cabinetX,
-        cabinetY +
-          cabinetHeight -
-          height,
-        width,
-        height,
-        'bottom'
+    const projected =
+      corners.map(point =>
+        phase4ProjectPoint(
+          point,
+          camera
+        )
       );
-    }
-  );
+
+    return {
+      part,
+      corners,
+      projected,
+    };
+  });
 
   /*
-   * Top.
+   * Determine the actual projected bounds.
    */
-  topParts.forEach(
-    (part) => {
-      const width =
-        Math.min(
-          cabinetWidth,
-          part.width * scale
-        );
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
 
-      const height =
-        Math.max(
-          6,
-          part.height * scale
-        );
+  geometry.forEach(item => {
+    item.projected.forEach(point => {
+      minX = Math.min(minX, point.x);
+      maxX = Math.max(maxX, point.x);
 
-      drawPanel(
-        part,
-        cabinetX,
-        cabinetY,
-        width,
-        height,
-        'top'
-      );
-    }
-  );
+      minY = Math.min(minY, point.y);
+      maxY = Math.max(maxY, point.y);
+    });
+  });
+
+  if (
+    !Number.isFinite(minX) ||
+    !Number.isFinite(maxX) ||
+    !Number.isFinite(minY) ||
+    !Number.isFinite(maxY)
+  ) {
+    return `
+      <div class="phase4-assembly-state empty">
+        <div class="phase4-assembly-state-title">
+          3D assembly state
+        </div>
+        <div class="phase4-assembly-state-empty">
+          Model coordinates unavailable
+        </div>
+      </div>
+    `;
+  }
+
+  const projectedWidth =
+    Math.max(maxX - minX, 0.001);
+
+  const projectedHeight =
+    Math.max(maxY - minY, 0.001);
+
+  const marginX = 65;
+  const marginY = 55;
 
   /*
-   * Vertical dividers.
+   * Auto-fit the entire current assembly state.
    */
-  verticalParts.forEach(
-    (part, index) => {
+  const fitScale =
+    Math.min(
+      (viewWidth - marginX * 2) /
+        projectedWidth,
 
-      const width =
-        Math.max(
-          5,
-          part.width * scale
-        );
+      (viewHeight - marginY * 2) /
+        projectedHeight
+    ) * 0.1;
 
-      const height =
-        Math.min(
-          cabinetHeight,
-          part.height * scale
-        );
+  const scale =
+    Math.max(
+      20,
+      Math.min(
+        fitScale,
+        220
+      )
+    );
 
-      const usable =
-        cabinetWidth - width;
+  const offsetX =
+    viewWidth / 2 -
+    ((minX + maxX) / 2) * scale;
 
-      const x =
-        cabinetX +
-        (
-          usable *
-          ((index + 1) /
-            (verticalParts.length + 1))
-        );
+  const offsetY =
+    viewHeight / 2 -
+    ((minY + maxY) / 2) * scale;
 
-      const y =
-        cabinetY +
-        (cabinetHeight - height) / 2;
+  const toSvg = point => ({
+    x:
+      point.x * scale +
+      offsetX,
 
-      drawPanel(
-        part,
-        x,
-        y,
-        width,
-        height,
-        'vertical'
-      );
-    }
-  );
+    y:
+      viewHeight -
+      (
+        point.y * scale +
+        offsetY
+      ),
+  });
 
   /*
-   * Shelves.
-   */
-  shelfParts.forEach(
-    (part, index) => {
-
-      const width =
-        Math.min(
-          cabinetWidth,
-          part.width * scale
-        );
-
-      const height =
-        Math.max(
-          5,
-          part.height * scale
-        );
-
-      const usable =
-        cabinetHeight -
-        height;
-
-      const y =
-        cabinetY +
-        usable *
-        (
-          (index + 1) /
-          (shelfParts.length + 1)
-        );
-
-      drawPanel(
-        part,
-        cabinetX,
-        y,
-        width,
-        height,
-        'shelf'
-      );
-    }
-  );
-
-  /*
-   * Back panel.
+   * Panel faces.
    *
-   * Drawn behind the internal parts.
+   * 0 = front
+   * 1 = right
+   * 2 = back
+   * 3 = left
+   * 4 = bottom
+   * 5 = top
    */
-  backParts.forEach(
-    (part) => {
+  const faces = [
+    [0, 1, 2, 3],
+    [1, 5, 6, 2],
+    [5, 4, 7, 6],
+    [4, 0, 3, 7],
+    [3, 2, 6, 7],
+    [4, 5, 1, 0],
+  ];
 
-      const width =
-        Math.min(
-          cabinetWidth,
-          part.width * scale
+  const faceObjects = [];
+
+  geometry.forEach(item => {
+    faces.forEach((face, faceIndex) => {
+      const points =
+        face.map(index =>
+          item.projected[index]
         );
 
-      const height =
-        Math.min(
-          cabinetHeight,
-          part.height * scale
-        );
+      const averageDepth =
+        points.reduce(
+          (sum, point) =>
+            sum + point.depth,
+          0
+        ) / points.length;
 
-      drawPanel(
-        part,
-        cabinetX,
-        cabinetY,
-        width,
-        height,
-        'back'
-      );
-    }
-  );
+      faceObjects.push({
+        item,
+        faceIndex,
+        points,
+        averageDepth,
+      });
+    });
+  });
 
   /*
-   * Doors.
+   * Painter's algorithm:
+   * farthest faces first.
    */
-  doors.forEach(
-    (part, index) => {
-
-      const width =
-        Math.max(
-          8,
-          part.width * scale
-        );
-
-      const height =
-        Math.max(
-          10,
-          part.height * scale
-        );
-
-      const x =
-        cabinetX +
-        cabinetWidth +
-        18 +
-        index *
-        (width + 8);
-
-      const y =
-        cabinetY +
-        (
-          cabinetHeight -
-          height
-        ) / 2;
-
-      drawPanel(
-        part,
-        x,
-        y,
-        width,
-        height,
-        'door'
-      );
-    }
+  faceObjects.sort(
+    (a, b) =>
+      a.averageDepth -
+      b.averageDepth
   );
+
+  const faceMarkup =
+    faceObjects.map(face => {
+      const points =
+        face.points
+          .map(point => {
+            const svg =
+              toSvg(point);
+
+            return `${svg.x.toFixed(2)},${svg.y.toFixed(2)}`;
+          })
+          .join(' ');
+
+      const isNew =
+        newIds.has(
+          String(face.item.part.id)
+        );
+
+      /*
+       * Keep the drawing neutral.
+       * New/active panels are slightly stronger.
+       */
+      const opacity =
+        isNew
+          ? 0.92
+          : 0.55;
+
+      return `
+        <polygon
+          points="${points}"
+          fill="currentColor"
+          fill-opacity="${opacity}"
+          stroke="currentColor"
+          stroke-width="1.2"
+          stroke-opacity="0.75"
+        />
+      `;
+    }).join('');
 
   /*
-   * Drawers.
+   * Labels are rendered after all faces so that
+   * they remain readable.
    */
-  drawers.forEach(
-    (part, index) => {
-
-      const width =
-        Math.max(
-          20,
-          part.width * scale
+  const labelMarkup =
+    geometry.map(item => {
+      const projectedCenter =
+        item.projected.reduce(
+          (acc, point) => ({
+            x: acc.x + point.x,
+            y: acc.y + point.y,
+            depth: acc.depth + point.depth,
+          }),
+          {
+            x: 0,
+            y: 0,
+            depth: 0,
+          }
         );
 
-      const height =
-        Math.max(
-          10,
-          part.height * scale
+      projectedCenter.x /=
+        item.projected.length;
+
+      projectedCenter.y /=
+        item.projected.length;
+
+      const svg =
+        toSvg(projectedCenter);
+
+      const isNew =
+        newIds.has(
+          String(item.part.id)
         );
 
-      const x =
-        cabinetX +
-        (
-          cabinetWidth -
-          width
-        ) / 2;
+      return `
+        <g
+          transform="
+            translate(
+              ${svg.x.toFixed(2)}
+              ${svg.y.toFixed(2)}
+            )
+          "
+        >
+          <text
+            x="0"
+            y="0"
+            text-anchor="middle"
+            font-size="11"
+            font-weight="${isNew ? '700' : '500'}"
+            fill="currentColor"
+          >
+            ${phase4EscapeHtml(
+              item.part.code
+            )}
+          </text>
+        </g>
+      `;
+    }).join('');
 
-      const y =
-        cabinetY +
-        cabinetHeight +
-        15 +
-        index *
-        (height + 7);
+  const placedCount =
+    visibleParts.length;
 
-      drawPanel(
-        part,
-        x,
-        y,
-        width,
-        height,
-        'drawer'
-      );
-    }
-  );
+  const totalCount =
+    parts.length;
 
   return `
-    <svg
-      class="p4-assembly-state"
-      viewBox="0 0 ${viewWidth} ${viewHeight}"
-      xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="xMidYMid meet"
-      role="img"
-      aria-label="Assembly state at this step"
+    <div
+      class="phase4-assembly-state"
+      style="
+        width:100%;
+        margin:0;
+        padding:0;
+      "
     >
-      ${svgParts.join('')}
-
-      <text
-        x="${viewWidth / 2}"
-        y="25"
-        text-anchor="middle"
-        font-size="13"
-        font-weight="800"
-        fill="#666"
+      <div
+        class="phase4-assembly-state-title"
+        style="
+          margin-bottom:6px;
+          font-size:11px;
+          font-weight:700;
+        "
       >
-        ASSEMBLY STATE
-      </text>
+        3D assembly state · resolved geometry
+      </div>
 
-      <text
-        x="${viewWidth / 2}"
-        y="${viewHeight - 12}"
-        text-anchor="middle"
-        font-size="10"
-        fill="#777"
+      <svg
+        viewBox="0 0 ${viewWidth} ${viewHeight}"
+        width="100%"
+        height="auto"
+        preserveAspectRatio="xMidYMid meet"
+        xmlns="http://www.w3.org/2000/svg"
+        style="
+          display:block;
+          overflow:visible;
+        "
       >
-        New panels are emphasized
-      </text>
-    </svg>
+        <g
+          fill="none"
+          stroke="currentColor"
+        >
+          ${faceMarkup}
+        </g>
+
+        <g>
+          ${labelMarkup}
+        </g>
+      </svg>
+
+      <div
+        style="
+          margin-top:4px;
+          font-size:8px;
+          opacity:.65;
+        "
+      >
+        ${placedCount} / ${totalCount}
+        panels placed
+      </div>
+    </div>
   `;
 }
 
@@ -1981,6 +2072,345 @@ function phase4BuildHardwareSummary(sequence) {
   return [...hardware.values()];
 }
 
+
+
+function phase4PickNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function phase4PickVector(value, fallback = null) {
+  if (Array.isArray(value)) {
+    if (value.length >= 3) {
+      const x = Number(value[0]);
+      const y = Number(value[1]);
+      const z = Number(value[2]);
+
+      if (
+        Number.isFinite(x) &&
+        Number.isFinite(y) &&
+        Number.isFinite(z)
+      ) {
+        return { x, y, z };
+      }
+    }
+  }
+
+  if (value && typeof value === 'object') {
+    const x = Number(
+      value.x ??
+      value.X ??
+      value[0]
+    );
+
+    const y = Number(
+      value.y ??
+      value.Y ??
+      value[1]
+    );
+
+    const z = Number(
+      value.z ??
+      value.Z ??
+      value[2]
+    );
+
+    if (
+      Number.isFinite(x) &&
+      Number.isFinite(y) &&
+      Number.isFinite(z)
+    ) {
+      return { x, y, z };
+    }
+  }
+
+  return fallback;
+}
+
+function phase4MatrixFrom(value) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  if (value.length === 9) {
+    return value.map(Number);
+  }
+
+  if (value.length === 16) {
+    return value.map(Number);
+  }
+
+  return null;
+}
+
+function phase4TranslationFromMatrix(matrix) {
+  if (!Array.isArray(matrix)) {
+    return null;
+  }
+
+  if (matrix.length === 16) {
+    const values = matrix.map(Number);
+
+    if (values.every(Number.isFinite)) {
+      return {
+        x: values[12],
+        y: values[13],
+        z: values[14],
+      };
+    }
+  }
+
+  return null;
+}
+
+function phase4RotationMatrix(rotation) {
+  if (!rotation) {
+    return [
+      1, 0, 0,
+      0, 1, 0,
+      0, 0, 1,
+    ];
+  }
+
+  /*
+   * Already a 3x3 matrix.
+   */
+  if (Array.isArray(rotation) && rotation.length === 9) {
+    return rotation.map(Number);
+  }
+
+  /*
+   * A 4x4 transform matrix.
+   */
+  if (Array.isArray(rotation) && rotation.length === 16) {
+    const m = rotation.map(Number);
+
+    return [
+      m[0], m[1], m[2],
+      m[4], m[5], m[6],
+      m[8], m[9], m[10],
+    ];
+  }
+
+  /*
+   * Quaternion:
+   * [x, y, z, w]
+   */
+  if (Array.isArray(rotation) && rotation.length === 4) {
+    const x = Number(rotation[0]);
+    const y = Number(rotation[1]);
+    const z = Number(rotation[2]);
+    const w = Number(rotation[3]);
+
+    if (
+      Number.isFinite(x) &&
+      Number.isFinite(y) &&
+      Number.isFinite(z) &&
+      Number.isFinite(w)
+    ) {
+      return phase4QuaternionToMatrix(x, y, z, w);
+    }
+  }
+
+  /*
+   * Quaternion object.
+   */
+  if (
+    rotation &&
+    typeof rotation === 'object' &&
+    Number.isFinite(Number(rotation.w))
+  ) {
+    return phase4QuaternionToMatrix(
+      Number(rotation.x ?? 0),
+      Number(rotation.y ?? 0),
+      Number(rotation.z ?? 0),
+      Number(rotation.w)
+    );
+  }
+
+  /*
+   * Euler object.
+   */
+  if (rotation && typeof rotation === 'object') {
+    const x = Number(
+      rotation.x ??
+      rotation.X ??
+      rotation.rx ??
+      rotation.pitch ??
+      0
+    );
+
+    const y = Number(
+      rotation.y ??
+      rotation.Y ??
+      rotation.ry ??
+      rotation.yaw ??
+      0
+    );
+
+    const z = Number(
+      rotation.z ??
+      rotation.Z ??
+      rotation.rz ??
+      rotation.roll ??
+      0
+    );
+
+    if (
+      Number.isFinite(x) &&
+      Number.isFinite(y) &&
+      Number.isFinite(z)
+    ) {
+      return phase4EulerToMatrix(x, y, z);
+    }
+  }
+
+  return [
+    1, 0, 0,
+    0, 1, 0,
+    0, 0, 1,
+  ];
+}
+
+function phase4QuaternionToMatrix(x, y, z, w) {
+  const length = Math.hypot(x, y, z, w) || 1;
+
+  x /= length;
+  y /= length;
+  z /= length;
+  w /= length;
+
+  const xx = x * x;
+  const yy = y * y;
+  const zz = z * z;
+
+  const xy = x * y;
+  const xz = x * z;
+  const yz = y * z;
+
+  const wx = w * x;
+  const wy = w * y;
+  const wz = w * z;
+
+  return [
+    1 - 2 * (yy + zz),
+    2 * (xy - wz),
+    2 * (xz + wy),
+
+    2 * (xy + wz),
+    1 - 2 * (xx + zz),
+    2 * (yz - wx),
+
+    2 * (xz - wy),
+    2 * (yz + wx),
+    1 - 2 * (xx + yy),
+  ];
+}
+
+function phase4EulerToMatrix(x, y, z) {
+  /*
+   * Accept degrees if values clearly exceed a normal radian
+   * range. Otherwise treat values as radians.
+   */
+  const convert = value =>
+    Math.abs(value) > Math.PI * 2
+      ? value * Math.PI / 180
+      : value;
+
+  x = convert(x);
+  y = convert(y);
+  z = convert(z);
+
+  const cx = Math.cos(x);
+  const sx = Math.sin(x);
+
+  const cy = Math.cos(y);
+  const sy = Math.sin(y);
+
+  const cz = Math.cos(z);
+  const sz = Math.sin(z);
+
+  /*
+   * Rz * Ry * Rx
+   */
+  return [
+    cz * cy,
+    cz * sy * sx - sz * cx,
+    cz * sy * cx + sz * sx,
+
+    sz * cy,
+    sz * sy * sx + cz * cx,
+    sz * sy * cx - cz * sx,
+
+    -sy,
+    cy * sx,
+    cy * cx,
+  ];
+}
+
+function phase4TransformPoint(point, matrix, position) {
+  const x = point.x;
+  const y = point.y;
+  const z = point.z;
+
+  let tx;
+  let ty;
+  let tz;
+
+  if (matrix.length === 16) {
+    /*
+     * Column-major 4x4 matrix.
+     */
+    tx =
+      matrix[0] * x +
+      matrix[4] * y +
+      matrix[8] * z +
+      matrix[12];
+
+    ty =
+      matrix[1] * x +
+      matrix[5] * y +
+      matrix[9] * z +
+      matrix[13];
+
+    tz =
+      matrix[2] * x +
+      matrix[6] * y +
+      matrix[10] * z +
+      matrix[14];
+
+    return {
+      x: tx,
+      y: ty,
+      z: tz,
+    };
+  }
+
+  /*
+   * 3x3 rotation + explicit position.
+   */
+  tx =
+    matrix[0] * x +
+    matrix[1] * y +
+    matrix[2] * z;
+
+  ty =
+    matrix[3] * x +
+    matrix[4] * y +
+    matrix[5] * z;
+
+  tz =
+    matrix[6] * x +
+    matrix[7] * y +
+    matrix[8] * z;
+
+  return {
+    x: tx + (position?.x ?? 0),
+    y: ty + (position?.y ?? 0),
+    z: tz + (position?.z ?? 0),
+  };
+}
+
 /**
  * Build the Phase-4 presentation model.
  *
@@ -2037,11 +2467,7 @@ export function buildAssemblyManualModel(
 
       const assemblyStateSvg =
         phase4BuildAssemblyStateSvg(
-          {
-            ...step,
-            placedPanelIds:
-              placedAfterStep,
-          },
+          step,
           visualParts
         );
 
@@ -2121,6 +2547,7 @@ export function buildAssemblyManualModel(
         progress,
 
         diagramHtml:
+          assemblyStateSvg ||
           phase4StepDiagram(step),
 
         hasWarnings:
@@ -3444,48 +3871,47 @@ export function exportAssemblyManualPdf(
     resolvedPanels = [],
   } = {}
 ) {
-  const html = buildAssemblyManualHtml(
-    sequence,
-    {
-      title: projectName,
-      subtitle: 'Human-first assembly instructions',
+  const html =
+    buildAssemblyManualHtml(
+      sequence,
+      {
+        title: projectName,
 
-      panels,
+        subtitle:
+          'Human-first assembly instructions',
 
-      resolvedPanels,
-    }
-  );
+        panels:
+          panels || [],
 
+        resolvedPanels:
+          resolvedPanels || [],
+      }
+    );
+
+  /*
+   * Existing browser/PDF opening behaviour.
+   */
   if (mode === 'open') {
-    const printWindow = window.open('', '_blank');
+    const printWindow =
+      window.open(
+        '',
+        '_blank'
+      );
 
     if (!printWindow) {
-      throw new Error(
-        'Unable to open the assembly manual. Please allow pop-ups for this application.'
-      );
+      return false;
     }
 
     printWindow.document.open();
     printWindow.document.write(html);
     printWindow.document.close();
 
-    printWindow.addEventListener('load', () => {
-      printWindow.focus();
-      printWindow.print();
-    });
-
-    return;
+    return true;
   }
 
-  const printWindow = window.open('', '_blank');
-
-  if (!printWindow) {
-    throw new Error(
-      'Unable to open the assembly manual. Please allow pop-ups for this application.'
-    );
-  }
-
-  printWindow.document.open();
-  printWindow.document.write(html);
-  printWindow.document.close();
+  /*
+   * Keep compatibility with callers that only need
+   * the generated HTML.
+   */
+  return html;
 }

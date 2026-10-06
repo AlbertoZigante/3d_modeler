@@ -270,21 +270,18 @@ exportJointsJsonBtn?.addEventListener('click', () => {
 // `resolved` directly (not just the plan) since the schematic
 // diagrams draw real panel geometry, which the plan's own step
 // objects reference only by id.
-printAssemblyBtn?.addEventListener('click', () => {
-  const resolved = resolveConstraints(panels);
+printAssemblyBtn?.addEventListener(
+  'click',
+  () => {
+    const resolved =resolveConstraints(panels);
 
-  const sequence = buildAssemblySequence(panels);
+    const sequence =buildAssemblySequence(panels);
 
-  exportAssemblyManualPdf(
-    sequence,
-    {
-      projectName: 'Assembly Instructions',
-      mode: 'open',
-      panels,
-      resolvedPanels: resolved,
-    }
-  );
-});
+    exportAssemblyManualPdf(
+      sequence,
+      {projectName:'Assembly Instructions',mode: 'open',panels,resolvedPanels: resolved}
+    );
+  });
 syncHistoryButtons();
 
 document.getElementById('export-bom-pdf-btn')?.addEventListener('click', () => {
