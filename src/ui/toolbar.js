@@ -24,7 +24,7 @@
  *      + Vertical shelf
  *      + Add Door
  *      + Add Drawer
- *      + Add Plinth (placeholder — not wired yet)
+ *      + Add Plinth
  *
  *   Tools
  *      Collinear
@@ -243,6 +243,14 @@ function ensureComponentIconStyles() {
       border-color: #c97b38;
       color: #fff;
     }
+    .component-icon-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .component-icon-btn:disabled:hover {
+      background: var(--toolbar-btn-bg, #fff);
+      border-color: var(--toolbar-border, #d8d0c4);
+    }
     .component-icon-btn svg {
       width: 22px;
       height: 22px;
@@ -373,6 +381,8 @@ export function renderPanelList(
 
     onAddDrawer,
     drawerToolActive,
+
+    onAddPlinth,
 
   }
 ) {
@@ -608,7 +618,8 @@ export function renderPanelList(
               type="button"
               class="component-icon-btn"
               id="add-plinth-btn"
-              title="Add Plinth — not wired yet"
+              ${selectedGroupId ? '' : 'disabled'}
+              title="${selectedGroupId ? "Add Plinth — builds a 4-panel kick base under the selected box's own Bottom panel" : 'Select a box first'}"
             >
               ${COMPONENT_ICONS.plinth}
               <span class="icon-label">Plinth</span>
@@ -884,6 +895,27 @@ export function renderPanelList(
         event.stopPropagation();
 
         onAddBox?.();
+      }
+    );
+
+
+  /* ==========================================================
+     ADD PLINTH (no pick mode — builds under the currently selected
+     box's own Bottom panel; button disabled above without one)
+     ========================================================== */
+
+  container
+    .querySelector(
+      '#add-plinth-btn'
+    )
+    ?.addEventListener(
+      'click',
+      (event) => {
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        onAddPlinth?.();
       }
     );
 

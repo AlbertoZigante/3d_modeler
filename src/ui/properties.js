@@ -28,6 +28,7 @@ import { getDisplayName, MATERIAL_CATALOG } from '../modeller/modules.js';
 import { renderDoorSchema } from './doorSchema.js';
 import { renderDrawerSchema } from './drawerSchema.js';
 import { DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM } from '../features/drawer.js';
+import { MIN_PLINTH_HEIGHT_MM } from '../features/plinth.js';
 
 const DIM_FIELDS = ['width', 'height']; // thickness is derived from material — see below, never a typed field
 
@@ -58,6 +59,7 @@ export function renderProperties(
     drawerHasBox,
     onToggleDrawerOpen,
     onDrawerBoxMarginChange,
+    onPlinthHeightChange,
   }
 ) {
   if (selectedGroupId && !selectedPanel) {
@@ -134,6 +136,7 @@ export function renderProperties(
     ${selectedPanel.edgeFit && !selectedPanel.isDoor && !selectedPanel.isDrawerFront ? edgeFitSectionHTML(selectedPanel.edgeFit) : ''}
     ${selectedPanel.isDoor ? doorSectionHTML(selectedPanel, hiddenGroupMembers || [], restoreError) : ''}
     ${selectedPanel.isDrawerFront ? drawerSectionHTML(selectedPanel, hiddenGroupMembers || [], restoreError, !!drawerHasBox) : ''}
+    ${selectedPanel.isPlinthPanel ? plinthSectionHTML(selectedPanel) : ''}
   `;
 
   // ---- rename (pencil icon) ----
@@ -262,6 +265,13 @@ export function renderProperties(
     onToggleDrawerOpen();
   });
 
+  // ---- plinth (height — only present for an isPlinthPanel selection,
+  // see plinthSectionHTML's own comment on why this is its own field
+  // rather than the generic dim-field path).
+  container.querySelector('.plinth-height-field')?.addEventListener('change', (event) => {
+    onPlinthHeightChange(Number(event.target.value));
+  });
+
   wireRestoreFaceButtons(container, onRestoreFace);
 }
 
@@ -388,6 +398,28 @@ function drawerSectionHTML(front, hiddenGroupMembers, restoreError, hasBox) {
       <div class="empty-state">This drawer has no box built yet — nothing here to adjust or open.</div>
     `}
     ${restoreFaceListHTML(hiddenGroupMembers, restoreError)}
+  `;
+}
+
+// Shown for ANY of the 4 plinth panels — all 4 share one height, so
+// this field edits whichever one happens to be selected but applies to
+// the whole plinth (modeller-main.js#updateSelectedPlinthHeight finds
+// the rest by groupId+isPlinthPanel, see features/plinth.js#
+// applyPlinthAdjustment). Deliberately NOT the generic dim-field path:
+// same reasoning as drawerSectionHTML's own margin fields just above —
+// editing one panel's own height directly would desync it from its 3
+// siblings, since nothing here re-derives the other 3 to match. (This
+// is the same gap drawer box panels already have for their own W/H/T —
+// see features/drawer.js#createDrawerBoxNodes's own header on
+// lockedMoveAxes; there's no lockedFields-for-dimensions mechanism in
+// this codebase yet, only for position, so it isn't solved here either
+// — the dedicated field below is the intended way in, same as the
+// drawer box margins, not a true lock against the generic one.)
+function plinthSectionHTML(panel) {
+  return `
+    <div class="divider"></div>
+    <div class="section-title">Plinth</div>
+    ${numberFieldHTML('Height', 'heightMm', panel.height, 'mm', { min: MIN_PLINTH_HEIGHT_MM }, 'plinth-height-field')}
   `;
 }
 

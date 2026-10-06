@@ -206,6 +206,18 @@ export class SetDrawerBoxMarginCommand extends ModelCommand {
   }
 }
 
+export class AddPlinthCommand extends ModelCommand {
+  constructor(options) {
+    super({ ...options, label: 'Add plinth' });
+  }
+}
+
+export class SetPlinthHeightCommand extends ModelCommand {
+  constructor(options) {
+    super({ ...options, label: 'Change plinth height' });
+  }
+}
+
 export class RenamePanelCommand extends ModelCommand {
   constructor(options) {
     super({ ...options, label: 'Rename panel' });
