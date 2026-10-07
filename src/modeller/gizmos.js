@@ -355,7 +355,7 @@ const FACE_RESIZE_INFO = {
   function isDrawerBoxPanel(mesh) {
     // Plinth panels are locked exactly like a drawer's own box panels:
     // derived from the owning box, never moved/resized by hand.
-    return !!(mesh?.userData?.isDrawerBoxPanel || mesh?.userData?.isPlinthPanel);
+    return !!(mesh?.userData?.isDrawerBoxPanel || mesh?.userData?.isPlinthPanel || mesh?.userData?.isLeg);
   }
 
   const FACE_NAMES = ['right', 'left', 'top', 'bottom', 'front', 'back'];

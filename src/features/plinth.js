@@ -321,6 +321,7 @@ export function addPlinthAndRaiseBox(panels, groupId, spec = {}) {
   if (panels.some((p) => p.groupId === groupId && p.isPlinthPanel)) {
     return { ok: false, reason: 'already-has-plinth' };
   }
+  if (panels.some((p) => p.groupId === groupId && p.isLeg)) return { ok: false, reason: 'has-legs' };
   const placement = computePlinthPlacement(panels, groupId, spec);
   if (!placement.ok) return placement;
 

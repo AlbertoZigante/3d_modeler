@@ -685,6 +685,7 @@ export function createModellerScene(
       entry.mesh.userData.isDrawerBoxPanel = !!node.isDrawerBoxPanel;
       // Plinth panels: derived + locked, no handles (see gizmos.js).
       entry.mesh.userData.isPlinthPanel = !!node.isPlinthPanel;
+      entry.mesh.userData.isLeg = !!node.isLeg; // derived + locked, like plinth panels
       entry.mesh.userData.thicknessAxis = node.thicknessAxis || null;
       entry.mesh.userData.resizeProxy = node.resizeProxy || null;
 
@@ -763,12 +764,12 @@ export function createModellerScene(
         entry.mesh.material.color.set(0xedca05);//CONST_Face_Panel_Color_Highlight);
         entry.mesh.material.opacity = 0.5;// CONST_Face_Panel_Color_Highlight_Opacity;
       } else {
-        entry.mesh.material.color.set(isSelected? 0xe0904a: isMultiSelected? 0x4f8cff: 0xdcbd8c);
+        entry.mesh.material.color.set(isSelected? 0xe0904a: isMultiSelected? 0x4f8cff: (node.displayColor ?? 0xdcbd8c)); // displayColor: legs are black
         entry.mesh.material.opacity = 1;
       }
       const material = new THREE.MeshStandardMaterial({color: 0xdcbd8c,roughness: 0.75,metalness: 0.04,transparent: true,});
       entry.mesh.material.needsUpdate = true;
-      entry.edges.material.color.set(isSelected? 0x8a4a1a: isMultiSelected? 0x2a5cc9: 0x8b6540);
+      entry.edges.material.color.set(isSelected? 0x8a4a1a: isMultiSelected? 0x2a5cc9: (node.displayColor != null ? 0x444444 : 0x8b6540));
     });
 
     const selectedEntry = meshRegistry.get(selectedId);

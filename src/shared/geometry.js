@@ -160,7 +160,7 @@ export function collectAxisSlabs(panels, groupId, axis, overrides = {}) {
     // resize any time a drawer box's own panels happened to sit within
     // MIN_WALL_GAP_MM of a wall or each other — which, given typical
     // slide-clearance margins, is common by design, not a mistake.
-    const isRelevantShelf = !p.isBoxWall && !p.isDoor && !p.isDrawerFront && !p.isDrawerBoxPanel && !p.isPlinthPanel && rotationsMatch(p.rotation, relevantRotation);
+    const isRelevantShelf = !p.isBoxWall && !p.isDoor && !p.isDrawerFront && !p.isDrawerBoxPanel && !p.isPlinthPanel && !p.isLeg && rotationsMatch(p.rotation, relevantRotation);
     if (!isRelevantWall && !isRelevantShelf) return;
     const o = overrides[p.id];
     slabs.push(

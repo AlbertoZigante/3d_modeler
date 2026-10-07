@@ -138,7 +138,7 @@ function isBoxWall(mesh) {
 // drawer fronts; fixed for all three here rather than leaving doors
 // resizable in the 2D view while drawer fronts/boxes aren't.
 function isDoorOrDrawerFront(mesh) {
-  return !!(mesh?.userData?.isDoor || mesh?.userData?.isDrawerFront || mesh?.userData?.isDrawerBoxPanel || mesh?.userData?.isPlinthPanel);
+  return !!(mesh?.userData?.isDoor || mesh?.userData?.isDrawerFront || mesh?.userData?.isDrawerBoxPanel || mesh?.userData?.isPlinthPanel || mesh?.userData?.isLeg);
 }
 
 export function create2DControls(

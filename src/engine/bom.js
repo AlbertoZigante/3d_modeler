@@ -158,6 +158,7 @@ export function computeBom(resolvedPanels) {
         unitBandingLengthM: pieceBandingLengthMm(node) / 1000,
         quantity: 1,
         unitAreaM2: node.width * node.height * MM2_TO_M2,
+        isHardware: !!node.isLeg,
       };
       rowsByKey.set(key, row);
       return;

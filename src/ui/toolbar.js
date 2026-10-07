@@ -189,6 +189,14 @@ const COMPONENT_ICONS = {
       <rect x="4" y="17" width="16" height="4" />
     </svg>
   `,
+  // Dashed cabinet body resting on four short solid feet.
+  legs: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="3" width="16" height="12" stroke-dasharray="1.6 2.2" opacity="0.6" />
+      <rect x="5" y="16" width="3" height="5" />
+      <rect x="16" y="16" width="3" height="5" />
+    </svg>
+  `,
   // Standard CAD dimension annotation — two extension lines (the
   // edges being measured) joined by a line with arrowheads pointing
   // out to each one. Reads as "the distance/size between these two
@@ -384,6 +392,8 @@ export function renderPanelList(
 
     onAddPlinth,
     plinthToolActive,
+    onAddLegs,
+    legToolActive,
 
   }
 ) {
@@ -417,7 +427,7 @@ export function renderPanelList(
    * collapses back to the three sections above it.
    */
   const anyToolActive =
-    !!(collinearActive || shelfMode || doorToolActive || drawerToolActive || plinthToolActive);
+    !!(collinearActive || shelfMode || doorToolActive || drawerToolActive || plinthToolActive || legToolActive);
 
   const propertiesSectionMarkup = `
     <div
@@ -623,6 +633,16 @@ export function renderPanelList(
             >
               ${COMPONENT_ICONS.plinth}
               <span class="icon-label">${plinthToolActive ? 'Cancel' : 'Plinth'}</span>
+            </button>
+
+            <button
+              type="button"
+              class="component-icon-btn ${legToolActive ? 'active' : ''}"
+              id="add-legs-btn"
+              title="${legToolActive ? 'Cancel Add Legs (Esc)' : 'Add Legs — click, then pick a box: 4 black legs (3x3 cm, 7 cm high, 1 cm from the Bottom edge) are placed under it and the box is raised by 7 cm'}"
+            >
+              ${COMPONENT_ICONS.legs}
+              <span class="icon-label">${legToolActive ? 'Cancel' : 'Legs'}</span>
             </button>
 
           </div>
@@ -919,6 +939,12 @@ export function renderPanelList(
       }
     );
 
+
+  container.querySelector('#add-legs-btn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onAddLegs?.();
+  });
 
   container
     .querySelector(

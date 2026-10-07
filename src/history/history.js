@@ -206,6 +206,12 @@ export class SetDrawerBoxMarginCommand extends ModelCommand {
   }
 }
 
+export class AddLegsCommand extends ModelCommand {
+  constructor(options) {
+    super({ ...options, label: 'Add legs' });
+  }
+}
+
 export class AddPlinthCommand extends ModelCommand {
   constructor(options) {
     super({ ...options, label: 'Add plinth' });

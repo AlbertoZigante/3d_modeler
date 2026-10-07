@@ -75,6 +75,8 @@ import {
 import { addBox, relayoutBox } from './features/box.js';
 import { isShelf } from './features/shelf.js';
 import { addPlinthAndRaiseBox, applyPlinthAdjustment, normalizePlinthEdgeFit, MIN_PLINTH_HEIGHT_MM } from './features/plinth.js';
+import { addLegsAndRaiseBox, applyLegAdjustment } from './features/leg.js';
+import { startLegMode, cancelLegMode, isLegPickActive, setLegToolContext } from './tools/leg.js';
 import { startPlinthMode, cancelPlinthMode, isPlinthPickActive, setPlinthToolContext } from './tools/plinth.js';
 import { createDoorNode, computeDoorOpenTransform, applyDoorAdjustmentsForGroup, applyPanelPatch, computeDoorPlacement, DEFAULT_DOOR_EDGE_FIT, DEFAULT_DOOR_HINGE } from './features/door.js';
 import { createDrawerFrontNodes, createDrawerBoxNodes, computeDrawerBoxPlacement, computeDrawerOpenTransform, applyDrawerAdjustmentsForGroup, computeDrawerFrontsPlacement, DEFAULT_DRAWER_EDGE_FIT, DEFAULT_DRAWER_COUNT, MAX_DRAWER_COUNT, DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM } from './features/drawer.js';
@@ -108,7 +110,7 @@ import {
   RemoveConstraintCommand, UnlinkConstraintCommand, HideBoxWallCommand, RestoreBoxWallCommand,
   ChangeEdgeFitCommand, AddDoorCommand, SetDoorHingeCommand, DeleteDoorCommand,
   AddDrawerCommand, DeleteDrawerCommand, SetDrawerBoxMarginCommand,
-  AddPlinthCommand, SetPlinthHeightCommand, SetPlinthEdgeFitCommand,
+  AddLegsCommand, AddPlinthCommand, SetPlinthHeightCommand, SetPlinthEdgeFitCommand,
 } from './history/history.js';
 initResizableLayout();
 
@@ -575,6 +577,10 @@ setPlinthToolContext({
   ...toolContext,
   onBoxPicked: (groupId) => handleAddPlinth(groupId),
 });
+setLegToolContext({
+  ...toolContext,
+  onBoxPicked: (groupId) => handleAddLegs(groupId),
+});
 setDoorToolContext({
   renderAll: () => renderAll(),
   onBoundaryPicked: (boundaryResult) => {
@@ -711,6 +717,7 @@ function applyRelayoutResult(result) {
     panels = applyDrawerAdjustmentsForGroup(panels, groupId);
     // Plinth follows the Bottom panel's footprint (and its own edge fit).
     panels = applyPlinthAdjustment(panels, groupId);
+    panels = applyLegAdjustment(panels, groupId); // legs follow the Bottom's corners
   }
   return true;
 }
@@ -728,6 +735,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && isDoorPickActive()) cancelDoorMode();
   if (e.key === 'Escape' && isDrawerPickActive()) cancelDrawerMode();
   if (e.key === 'Escape' && isPlinthPickActive()) cancelPlinthMode();
+  if (e.key === 'Escape' && isLegPickActive()) cancelLegMode();
 
   if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
     e.preventDefault();
@@ -785,6 +793,7 @@ const TOOL_HINTS = {
   shelfHorizontal: 'Horizontal shelf: pick one boundary of the box, then the opposite boundary, to span a shelf between them · Esc: cancel',
   shelfVertical: 'Vertical shelf: pick one boundary of the box, then the opposite boundary, to span a shelf between them · Esc: cancel',
   doorPick: 'Add door: pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or a shelf) to place the door — it\'s added immediately, in/in/in/in · Esc: cancel',
+  legPick: 'Add legs: click a box — 4 legs are placed under its Bottom panel and the box is raised by the leg height · Esc: cancel',
   plinthPick: 'Add plinth: click a box — a plinth is built under it and the box is raised by the plinth height · Esc: cancel',
   drawerPick: 'Add drawer: pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or a shelf) to place the drawers — added immediately, in/in/in/in · Esc: cancel',
 };
@@ -797,6 +806,7 @@ function updateToolHint() {
   else if (isDoorPickActive()) hint = TOOL_HINTS.doorPick;
   else if (isDrawerPickActive()) hint = TOOL_HINTS.drawerPick;
   else if (isPlinthPickActive()) hint = TOOL_HINTS.plinthPick;
+  else if (isLegPickActive()) hint = TOOL_HINTS.legPick;
 
   if (hint) {
     hintBarTool.textContent = hint;
@@ -1093,6 +1103,9 @@ function renderAll() {
   const plinthPanelFieldsById = new Map(
     panels.filter((p) => p.isPlinthPanel).map((p) => [p.id, { isPlinthPanel: true }])
   );
+  const legFieldsById = new Map(
+    panels.filter((p) => p.isLeg).map((p) => [p.id, { isLeg: true, displayColor: p.displayColor }])
+  );
   const resolvedWithCodes = resolved.map((r) => ({
     ...r,
     pieceCode: r.pieceCode ?? pieceCodeById.get(r.id),
@@ -1100,6 +1113,7 @@ function renderAll() {
     ...drawerFrontFieldsById.get(r.id),
     ...drawerBoxPanelFieldsById.get(r.id),
     ...plinthPanelFieldsById.get(r.id),
+    ...legFieldsById.get(r.id),
   }));
 
   const visiblePanels = resolvedWithCodes.filter((p) => !p.hidden);
@@ -1162,18 +1176,20 @@ function renderAll() {
     onAddHorizontal: addHorizontalPanel,
     onAddParallel: addParallelPanel,
     onAddBox: handleAddBox,
-    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), startCollinearMode())),
+    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startCollinearMode())),
     collinearActive: isCollinearActive(),
     collinearGapMm: getCollinearGapMm(),
     onCollinearGapChange: setCollinearGapMm, // deliberately no renderAll() here — see toolbar.js's own comment on why
-    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), startShelfMode('horizontal'))),
-    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), startShelfMode('vertical'))),
+    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startShelfMode('horizontal'))),
+    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startShelfMode('vertical'))),
     shelfMode: getShelfMode(),
-    onAddDoor: () => (isDoorPickActive() ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDrawerMode(), cancelPlinthMode(), startDoorMode())),
+    onAddDoor: () => (isDoorPickActive() ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startDoorMode())),
     doorToolActive: isDoorPickActive(),
-    onAddDrawer: () => (isDrawerPickActive() ? cancelDrawerMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelPlinthMode(), startDrawerMode())),
+    onAddDrawer: () => (isDrawerPickActive() ? cancelDrawerMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelPlinthMode(), cancelLegMode(), startDrawerMode())),
     drawerToolActive: isDrawerPickActive(),
-    onAddPlinth: () => (isPlinthPickActive() ? cancelPlinthMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), startPlinthMode())),
+    onAddPlinth: () => (isPlinthPickActive() ? cancelPlinthMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelLegMode(), startPlinthMode())),
+    onAddLegs: () => (isLegPickActive() ? cancelLegMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), startLegMode())),
+    legToolActive: isLegPickActive(),
     plinthToolActive: isPlinthPickActive(),
   });
 
@@ -1830,6 +1846,30 @@ function updateSelectedPlinthEdge(edge, patch) {
   renderAll();
 }
 
+// Legs tool callback — same flow as the plinth: tool start deselected
+// everything, then the person picked a box. Builds 4 legs on the
+// Bottom's corners and raises the box by the leg height (ONE history step).
+function handleAddLegs(groupId) {
+  const result = addLegsAndRaiseBox(panels, groupId);
+  if (!result.ok) {
+    showToast(result.reason === 'already-has-legs'
+      ? 'That box already has legs'
+      : result.reason === 'has-plinth'
+        ? 'That box has a plinth — legs and plinth cannot be combined'
+        : result.reason === 'no-bottom-panel'
+          ? 'That box has no Bottom panel to put legs under'
+          : 'The Bottom panel is too small for legs');
+    renderAll();
+    return;
+  }
+  const before = panels;
+  panels = result.panels;
+  recordHistoryCommand(AddLegsCommand, before, panels);
+  setSelectedGroupId(groupId);
+  setSelectedId(null);
+  renderAll();
+}
+
 // Plinth tool callback — the person clicked Plinth (everything got
 // deselected, see tools/plinth.js) and then picked a box. Builds the
 // plinth under it and raises the box by the plinth's height, as ONE
@@ -1839,6 +1879,8 @@ function handleAddPlinth(groupId) {
   if (!result.ok) {
     showToast(result.reason === 'already-has-plinth'
       ? 'That box already has a plinth — select it to change its height'
+      : result.reason === 'has-legs'
+        ? 'That box has legs — legs and plinth cannot be combined'
       : result.reason === 'no-bottom-panel'
         ? 'That box has no Bottom panel to build a plinth under'
         : 'Not enough room under that box for a plinth');

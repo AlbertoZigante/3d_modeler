@@ -378,6 +378,7 @@ export function nestCutList(bomRows, materialCatalog, options = {}) {
   const byMaterial = new Map();
 
   bomRows.forEach((row) => {
+    if (row.isHardware) return; // bought parts (legs), not cut from a sheet
     const key = `${row.material}::${row.thicknessMm}`;
     if (!byMaterial.has(key)) byMaterial.set(key, []);
     const list = byMaterial.get(key);
