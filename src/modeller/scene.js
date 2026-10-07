@@ -683,6 +683,8 @@ export function createModellerScene(
       // bottom/back — see features/drawer.js#createDrawerBoxNodes):
       // also derived, also never resized/moved by hand.
       entry.mesh.userData.isDrawerBoxPanel = !!node.isDrawerBoxPanel;
+      // Plinth panels: derived + locked, no handles (see gizmos.js).
+      entry.mesh.userData.isPlinthPanel = !!node.isPlinthPanel;
       entry.mesh.userData.thicknessAxis = node.thicknessAxis || null;
       entry.mesh.userData.resizeProxy = node.resizeProxy || null;
 

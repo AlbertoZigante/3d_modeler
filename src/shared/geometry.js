@@ -142,6 +142,10 @@ export function collectAxisSlabs(panels, groupId, axis, overrides = {}) {
     if (p.groupId !== groupId) return;
     if (p.hidden) return; // a hidden (removed-but-restorable) panel no longer occupies space — see removeSelected()
     const isRelevantWall = p.isBoxWall && (p.name === wallRoleLow || p.name === wallRoleHigh);
+    // Plinth panels (walls + ribs) are DERIVED too, same reasoning —
+    // its vertical panels sit flush under the box's own Left/Right and
+    // must never be counted as 'shelves' next to them (that made every
+    // box resize fail min-gap once a plinth existed).
     // Doors, drawer fronts, and drawer box panels are all DERIVED —
     // their position/size come from dedicated code
     // (shared/frontFit.js#computeFrontFit,
@@ -156,7 +160,7 @@ export function collectAxisSlabs(panels, groupId, axis, overrides = {}) {
     // resize any time a drawer box's own panels happened to sit within
     // MIN_WALL_GAP_MM of a wall or each other — which, given typical
     // slide-clearance margins, is common by design, not a mistake.
-    const isRelevantShelf = !p.isBoxWall && !p.isDoor && !p.isDrawerFront && !p.isDrawerBoxPanel && rotationsMatch(p.rotation, relevantRotation);
+    const isRelevantShelf = !p.isBoxWall && !p.isDoor && !p.isDrawerFront && !p.isDrawerBoxPanel && !p.isPlinthPanel && rotationsMatch(p.rotation, relevantRotation);
     if (!isRelevantWall && !isRelevantShelf) return;
     const o = overrides[p.id];
     slabs.push(

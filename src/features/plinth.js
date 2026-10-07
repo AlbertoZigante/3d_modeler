@@ -12,28 +12,71 @@
  * (where the carcass's own Bottom rests on it) and open bottom (on the
  * floor) — exactly what "4 lateral panels" means.
  *
- * BOX-AS-GENERATOR, ONE LEVEL DOWN: reuses features/box.js's own
- * computeBoxLayout PURE MATH directly, rather than a second copy of
- * the same butted-corner arithmetic — two throwaway, zero-thickness
- * "top"/"bottom" shaped exactly like computeBoxLayout expects (so
- * left/right's own height and back/front's own vertical extent come
- * out right), then only the 4 REAL panels survive into the result.
- * Left/right run the full depth; back/front sit inset between them,
- * at DEFAULT_EDGE_FIT ('in' on every edge — i.e. no .edgeFit field at
- * all, same "nothing set = the plain original construction" reasoning
- * box.js's own resolvePanelFit already documents) rather than the
- * 'out' a carcass's own Back wall uses — 'out' would make the plinth's
- * true footprint W × (D+2T), overshooting the Bottom panel's own
- * boundary by a thickness at each end; 'in' keeps it exactly W × D,
- * flush on all four sides with what it's sitting under, which is what
- * "gets its boundaries" means here.
+ * CORNERS: Back/Front run the FULL plinth width ('out' past the
+ * lateral panels); Left/Right sit between them (depth - 2T). The
+ * footprint itself is the owning Bottom panel's x/z size, each edge
+ * optionally pulled in (see normalizePlinthEdgeFit).
  */
-import { createPanelNode, MIN_PANEL_DIM_MM } from '../modeller/modules.js';
+import { createPanelNode, MIN_PANEL_DIM_MM, computeWorldHalfExtents } from '../modeller/modules.js';
 import { resolveConstraints } from '../modeller/snap.js';
 import { VERTICAL_ROTATION, PARALLEL_ROTATION } from '../shared/geometry.js';
-import { findBoxSibling, computeBoxLayout } from './box.js';
+import { findBoxSibling } from './box.js';
 
 export const DEFAULT_PLINTH_HEIGHT_MM = 60;
+export const DEFAULT_PLINTH_INSET_MM = 30; // used when an edge is switched to 'in' and no mm was typed yet
+export const PLINTH_EDGES = ['left', 'right', 'back', 'front'];
+// Reinforcement panels: clear spacing between adjacent panels (faces,
+// outer plinth walls included) is kept within this range, in mm.
+export const MIN_RIB_SPACING_MM = 250;
+export const MAX_RIB_SPACING_MM = 400;
+const PERIMETER_ROLES = PLINTH_EDGES;
+
+/**
+ * How many evenly spaced ribs of thickness T fit in a clear span L so
+ * every gap lies in [MIN_RIB_SPACING_MM, MAX_RIB_SPACING_MM]. Fewest
+ * ribs that work wins; when no count can satisfy the range (e.g. a
+ * 410 mm span), the count whose gap is closest to the range wins.
+ * @returns {{count:number, gap:number}}
+ */
+export function computeRibLayout(L, T) {
+  let best = null;
+  for (let n = 0; n <= 60; n++) {
+    const gap = (L - n * T) / (n + 1);
+    if (gap <= 0) break;
+    const dev = gap > MAX_RIB_SPACING_MM ? gap - MAX_RIB_SPACING_MM : gap < MIN_RIB_SPACING_MM ? MIN_RIB_SPACING_MM - gap : 0;
+    if (dev === 0) return { count: n, gap };
+    if (!best || dev < best.dev) best = { count: n, gap, dev };
+  }
+  return best ? { count: best.count, gap: best.gap } : { count: 0, gap: L };
+}
+
+/**
+ * Per-edge fit of the plinth against the Bottom panel's footprint.
+ * 'out' = flush with that outer
+ * edge; 'in' = set back from it by insetMm. insetMm is kept even
+ * while 'out' so toggling back restores the last typed value.
+ *
+ * @returns {{left,right,back,front: {fit:'in'|'out', insetMm:number}}}
+ */
+export function normalizePlinthEdgeFit(edgeFit) {
+  const out = {};
+  PLINTH_EDGES.forEach((edge) => {
+    const e = edgeFit?.[edge] || {};
+    const insetMm = Number.isFinite(e.insetMm) ? Math.max(0, e.insetMm) : DEFAULT_PLINTH_INSET_MM;
+    out[edge] = { fit: e.fit === 'in' ? 'in' : 'out', insetMm };
+  });
+  return out;
+}
+
+/**
+ * x/z footprint (mm) of the box's own Bottom panel — the plinth's
+ * reference. Doors/drawer fronts that overhang ('out') the Bottom are
+ * deliberately ignored, otherwise the plinth would grow under them.
+ */
+function computeBottomFootprint(bottom) {
+  const h = computeWorldHalfExtents(bottom);
+  return { xMin: bottom.position.x - h.x, xMax: bottom.position.x + h.x, zMin: bottom.position.z - h.z, zMax: bottom.position.z + h.z };
+}
 // No feature-specific floor beyond the general one — unlike
 // features/drawer.js's top/bottom margins, there's no carcass-
 // clearance reason to demand more than "still a real panel".
@@ -63,37 +106,72 @@ export function computePlinthPlacement(panels, groupId, spec = {}) {
   const thicknessMm = spec.thicknessMm ?? bottom.thickness;
   const heightMm = Math.max(MIN_PLINTH_HEIGHT_MM, spec.heightMm ?? DEFAULT_PLINTH_HEIGHT_MM);
 
-  const W = bottom.width;  // Bottom's own full outer width (box.js's own header: "Top/Bottom always run the full outer width")
-  const D = bottom.height; // Bottom's own "height" field IS its depth footprint — HORIZONTAL_ROTATION convention (width->x, height->z, thickness->y)
+  // Footprint = the Bottom panel's own x/z size,
+  // each edge pulled in by its own 'in' inset (0 when 'out').
+  const edgeFit = normalizePlinthEdgeFit(spec.edgeFit);
+  const outer = computeBottomFootprint(bottom);
+  const inset = (edge) => (edgeFit[edge].fit === 'in' ? edgeFit[edge].insetMm : 0);
+  const xMin = outer.xMin + inset('left'), xMax = outer.xMax - inset('right');
+  const zMin = outer.zMin + inset('back'), zMax = outer.zMax - inset('front');
+  const W = xMax - xMin;
+  const D = zMax - zMin;
+  const cx = (xMin + xMax) / 2, cz = (zMin + zMax) / 2;
   const T = thicknessMm;
 
-  if ((W - 2 * T) < MIN_PANEL_DIM_MM || D < MIN_PANEL_DIM_MM || heightMm < MIN_PANEL_DIM_MM) {
+  if (W < MIN_PANEL_DIM_MM || (D - 2 * T) < MIN_PANEL_DIM_MM || heightMm < MIN_PANEL_DIM_MM) {
     return { ok: false, reason: 'panel-too-short' };
   }
 
   const topY = bottom.position.y - bottom.thickness / 2; // Bottom's own underside — the plinth's real top edge, flush
   const centerY = topY - heightMm / 2;
 
-  // Zero-thickness throwaway caps — see this file's own header on why
-  // computeBoxLayout needs a top/bottom pair at all when neither is a
-  // real panel here. Zero thickness means their INNER face (what
-  // left/right/back/front actually key off) sits exactly at their own
-  // offset, i.e. exactly at the plinth's real top/bottom edges, with
-  // nothing shaved off for a cap that doesn't exist.
-  const capTop = { offset: { y: heightMm / 2 }, thickness: 0 };
-  const capBottom = { offset: { y: -heightMm / 2 }, thickness: 0 };
-  const left = { offset: { x: -(W / 2 - T / 2), y: 0, z: 0 }, thickness: T };
-  const right = { offset: { x: +(W / 2 - T / 2), y: 0, z: 0 }, thickness: T };
-  const back = { offset: { x: 0, y: 0, z: -(D / 2 - T / 2) }, thickness: T };
-  const front = { offset: { x: 0, y: 0, z: +(D / 2 - T / 2) }, thickness: T };
+  // Corner ownership: Back/Front run the FULL plinth width ('out' past
+  // the lateral panels); Left/Right sit between them (depth - 2T).
+  const lateralLen = D - 2 * T;
+  const centers = {
+    left:  { x: cx - (W / 2 - T / 2), y: centerY, z: cz },
+    right: { x: cx + (W / 2 - T / 2), y: centerY, z: cz },
+    back:  { x: cx, y: centerY, z: cz - (D / 2 - T / 2) },
+    front: { x: cx, y: centerY, z: cz + (D / 2 - T / 2) },
+  };
+  const lateralDims = { width: lateralLen, height: heightMm, thickness: T };
+  const frontBackDims = { width: W, height: heightMm, thickness: T };
 
-  const layout = computeBoxLayout({ left, right, top: capTop, bottom: capBottom, back, front });
-
-  const centerFor = (role) => ({
-    x: bottom.position.x + layout[role].offset.x,
-    y: centerY + layout[role].offset.y,
-    z: bottom.position.z + layout[role].offset.z,
-  });
+  // ---- reinforcement panels (inside the 4 walls) ----
+  // X-running ribs (parallel to back/front) span the full inner width;
+  // depth-running ribs are CUT into one segment per bay between those
+  // (and the back/front walls), so no two panels ever overlap.
+  const innerW = W - 2 * T, innerD = D - 2 * T;
+  const ribs = [];
+  const nz = computeRibLayout(innerD, T);  // x-running ribs, spread along depth
+  const nx = computeRibLayout(innerW, T);  // depth-running ribs, spread along width
+  const zStart = zMin + T, xStart = xMin + T;
+  const yC = centerY;
+  const bayLen = nz.gap;
+  if (innerW >= MIN_PANEL_DIM_MM && nz.count > 0 && nz.gap >= MIN_PANEL_DIM_MM) {
+    for (let i = 1; i <= nz.count; i++) {
+      ribs.push({
+        role: `rib-x-${i}`,
+        center: { x: cx, y: yC, z: zStart + i * nz.gap + (i - 1) * T + T / 2 },
+        rotation: PARALLEL_ROTATION,
+        dims: { width: innerW, height: heightMm, thickness: T },
+      });
+    }
+  }
+  if (nx.count > 0 && bayLen >= MIN_PANEL_DIM_MM) {
+    for (let j = 1; j <= nx.count; j++) {
+      const rx = xStart + j * nx.gap + (j - 1) * T + T / 2;
+      for (let k = 0; k <= nz.count; k++) {
+        const bayStart = zStart + k * (nz.gap + T);
+        ribs.push({
+          role: `rib-y-${j}-${k + 1}`,
+          center: { x: rx, y: yC, z: bayStart + nz.gap / 2 },
+          rotation: VERTICAL_ROTATION,
+          dims: { width: nz.gap, height: heightMm, thickness: T },
+        });
+      }
+    }
+  }
 
   return {
     ok: true,
@@ -101,10 +179,12 @@ export function computePlinthPlacement(panels, groupId, spec = {}) {
     material,
     thicknessMm: T,
     heightMm,
-    left:  { center: centerFor('left'),  rotation: VERTICAL_ROTATION, dims: { width: layout.left.width,  height: layout.left.height,  thickness: T } },
-    right: { center: centerFor('right'), rotation: VERTICAL_ROTATION, dims: { width: layout.right.width, height: layout.right.height, thickness: T } },
-    back:  { center: centerFor('back'),  rotation: PARALLEL_ROTATION, dims: { width: layout.back.width,  height: layout.back.height,  thickness: T } },
-    front: { center: centerFor('front'), rotation: PARALLEL_ROTATION, dims: { width: layout.front.width, height: layout.front.height, thickness: T } },
+    edgeFit,
+    left:  { center: centers.left,  rotation: VERTICAL_ROTATION, dims: lateralDims },
+    right: { center: centers.right, rotation: VERTICAL_ROTATION, dims: lateralDims },
+    back:  { center: centers.back,  rotation: PARALLEL_ROTATION, dims: frontBackDims },
+    front: { center: centers.front, rotation: PARALLEL_ROTATION, dims: frontBackDims },
+    ribs,
   };
 }
 
@@ -126,10 +206,14 @@ export function computePlinthPlacement(panels, groupId, spec = {}) {
  */
 export function createPlinthNodes(panels, placement) {
   const basePosition = panels.find((p) => p.groupId === placement.groupId)?.basePosition || { x: 0, y: 0, z: 0 };
-  return ['left', 'right', 'back', 'front'].map((role) => {
-    const spec = placement[role];
+  const specs = [
+    ...(placement.skipPerimeter ? [] : PERIMETER_ROLES.map((role) => ({ role, ...placement[role] }))),
+    ...(placement.ribs || []),
+  ];
+  return specs.map((spec) => {
+    const role = spec.role;
     const node = createPanelNode({
-      name: `Plinth ${role[0].toUpperCase()}${role.slice(1)}`,
+      name: role.startsWith('rib-') ? `Plinth Rib ${role.slice(4)}` : `Plinth ${role[0].toUpperCase()}${role.slice(1)}`,
       material: placement.material,
       rotation: spec.rotation,
       groupId: placement.groupId,
@@ -140,6 +224,8 @@ export function createPlinthNodes(panels, placement) {
       // lockedMoveAxes) as a drawer box's own 4 panels.
       isPlinthPanel: true,
       plinthRole: role,
+      plinthEdgeFit: placement.edgeFit, // shared by every plinth panel — see applyPlinthAdjustment
+      isPlinthRib: role.startsWith('rib-'),
       lockedMoveAxes: ['x', 'y', 'z'],
       ...spec.dims,
     });
@@ -173,20 +259,72 @@ export function createPlinthNodes(panels, placement) {
  * @param {number} heightMm
  * @returns {Array} patched panels
  */
-export function applyPlinthAdjustment(panels, groupId, heightMm) {
+export function applyPlinthAdjustment(panels, groupId, heightMm, edgeFit) {
   const existing = panels.filter((p) => p.groupId === groupId && p.isPlinthPanel);
   if (existing.length === 0) return panels;
 
-  const sample = existing[0];
-  const placement = computePlinthPlacement(panels, groupId, { heightMm, material: sample.material, thicknessMm: sample.thickness });
+  const sample = existing.find((p) => p.plinthRole === 'left') || existing[0];
+  const placement = computePlinthPlacement(panels, groupId, {
+    heightMm: heightMm ?? sample.height,
+    material: sample.material,
+    thicknessMm: sample.thickness,
+    edgeFit: edgeFit ?? sample.plinthEdgeFit,
+  });
   if (!placement.ok) return panels;
 
-  let next = panels;
-  ['left', 'right', 'back', 'front'].forEach((role) => {
-    const spec = placement[role];
-    next = next.map((p) => (p.groupId === groupId && p.isPlinthPanel && p.plinthRole === role
-      ? { ...p, ...spec.dims, offset: { x: spec.center.x - p.basePosition.x, y: spec.center.y - p.basePosition.y, z: spec.center.z - p.basePosition.z } }
-      : p));
-  });
-  return next;
+  const delta = placement.heightMm - sample.height; // box rises/lowers so the plinth's bottom stays put
+  const specByRole = new Map([
+    ...PERIMETER_ROLES.map((role) => [role, placement[role]]),
+    ...placement.ribs.map((r) => [r.role, r]),
+  ]);
+  const have = new Set(existing.map((p) => p.plinthRole));
+
+  // patch existing (keeps ids), drop ribs that no longer exist
+  let next = panels
+    .filter((p) => !(p.groupId === groupId && p.isPlinthPanel && !specByRole.has(p.plinthRole)))
+    .map((p) => {
+      if (!(p.groupId === groupId && p.isPlinthPanel)) return p;
+      const spec = specByRole.get(p.plinthRole);
+      return { ...p, ...spec.dims, plinthEdgeFit: placement.edgeFit, offset: { x: spec.center.x - p.basePosition.x, y: spec.center.y - p.basePosition.y, z: spec.center.z - p.basePosition.z } };
+    });
+
+  // add ribs that are new (e.g. the plinth grew past a spacing threshold)
+  const missing = placement.ribs.filter((r) => !have.has(r.role));
+  if (missing.length) {
+    next = [...next, ...createPlinthNodes(panels, { ...placement, ribs: missing, skipPerimeter: true })];
+  }
+  return shiftGroupY(next, groupId, delta);
+}
+
+/**
+ * Shifts EVERY member of a group (carcass panels, shelves, doors,
+ * drawers, plinth) up/down by dy mm via their shared basePosition —
+ * position = basePosition + offset, so this moves the whole group
+ * without touching any offset or constraint.
+ */
+export function shiftGroupY(panels, groupId, dy) {
+  if (!dy) return panels;
+  return panels.map((p) => (p.groupId === groupId
+    ? { ...p, basePosition: { ...p.basePosition, y: p.basePosition.y + dy } }
+    : p));
+}
+
+/**
+ * Builds the plinth under the box AND raises the whole box by the
+ * plinth's height, so the plinth stands where the box's bottom used
+ * to be (e.g. on the floor).
+ *
+ * @returns {{ok:true, panels:Array, groupId:string, heightMm:number}
+ *   | {ok:false, reason:string}}
+ */
+export function addPlinthAndRaiseBox(panels, groupId, spec = {}) {
+  if (panels.some((p) => p.groupId === groupId && p.isPlinthPanel)) {
+    return { ok: false, reason: 'already-has-plinth' };
+  }
+  const placement = computePlinthPlacement(panels, groupId, spec);
+  if (!placement.ok) return placement;
+
+  const nodes = createPlinthNodes(panels, placement);
+  const next = shiftGroupY([...panels, ...nodes], groupId, placement.heightMm);
+  return { ok: true, panels: next, groupId, heightMm: placement.heightMm };
 }

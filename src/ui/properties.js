@@ -28,7 +28,7 @@ import { getDisplayName, MATERIAL_CATALOG } from '../modeller/modules.js';
 import { renderDoorSchema } from './doorSchema.js';
 import { renderDrawerSchema } from './drawerSchema.js';
 import { DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM } from '../features/drawer.js';
-import { MIN_PLINTH_HEIGHT_MM } from '../features/plinth.js';
+import { MIN_PLINTH_HEIGHT_MM, PLINTH_EDGES, normalizePlinthEdgeFit } from '../features/plinth.js';
 
 const DIM_FIELDS = ['width', 'height']; // thickness is derived from material — see below, never a typed field
 
@@ -60,6 +60,7 @@ export function renderProperties(
     onToggleDrawerOpen,
     onDrawerBoxMarginChange,
     onPlinthHeightChange,
+    onPlinthEdgeChange,
   }
 ) {
   if (selectedGroupId && !selectedPanel) {
@@ -271,6 +272,12 @@ export function renderProperties(
   container.querySelector('.plinth-height-field')?.addEventListener('change', (event) => {
     onPlinthHeightChange(Number(event.target.value));
   });
+  container.querySelectorAll('.plinth-edge-fit').forEach((select) => {
+    select.addEventListener('change', () => onPlinthEdgeChange(select.dataset.edge, { fit: select.value }));
+  });
+  container.querySelectorAll('.plinth-edge-inset').forEach((input) => {
+    input.addEventListener('change', () => onPlinthEdgeChange(input.dataset.edge, { insetMm: Number(input.value) }));
+  });
 
   wireRestoreFaceButtons(container, onRestoreFace);
 }
@@ -420,6 +427,22 @@ function plinthSectionHTML(panel) {
     <div class="divider"></div>
     <div class="section-title">Plinth</div>
     ${numberFieldHTML('Height', 'heightMm', panel.height, 'mm', { min: MIN_PLINTH_HEIGHT_MM }, 'plinth-height-field')}
+    <div class="section-title" title="Out = flush with the box's Bottom panel edge. In = set back by the given mm.">Edges</div>
+    ${PLINTH_EDGES.map((edge) => {
+      const e = normalizePlinthEdgeFit(panel.plinthEdgeFit)[edge];
+      return `
+    <div class="field-row">
+      <label>${edge[0].toUpperCase()}${edge.slice(1)}</label>
+      <div class="field-input-wrap">
+        <select class="field-input plinth-edge-fit" data-edge="${edge}">
+          <option value="out" ${e.fit === 'out' ? 'selected' : ''}>Out</option>
+          <option value="in" ${e.fit === 'in' ? 'selected' : ''}>In</option>
+        </select>
+        <input type="number" min="0" step="any" value="${e.insetMm}" data-edge="${edge}" class="field-input plinth-edge-inset" ${e.fit === 'in' ? '' : 'disabled'} />
+        <span class="field-unit">mm</span>
+      </div>
+    </div>`;
+    }).join('')}
   `;
 }
 

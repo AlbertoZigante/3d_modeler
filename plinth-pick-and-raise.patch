@@ -1,0 +1,772 @@
+diff --git a/src/features/plinth.js b/src/features/plinth.js
+index 8cfb0b5..f6de39f 100644
+--- a/src/features/plinth.js
++++ b/src/features/plinth.js
+@@ -12,28 +12,71 @@
+  * (where the carcass's own Bottom rests on it) and open bottom (on the
+  * floor) — exactly what "4 lateral panels" means.
+  *
+- * BOX-AS-GENERATOR, ONE LEVEL DOWN: reuses features/box.js's own
+- * computeBoxLayout PURE MATH directly, rather than a second copy of
+- * the same butted-corner arithmetic — two throwaway, zero-thickness
+- * "top"/"bottom" shaped exactly like computeBoxLayout expects (so
+- * left/right's own height and back/front's own vertical extent come
+- * out right), then only the 4 REAL panels survive into the result.
+- * Left/right run the full depth; back/front sit inset between them,
+- * at DEFAULT_EDGE_FIT ('in' on every edge — i.e. no .edgeFit field at
+- * all, same "nothing set = the plain original construction" reasoning
+- * box.js's own resolvePanelFit already documents) rather than the
+- * 'out' a carcass's own Back wall uses — 'out' would make the plinth's
+- * true footprint W × (D+2T), overshooting the Bottom panel's own
+- * boundary by a thickness at each end; 'in' keeps it exactly W × D,
+- * flush on all four sides with what it's sitting under, which is what
+- * "gets its boundaries" means here.
++ * CORNERS: Back/Front run the FULL plinth width ('out' past the
++ * lateral panels); Left/Right sit between them (depth - 2T). The
++ * footprint itself is the owning Bottom panel's x/z size, each edge
++ * optionally pulled in (see normalizePlinthEdgeFit).
+  */
+-import { createPanelNode, MIN_PANEL_DIM_MM } from '../modeller/modules.js';
++import { createPanelNode, MIN_PANEL_DIM_MM, computeWorldHalfExtents } from '../modeller/modules.js';
+ import { resolveConstraints } from '../modeller/snap.js';
+ import { VERTICAL_ROTATION, PARALLEL_ROTATION } from '../shared/geometry.js';
+-import { findBoxSibling, computeBoxLayout } from './box.js';
++import { findBoxSibling } from './box.js';
+ 
+ export const DEFAULT_PLINTH_HEIGHT_MM = 60;
++export const DEFAULT_PLINTH_INSET_MM = 30; // used when an edge is switched to 'in' and no mm was typed yet
++export const PLINTH_EDGES = ['left', 'right', 'back', 'front'];
++// Reinforcement panels: clear spacing between adjacent panels (faces,
++// outer plinth walls included) is kept within this range, in mm.
++export const MIN_RIB_SPACING_MM = 250;
++export const MAX_RIB_SPACING_MM = 400;
++const PERIMETER_ROLES = PLINTH_EDGES;
++
++/**
++ * How many evenly spaced ribs of thickness T fit in a clear span L so
++ * every gap lies in [MIN_RIB_SPACING_MM, MAX_RIB_SPACING_MM]. Fewest
++ * ribs that work wins; when no count can satisfy the range (e.g. a
++ * 410 mm span), the count whose gap is closest to the range wins.
++ * @returns {{count:number, gap:number}}
++ */
++export function computeRibLayout(L, T) {
++  let best = null;
++  for (let n = 0; n <= 60; n++) {
++    const gap = (L - n * T) / (n + 1);
++    if (gap <= 0) break;
++    const dev = gap > MAX_RIB_SPACING_MM ? gap - MAX_RIB_SPACING_MM : gap < MIN_RIB_SPACING_MM ? MIN_RIB_SPACING_MM - gap : 0;
++    if (dev === 0) return { count: n, gap };
++    if (!best || dev < best.dev) best = { count: n, gap, dev };
++  }
++  return best ? { count: best.count, gap: best.gap } : { count: 0, gap: L };
++}
++
++/**
++ * Per-edge fit of the plinth against the Bottom panel's footprint.
++ * 'out' = flush with that outer
++ * edge; 'in' = set back from it by insetMm. insetMm is kept even
++ * while 'out' so toggling back restores the last typed value.
++ *
++ * @returns {{left,right,back,front: {fit:'in'|'out', insetMm:number}}}
++ */
++export function normalizePlinthEdgeFit(edgeFit) {
++  const out = {};
++  PLINTH_EDGES.forEach((edge) => {
++    const e = edgeFit?.[edge] || {};
++    const insetMm = Number.isFinite(e.insetMm) ? Math.max(0, e.insetMm) : DEFAULT_PLINTH_INSET_MM;
++    out[edge] = { fit: e.fit === 'in' ? 'in' : 'out', insetMm };
++  });
++  return out;
++}
++
++/**
++ * x/z footprint (mm) of the box's own Bottom panel — the plinth's
++ * reference. Doors/drawer fronts that overhang ('out') the Bottom are
++ * deliberately ignored, otherwise the plinth would grow under them.
++ */
++function computeBottomFootprint(bottom) {
++  const h = computeWorldHalfExtents(bottom);
++  return { xMin: bottom.position.x - h.x, xMax: bottom.position.x + h.x, zMin: bottom.position.z - h.z, zMax: bottom.position.z + h.z };
++}
+ // No feature-specific floor beyond the general one — unlike
+ // features/drawer.js's top/bottom margins, there's no carcass-
+ // clearance reason to demand more than "still a real panel".
+@@ -63,37 +106,72 @@ export function computePlinthPlacement(panels, groupId, spec = {}) {
+   const thicknessMm = spec.thicknessMm ?? bottom.thickness;
+   const heightMm = Math.max(MIN_PLINTH_HEIGHT_MM, spec.heightMm ?? DEFAULT_PLINTH_HEIGHT_MM);
+ 
+-  const W = bottom.width;  // Bottom's own full outer width (box.js's own header: "Top/Bottom always run the full outer width")
+-  const D = bottom.height; // Bottom's own "height" field IS its depth footprint — HORIZONTAL_ROTATION convention (width->x, height->z, thickness->y)
++  // Footprint = the Bottom panel's own x/z size,
++  // each edge pulled in by its own 'in' inset (0 when 'out').
++  const edgeFit = normalizePlinthEdgeFit(spec.edgeFit);
++  const outer = computeBottomFootprint(bottom);
++  const inset = (edge) => (edgeFit[edge].fit === 'in' ? edgeFit[edge].insetMm : 0);
++  const xMin = outer.xMin + inset('left'), xMax = outer.xMax - inset('right');
++  const zMin = outer.zMin + inset('back'), zMax = outer.zMax - inset('front');
++  const W = xMax - xMin;
++  const D = zMax - zMin;
++  const cx = (xMin + xMax) / 2, cz = (zMin + zMax) / 2;
+   const T = thicknessMm;
+ 
+-  if ((W - 2 * T) < MIN_PANEL_DIM_MM || D < MIN_PANEL_DIM_MM || heightMm < MIN_PANEL_DIM_MM) {
++  if (W < MIN_PANEL_DIM_MM || (D - 2 * T) < MIN_PANEL_DIM_MM || heightMm < MIN_PANEL_DIM_MM) {
+     return { ok: false, reason: 'panel-too-short' };
+   }
+ 
+   const topY = bottom.position.y - bottom.thickness / 2; // Bottom's own underside — the plinth's real top edge, flush
+   const centerY = topY - heightMm / 2;
+ 
+-  // Zero-thickness throwaway caps — see this file's own header on why
+-  // computeBoxLayout needs a top/bottom pair at all when neither is a
+-  // real panel here. Zero thickness means their INNER face (what
+-  // left/right/back/front actually key off) sits exactly at their own
+-  // offset, i.e. exactly at the plinth's real top/bottom edges, with
+-  // nothing shaved off for a cap that doesn't exist.
+-  const capTop = { offset: { y: heightMm / 2 }, thickness: 0 };
+-  const capBottom = { offset: { y: -heightMm / 2 }, thickness: 0 };
+-  const left = { offset: { x: -(W / 2 - T / 2), y: 0, z: 0 }, thickness: T };
+-  const right = { offset: { x: +(W / 2 - T / 2), y: 0, z: 0 }, thickness: T };
+-  const back = { offset: { x: 0, y: 0, z: -(D / 2 - T / 2) }, thickness: T };
+-  const front = { offset: { x: 0, y: 0, z: +(D / 2 - T / 2) }, thickness: T };
+-
+-  const layout = computeBoxLayout({ left, right, top: capTop, bottom: capBottom, back, front });
+-
+-  const centerFor = (role) => ({
+-    x: bottom.position.x + layout[role].offset.x,
+-    y: centerY + layout[role].offset.y,
+-    z: bottom.position.z + layout[role].offset.z,
+-  });
++  // Corner ownership: Back/Front run the FULL plinth width ('out' past
++  // the lateral panels); Left/Right sit between them (depth - 2T).
++  const lateralLen = D - 2 * T;
++  const centers = {
++    left:  { x: cx - (W / 2 - T / 2), y: centerY, z: cz },
++    right: { x: cx + (W / 2 - T / 2), y: centerY, z: cz },
++    back:  { x: cx, y: centerY, z: cz - (D / 2 - T / 2) },
++    front: { x: cx, y: centerY, z: cz + (D / 2 - T / 2) },
++  };
++  const lateralDims = { width: lateralLen, height: heightMm, thickness: T };
++  const frontBackDims = { width: W, height: heightMm, thickness: T };
++
++  // ---- reinforcement panels (inside the 4 walls) ----
++  // X-running ribs (parallel to back/front) span the full inner width;
++  // depth-running ribs are CUT into one segment per bay between those
++  // (and the back/front walls), so no two panels ever overlap.
++  const innerW = W - 2 * T, innerD = D - 2 * T;
++  const ribs = [];
++  const nz = computeRibLayout(innerD, T);  // x-running ribs, spread along depth
++  const nx = computeRibLayout(innerW, T);  // depth-running ribs, spread along width
++  const zStart = zMin + T, xStart = xMin + T;
++  const yC = centerY;
++  const bayLen = nz.gap;
++  if (innerW >= MIN_PANEL_DIM_MM && nz.count > 0 && nz.gap >= MIN_PANEL_DIM_MM) {
++    for (let i = 1; i <= nz.count; i++) {
++      ribs.push({
++        role: `rib-x-${i}`,
++        center: { x: cx, y: yC, z: zStart + i * nz.gap + (i - 1) * T + T / 2 },
++        rotation: PARALLEL_ROTATION,
++        dims: { width: innerW, height: heightMm, thickness: T },
++      });
++    }
++  }
++  if (nx.count > 0 && bayLen >= MIN_PANEL_DIM_MM) {
++    for (let j = 1; j <= nx.count; j++) {
++      const rx = xStart + j * nx.gap + (j - 1) * T + T / 2;
++      for (let k = 0; k <= nz.count; k++) {
++        const bayStart = zStart + k * (nz.gap + T);
++        ribs.push({
++          role: `rib-y-${j}-${k + 1}`,
++          center: { x: rx, y: yC, z: bayStart + nz.gap / 2 },
++          rotation: VERTICAL_ROTATION,
++          dims: { width: nz.gap, height: heightMm, thickness: T },
++        });
++      }
++    }
++  }
+ 
+   return {
+     ok: true,
+@@ -101,10 +179,12 @@ export function computePlinthPlacement(panels, groupId, spec = {}) {
+     material,
+     thicknessMm: T,
+     heightMm,
+-    left:  { center: centerFor('left'),  rotation: VERTICAL_ROTATION, dims: { width: layout.left.width,  height: layout.left.height,  thickness: T } },
+-    right: { center: centerFor('right'), rotation: VERTICAL_ROTATION, dims: { width: layout.right.width, height: layout.right.height, thickness: T } },
+-    back:  { center: centerFor('back'),  rotation: PARALLEL_ROTATION, dims: { width: layout.back.width,  height: layout.back.height,  thickness: T } },
+-    front: { center: centerFor('front'), rotation: PARALLEL_ROTATION, dims: { width: layout.front.width, height: layout.front.height, thickness: T } },
++    edgeFit,
++    left:  { center: centers.left,  rotation: VERTICAL_ROTATION, dims: lateralDims },
++    right: { center: centers.right, rotation: VERTICAL_ROTATION, dims: lateralDims },
++    back:  { center: centers.back,  rotation: PARALLEL_ROTATION, dims: frontBackDims },
++    front: { center: centers.front, rotation: PARALLEL_ROTATION, dims: frontBackDims },
++    ribs,
+   };
+ }
+ 
+@@ -126,10 +206,14 @@ export function computePlinthPlacement(panels, groupId, spec = {}) {
+  */
+ export function createPlinthNodes(panels, placement) {
+   const basePosition = panels.find((p) => p.groupId === placement.groupId)?.basePosition || { x: 0, y: 0, z: 0 };
+-  return ['left', 'right', 'back', 'front'].map((role) => {
+-    const spec = placement[role];
++  const specs = [
++    ...(placement.skipPerimeter ? [] : PERIMETER_ROLES.map((role) => ({ role, ...placement[role] }))),
++    ...(placement.ribs || []),
++  ];
++  return specs.map((spec) => {
++    const role = spec.role;
+     const node = createPanelNode({
+-      name: `Plinth ${role[0].toUpperCase()}${role.slice(1)}`,
++      name: role.startsWith('rib-') ? `Plinth Rib ${role.slice(4)}` : `Plinth ${role[0].toUpperCase()}${role.slice(1)}`,
+       material: placement.material,
+       rotation: spec.rotation,
+       groupId: placement.groupId,
+@@ -140,6 +224,8 @@ export function createPlinthNodes(panels, placement) {
+       // lockedMoveAxes) as a drawer box's own 4 panels.
+       isPlinthPanel: true,
+       plinthRole: role,
++      plinthEdgeFit: placement.edgeFit, // shared by every plinth panel — see applyPlinthAdjustment
++      isPlinthRib: role.startsWith('rib-'),
+       lockedMoveAxes: ['x', 'y', 'z'],
+       ...spec.dims,
+     });
+@@ -173,20 +259,72 @@ export function createPlinthNodes(panels, placement) {
+  * @param {number} heightMm
+  * @returns {Array} patched panels
+  */
+-export function applyPlinthAdjustment(panels, groupId, heightMm) {
++export function applyPlinthAdjustment(panels, groupId, heightMm, edgeFit) {
+   const existing = panels.filter((p) => p.groupId === groupId && p.isPlinthPanel);
+   if (existing.length === 0) return panels;
+ 
+-  const sample = existing[0];
+-  const placement = computePlinthPlacement(panels, groupId, { heightMm, material: sample.material, thicknessMm: sample.thickness });
++  const sample = existing.find((p) => p.plinthRole === 'left') || existing[0];
++  const placement = computePlinthPlacement(panels, groupId, {
++    heightMm: heightMm ?? sample.height,
++    material: sample.material,
++    thicknessMm: sample.thickness,
++    edgeFit: edgeFit ?? sample.plinthEdgeFit,
++  });
+   if (!placement.ok) return panels;
+ 
+-  let next = panels;
+-  ['left', 'right', 'back', 'front'].forEach((role) => {
+-    const spec = placement[role];
+-    next = next.map((p) => (p.groupId === groupId && p.isPlinthPanel && p.plinthRole === role
+-      ? { ...p, ...spec.dims, offset: { x: spec.center.x - p.basePosition.x, y: spec.center.y - p.basePosition.y, z: spec.center.z - p.basePosition.z } }
+-      : p));
+-  });
+-  return next;
++  const delta = placement.heightMm - sample.height; // box rises/lowers so the plinth's bottom stays put
++  const specByRole = new Map([
++    ...PERIMETER_ROLES.map((role) => [role, placement[role]]),
++    ...placement.ribs.map((r) => [r.role, r]),
++  ]);
++  const have = new Set(existing.map((p) => p.plinthRole));
++
++  // patch existing (keeps ids), drop ribs that no longer exist
++  let next = panels
++    .filter((p) => !(p.groupId === groupId && p.isPlinthPanel && !specByRole.has(p.plinthRole)))
++    .map((p) => {
++      if (!(p.groupId === groupId && p.isPlinthPanel)) return p;
++      const spec = specByRole.get(p.plinthRole);
++      return { ...p, ...spec.dims, plinthEdgeFit: placement.edgeFit, offset: { x: spec.center.x - p.basePosition.x, y: spec.center.y - p.basePosition.y, z: spec.center.z - p.basePosition.z } };
++    });
++
++  // add ribs that are new (e.g. the plinth grew past a spacing threshold)
++  const missing = placement.ribs.filter((r) => !have.has(r.role));
++  if (missing.length) {
++    next = [...next, ...createPlinthNodes(panels, { ...placement, ribs: missing, skipPerimeter: true })];
++  }
++  return shiftGroupY(next, groupId, delta);
++}
++
++/**
++ * Shifts EVERY member of a group (carcass panels, shelves, doors,
++ * drawers, plinth) up/down by dy mm via their shared basePosition —
++ * position = basePosition + offset, so this moves the whole group
++ * without touching any offset or constraint.
++ */
++export function shiftGroupY(panels, groupId, dy) {
++  if (!dy) return panels;
++  return panels.map((p) => (p.groupId === groupId
++    ? { ...p, basePosition: { ...p.basePosition, y: p.basePosition.y + dy } }
++    : p));
++}
++
++/**
++ * Builds the plinth under the box AND raises the whole box by the
++ * plinth's height, so the plinth stands where the box's bottom used
++ * to be (e.g. on the floor).
++ *
++ * @returns {{ok:true, panels:Array, groupId:string, heightMm:number}
++ *   | {ok:false, reason:string}}
++ */
++export function addPlinthAndRaiseBox(panels, groupId, spec = {}) {
++  if (panels.some((p) => p.groupId === groupId && p.isPlinthPanel)) {
++    return { ok: false, reason: 'already-has-plinth' };
++  }
++  const placement = computePlinthPlacement(panels, groupId, spec);
++  if (!placement.ok) return placement;
++
++  const nodes = createPlinthNodes(panels, placement);
++  const next = shiftGroupY([...panels, ...nodes], groupId, placement.heightMm);
++  return { ok: true, panels: next, groupId, heightMm: placement.heightMm };
+ }
+diff --git a/src/history/history.js b/src/history/history.js
+index 665a185..f8c8027 100644
+--- a/src/history/history.js
++++ b/src/history/history.js
+@@ -218,6 +218,12 @@ export class SetPlinthHeightCommand extends ModelCommand {
+   }
+ }
+ 
++export class SetPlinthEdgeFitCommand extends ModelCommand {
++  constructor(options) {
++    super({ ...options, label: 'Change plinth edge' });
++  }
++}
++
+ export class RenamePanelCommand extends ModelCommand {
+   constructor(options) {
+     super({ ...options, label: 'Rename panel' });
+diff --git a/src/modeller-main.js b/src/modeller-main.js
+index 3aeba7d..8b96ae5 100644
+--- a/src/modeller-main.js
++++ b/src/modeller-main.js
+@@ -74,6 +74,8 @@ import {
+ } from './shared/geometry.js';
+ import { addBox, relayoutBox } from './features/box.js';
+ import { isShelf } from './features/shelf.js';
++import { addPlinthAndRaiseBox, applyPlinthAdjustment, normalizePlinthEdgeFit, MIN_PLINTH_HEIGHT_MM } from './features/plinth.js';
++import { startPlinthMode, cancelPlinthMode, isPlinthPickActive, setPlinthToolContext } from './tools/plinth.js';
+ import { createDoorNode, computeDoorOpenTransform, applyDoorAdjustmentsForGroup, applyPanelPatch, computeDoorPlacement, DEFAULT_DOOR_EDGE_FIT, DEFAULT_DOOR_HINGE } from './features/door.js';
+ import { createDrawerFrontNodes, createDrawerBoxNodes, computeDrawerBoxPlacement, computeDrawerOpenTransform, applyDrawerAdjustmentsForGroup, computeDrawerFrontsPlacement, DEFAULT_DRAWER_EDGE_FIT, DEFAULT_DRAWER_COUNT, MAX_DRAWER_COUNT, DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM } from './features/drawer.js';
+ import { startShelfMode, cancelShelfMode, getShelfMode, setShelfToolContext } from './tools/shelfTool.js';
+@@ -106,6 +108,7 @@ import {
+   RemoveConstraintCommand, UnlinkConstraintCommand, HideBoxWallCommand, RestoreBoxWallCommand,
+   ChangeEdgeFitCommand, AddDoorCommand, SetDoorHingeCommand, DeleteDoorCommand,
+   AddDrawerCommand, DeleteDrawerCommand, SetDrawerBoxMarginCommand,
++  AddPlinthCommand, SetPlinthHeightCommand, SetPlinthEdgeFitCommand,
+ } from './history/history.js';
+ initResizableLayout();
+ 
+@@ -568,6 +571,10 @@ setShelfToolContext(toolContext);
+ setCollinearToolContext(toolContext);
+ setAttachToolContext(toolContext);
+ setBoundaryRectToolContext(toolContext);
++setPlinthToolContext({
++  ...toolContext,
++  onBoxPicked: (groupId) => handleAddPlinth(groupId),
++});
+ setDoorToolContext({
+   renderAll: () => renderAll(),
+   onBoundaryPicked: (boundaryResult) => {
+@@ -702,6 +709,8 @@ function applyRelayoutResult(result) {
+     // features/drawer.js#applyDrawerAdjustmentsForGroup's own doc
+     // comment.
+     panels = applyDrawerAdjustmentsForGroup(panels, groupId);
++    // Plinth follows the Bottom panel's footprint (and its own edge fit).
++    panels = applyPlinthAdjustment(panels, groupId);
+   }
+   return true;
+ }
+@@ -718,6 +727,7 @@ window.addEventListener('keydown', (e) => {
+   if (e.key === 'Escape' && getShelfMode()) cancelShelfMode();
+   if (e.key === 'Escape' && isDoorPickActive()) cancelDoorMode();
+   if (e.key === 'Escape' && isDrawerPickActive()) cancelDrawerMode();
++  if (e.key === 'Escape' && isPlinthPickActive()) cancelPlinthMode();
+ 
+   if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
+     e.preventDefault();
+@@ -775,6 +785,7 @@ const TOOL_HINTS = {
+   shelfHorizontal: 'Horizontal shelf: pick one boundary of the box, then the opposite boundary, to span a shelf between them · Esc: cancel',
+   shelfVertical: 'Vertical shelf: pick one boundary of the box, then the opposite boundary, to span a shelf between them · Esc: cancel',
+   doorPick: 'Add door: pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or a shelf) to place the door — it\'s added immediately, in/in/in/in · Esc: cancel',
++  plinthPick: 'Add plinth: click a box — a plinth is built under it and the box is raised by the plinth height · Esc: cancel',
+   drawerPick: 'Add drawer: pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or a shelf) to place the drawers — added immediately, in/in/in/in · Esc: cancel',
+ };
+ 
+@@ -785,6 +796,7 @@ function updateToolHint() {
+   else if (getShelfMode() === 'vertical') hint = TOOL_HINTS.shelfVertical;
+   else if (isDoorPickActive()) hint = TOOL_HINTS.doorPick;
+   else if (isDrawerPickActive()) hint = TOOL_HINTS.drawerPick;
++  else if (isPlinthPickActive()) hint = TOOL_HINTS.plinthPick;
+ 
+   if (hint) {
+     hintBarTool.textContent = hint;
+@@ -1076,12 +1088,18 @@ function renderAll() {
+   const drawerBoxPanelFieldsById = new Map(
+     panels.filter((p) => p.isDrawerBoxPanel).map((p) => [p.id, { isDrawerBoxPanel: true }])
+   );
++  // Same re-attachment for plinth panels (walls + ribs) so scene.js/
++  // gizmos.js see isPlinthPanel and hide every resize/move handle.
++  const plinthPanelFieldsById = new Map(
++    panels.filter((p) => p.isPlinthPanel).map((p) => [p.id, { isPlinthPanel: true }])
++  );
+   const resolvedWithCodes = resolved.map((r) => ({
+     ...r,
+     pieceCode: r.pieceCode ?? pieceCodeById.get(r.id),
+     ...doorFieldsById.get(r.id),
+     ...drawerFrontFieldsById.get(r.id),
+     ...drawerBoxPanelFieldsById.get(r.id),
++    ...plinthPanelFieldsById.get(r.id),
+   }));
+ 
+   const visiblePanels = resolvedWithCodes.filter((p) => !p.hidden);
+@@ -1144,17 +1162,19 @@ function renderAll() {
+     onAddHorizontal: addHorizontalPanel,
+     onAddParallel: addParallelPanel,
+     onAddBox: handleAddBox,
+-    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), startCollinearMode())),
++    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), startCollinearMode())),
+     collinearActive: isCollinearActive(),
+     collinearGapMm: getCollinearGapMm(),
+     onCollinearGapChange: setCollinearGapMm, // deliberately no renderAll() here — see toolbar.js's own comment on why
+-    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), startShelfMode('horizontal'))),
+-    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), startShelfMode('vertical'))),
++    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), startShelfMode('horizontal'))),
++    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), startShelfMode('vertical'))),
+     shelfMode: getShelfMode(),
+-    onAddDoor: () => (isDoorPickActive() ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDrawerMode(), startDoorMode())),
++    onAddDoor: () => (isDoorPickActive() ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDrawerMode(), cancelPlinthMode(), startDoorMode())),
+     doorToolActive: isDoorPickActive(),
+-    onAddDrawer: () => (isDrawerPickActive() ? cancelDrawerMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), startDrawerMode())),
++    onAddDrawer: () => (isDrawerPickActive() ? cancelDrawerMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelPlinthMode(), startDrawerMode())),
+     drawerToolActive: isDrawerPickActive(),
++    onAddPlinth: () => (isPlinthPickActive() ? cancelPlinthMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), startPlinthMode())),
++    plinthToolActive: isPlinthPickActive(),
+   });
+ 
+   renderInspectorOnly();
+@@ -1253,6 +1273,8 @@ function renderInspectorOnly() {
+       onDrawerFrontCountChange: updateSelectedDrawerFrontCount,
+       onToggleDrawerOpen: toggleSelectedDrawerOpen,
+       onDrawerBoxMarginChange: updateSelectedDrawerBoxMargin,
++      onPlinthHeightChange: updateSelectedPlinthHeight,
++      onPlinthEdgeChange: updateSelectedPlinthEdge,
+     });
+   }
+ 
+@@ -1789,6 +1811,67 @@ function updateSelectedDrawerBoxMargin(field, rawValue) {
+   renderAll();
+ }
+ 
++// Right-toolbar edge fields: one edge's in/out and/or inset mm.
++function updateSelectedPlinthEdge(edge, patch) {
++  const node = panels.find((p) => p.id === getSelectedId());
++  if (!node || !node.isPlinthPanel) return;
++
++  const current = normalizePlinthEdgeFit(node.plinthEdgeFit);
++  const next = { ...current, [edge]: { ...current[edge], ...patch } };
++  const before = panels;
++  const after = applyPlinthAdjustment(panels, node.groupId, undefined, next);
++  if (after === before) {
++    showToast("Not enough room for that plinth edge setting");
++    renderAll(); // reset the field to the stored value
++    return;
++  }
++  panels = after;
++  recordHistoryCommand(SetPlinthEdgeFitCommand, before, after);
++  renderAll();
++}
++
++// Plinth tool callback — the person clicked Plinth (everything got
++// deselected, see tools/plinth.js) and then picked a box. Builds the
++// plinth under it and raises the box by the plinth's height, as ONE
++// history step.
++function handleAddPlinth(groupId) {
++  const result = addPlinthAndRaiseBox(panels, groupId, {});
++  if (!result.ok) {
++    showToast(result.reason === 'already-has-plinth'
++      ? 'That box already has a plinth — select it to change its height'
++      : result.reason === 'no-bottom-panel'
++        ? 'That box has no Bottom panel to build a plinth under'
++        : 'Not enough room under that box for a plinth');
++    renderAll();
++    return;
++  }
++  const before = panels;
++  panels = result.panels;
++  recordHistoryCommand(AddPlinthCommand, before, panels);
++  // Select one plinth panel so its edge/height fields show in the
++  // right toolbar (same as a freshly added door/drawer).
++  setSelectedGroupId(groupId);
++  setSelectedId(panels.find((p) => p.groupId === groupId && p.plinthRole === 'left')?.id ?? null);
++  renderAll();
++}
++
++// ui/properties.js's Plinth height field — goes through history; the
++// box is raised/lowered by the height change so the plinth's bottom
++// stays where it was (see features/plinth.js#applyPlinthAdjustment).
++function updateSelectedPlinthHeight(rawValue) {
++  const selectedId = getSelectedId();
++  const node = panels.find((p) => p.id === selectedId);
++  if (!node || !node.isPlinthPanel) return;
++
++  const clamped = Math.max(MIN_PLINTH_HEIGHT_MM, rawValue);
++  const before = panels;
++  const after = applyPlinthAdjustment(panels, node.groupId, clamped);
++  if (after === before) return;
++  panels = after;
++  recordHistoryCommand(SetPlinthHeightCommand, before, after);
++  renderAll();
++}
++
+ // Unlike doorOpen above, which side a door hinges on IS a design
+ // decision (affects assembly/hardware later), so this goes through
+ // history like any other field edit.
+diff --git a/src/modeller/gizmos.js b/src/modeller/gizmos.js
+index 21cf406..345a353 100644
+--- a/src/modeller/gizmos.js
++++ b/src/modeller/gizmos.js
+@@ -353,7 +353,9 @@ const FACE_RESIZE_INFO = {
+   // Same reasoning as isDrawerFront above, drawer BOX panel
+   // counterpart (left/right/bottom/back).
+   function isDrawerBoxPanel(mesh) {
+-    return !!mesh?.userData?.isDrawerBoxPanel;
++    // Plinth panels are locked exactly like a drawer's own box panels:
++    // derived from the owning box, never moved/resized by hand.
++    return !!(mesh?.userData?.isDrawerBoxPanel || mesh?.userData?.isPlinthPanel);
+   }
+ 
+   const FACE_NAMES = ['right', 'left', 'top', 'bottom', 'front', 'back'];
+diff --git a/src/modeller/scene.js b/src/modeller/scene.js
+index 352e8ce..8b538ce 100644
+--- a/src/modeller/scene.js
++++ b/src/modeller/scene.js
+@@ -683,6 +683,8 @@ export function createModellerScene(
+       // bottom/back — see features/drawer.js#createDrawerBoxNodes):
+       // also derived, also never resized/moved by hand.
+       entry.mesh.userData.isDrawerBoxPanel = !!node.isDrawerBoxPanel;
++      // Plinth panels: derived + locked, no handles (see gizmos.js).
++      entry.mesh.userData.isPlinthPanel = !!node.isPlinthPanel;
+       entry.mesh.userData.thicknessAxis = node.thicknessAxis || null;
+       entry.mesh.userData.resizeProxy = node.resizeProxy || null;
+ 
+diff --git a/src/modeller/view2d.js b/src/modeller/view2d.js
+index 4eb922d..f27a2ab 100644
+--- a/src/modeller/view2d.js
++++ b/src/modeller/view2d.js
+@@ -138,7 +138,7 @@ function isBoxWall(mesh) {
+ // drawer fronts; fixed for all three here rather than leaving doors
+ // resizable in the 2D view while drawer fronts/boxes aren't.
+ function isDoorOrDrawerFront(mesh) {
+-  return !!(mesh?.userData?.isDoor || mesh?.userData?.isDrawerFront || mesh?.userData?.isDrawerBoxPanel);
++  return !!(mesh?.userData?.isDoor || mesh?.userData?.isDrawerFront || mesh?.userData?.isDrawerBoxPanel || mesh?.userData?.isPlinthPanel);
+ }
+ 
+ export function create2DControls(
+diff --git a/src/shared/geometry.js b/src/shared/geometry.js
+index f2cd520..e7d441e 100644
+--- a/src/shared/geometry.js
++++ b/src/shared/geometry.js
+@@ -142,6 +142,10 @@ export function collectAxisSlabs(panels, groupId, axis, overrides = {}) {
+     if (p.groupId !== groupId) return;
+     if (p.hidden) return; // a hidden (removed-but-restorable) panel no longer occupies space — see removeSelected()
+     const isRelevantWall = p.isBoxWall && (p.name === wallRoleLow || p.name === wallRoleHigh);
++    // Plinth panels (walls + ribs) are DERIVED too, same reasoning —
++    // its vertical panels sit flush under the box's own Left/Right and
++    // must never be counted as 'shelves' next to them (that made every
++    // box resize fail min-gap once a plinth existed).
+     // Doors, drawer fronts, and drawer box panels are all DERIVED —
+     // their position/size come from dedicated code
+     // (shared/frontFit.js#computeFrontFit,
+@@ -156,7 +160,7 @@ export function collectAxisSlabs(panels, groupId, axis, overrides = {}) {
+     // resize any time a drawer box's own panels happened to sit within
+     // MIN_WALL_GAP_MM of a wall or each other — which, given typical
+     // slide-clearance margins, is common by design, not a mistake.
+-    const isRelevantShelf = !p.isBoxWall && !p.isDoor && !p.isDrawerFront && !p.isDrawerBoxPanel && rotationsMatch(p.rotation, relevantRotation);
++    const isRelevantShelf = !p.isBoxWall && !p.isDoor && !p.isDrawerFront && !p.isDrawerBoxPanel && !p.isPlinthPanel && rotationsMatch(p.rotation, relevantRotation);
+     if (!isRelevantWall && !isRelevantShelf) return;
+     const o = overrides[p.id];
+     slabs.push(
+diff --git a/src/tools/plinth.js b/src/tools/plinth.js
+index e69de29..378176b 100644
+--- a/src/tools/plinth.js
++++ b/src/tools/plinth.js
+@@ -0,0 +1,76 @@
++/**
++ * tools/plinth.js
++ *
++ * ADD PLINTH — pick-a-box tool. Clicking the toolbar's Plinth button
++ * deselects everything (3D + 2D) and enters a single-click pick mode;
++ * the next click on any panel of a box immediately builds the plinth
++ * under that box and lifts the box by the plinth's height (see
++ * features/plinth.js#addPlinthAndRaiseBox). No confirm step.
++ *
++ * Only orchestrates interaction state — modeller-main.js remains the
++ * single writer that turns the picked groupId into a history-tracked
++ * graph change (ctx.onBoxPicked).
++ */
++import { setSelectedId, setSelectedGroupId } from '../modeller/selection.js';
++import { showToast, hideToast } from '../ui/toast.js';
++
++/**
++ * @typedef {Object} PlinthToolContext
++ * @property {() => Array} getPanels
++ * @property {() => void} renderAll
++ * @property {() => void} clearMultiSelected
++ * @property {(nodeId: string|null, faceName: string|null) => void} setFaceHighlight
++ * @property {(active: boolean, onPick: Function|null) => void} setFacePickMode
++ * @property {(nodeIds: string[]) => void} setPanelHighlightSet
++ * @property {(groupId: string) => void} onBoxPicked
++ */
++
++/** @type {PlinthToolContext|null} */
++let ctx = null;
++let active = false;
++
++export function setPlinthToolContext(context) {
++  ctx = context;
++}
++
++export function isPlinthPickActive() {
++  return active;
++}
++
++export function startPlinthMode() {
++  active = true;
++  setSelectedId(null);
++  setSelectedGroupId(null);
++  ctx.clearMultiSelected();
++  ctx.setFaceHighlight(null, null);
++  ctx.setPanelHighlightSet([]);
++  ctx.setFacePickMode(true, handlePlinthPick);
++  showToast('Plinth: click a box to place the plinth under it', false);
++  ctx.renderAll();
++}
++
++function handlePlinthPick(nodeId) {
++  const node = ctx.getPanels().find((p) => p.id === nodeId);
++  if (!node || !node.groupId) {
++    showToast('Pick a panel that belongs to a box');
++    return;
++  }
++  const groupId = node.groupId;
++  finish();
++  ctx.onBoxPicked(groupId);
++}
++
++function finish() {
++  active = false;
++  setSelectedId(null);
++  ctx.setFaceHighlight(null, null);
++  ctx.setPanelHighlightSet([]);
++  ctx.setFacePickMode(false, null);
++  hideToast();
++}
++
++export function cancelPlinthMode() {
++  if (!active) return;
++  finish();
++  ctx.renderAll();
++}
+diff --git a/src/ui/properties.js b/src/ui/properties.js
+index f15e2d5..86a5815 100644
+--- a/src/ui/properties.js
++++ b/src/ui/properties.js
+@@ -28,7 +28,7 @@ import { getDisplayName, MATERIAL_CATALOG } from '../modeller/modules.js';
+ import { renderDoorSchema } from './doorSchema.js';
+ import { renderDrawerSchema } from './drawerSchema.js';
+ import { DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM } from '../features/drawer.js';
+-import { MIN_PLINTH_HEIGHT_MM } from '../features/plinth.js';
++import { MIN_PLINTH_HEIGHT_MM, PLINTH_EDGES, normalizePlinthEdgeFit } from '../features/plinth.js';
+ 
+ const DIM_FIELDS = ['width', 'height']; // thickness is derived from material — see below, never a typed field
+ 
+@@ -60,6 +60,7 @@ export function renderProperties(
+     onToggleDrawerOpen,
+     onDrawerBoxMarginChange,
+     onPlinthHeightChange,
++    onPlinthEdgeChange,
+   }
+ ) {
+   if (selectedGroupId && !selectedPanel) {
+@@ -271,6 +272,12 @@ export function renderProperties(
+   container.querySelector('.plinth-height-field')?.addEventListener('change', (event) => {
+     onPlinthHeightChange(Number(event.target.value));
+   });
++  container.querySelectorAll('.plinth-edge-fit').forEach((select) => {
++    select.addEventListener('change', () => onPlinthEdgeChange(select.dataset.edge, { fit: select.value }));
++  });
++  container.querySelectorAll('.plinth-edge-inset').forEach((input) => {
++    input.addEventListener('change', () => onPlinthEdgeChange(input.dataset.edge, { insetMm: Number(input.value) }));
++  });
+ 
+   wireRestoreFaceButtons(container, onRestoreFace);
+ }
+@@ -420,6 +427,22 @@ function plinthSectionHTML(panel) {
+     <div class="divider"></div>
+     <div class="section-title">Plinth</div>
+     ${numberFieldHTML('Height', 'heightMm', panel.height, 'mm', { min: MIN_PLINTH_HEIGHT_MM }, 'plinth-height-field')}
++    <div class="section-title" title="Out = flush with the box's Bottom panel edge. In = set back by the given mm.">Edges</div>
++    ${PLINTH_EDGES.map((edge) => {
++      const e = normalizePlinthEdgeFit(panel.plinthEdgeFit)[edge];
++      return `
++    <div class="field-row">
++      <label>${edge[0].toUpperCase()}${edge.slice(1)}</label>
++      <div class="field-input-wrap">
++        <select class="field-input plinth-edge-fit" data-edge="${edge}">
++          <option value="out" ${e.fit === 'out' ? 'selected' : ''}>Out</option>
++          <option value="in" ${e.fit === 'in' ? 'selected' : ''}>In</option>
++        </select>
++        <input type="number" min="0" step="any" value="${e.insetMm}" data-edge="${edge}" class="field-input plinth-edge-inset" ${e.fit === 'in' ? '' : 'disabled'} />
++        <span class="field-unit">mm</span>
++      </div>
++    </div>`;
++    }).join('')}
+   `;
+ }
+ 
+diff --git a/src/ui/toolbar.js b/src/ui/toolbar.js
+index 5563476..2304961 100644
+--- a/src/ui/toolbar.js
++++ b/src/ui/toolbar.js
+@@ -383,6 +383,7 @@ export function renderPanelList(
+     drawerToolActive,
+ 
+     onAddPlinth,
++    plinthToolActive,
+ 
+   }
+ ) {
+@@ -416,7 +417,7 @@ export function renderPanelList(
+    * collapses back to the three sections above it.
+    */
+   const anyToolActive =
+-    !!(collinearActive || shelfMode || doorToolActive || drawerToolActive);
++    !!(collinearActive || shelfMode || doorToolActive || drawerToolActive || plinthToolActive);
+ 
+   const propertiesSectionMarkup = `
+     <div
+@@ -616,13 +617,12 @@ export function renderPanelList(
+ 
+             <button
+               type="button"
+-              class="component-icon-btn"
++              class="component-icon-btn ${plinthToolActive ? 'active' : ''}"
+               id="add-plinth-btn"
+-              ${selectedGroupId ? '' : 'disabled'}
+-              title="${selectedGroupId ? "Add Plinth — builds a 4-panel kick base under the selected box's own Bottom panel" : 'Select a box first'}"
++              title="${plinthToolActive ? 'Cancel Add Plinth (Esc)' : 'Add Plinth — click, then pick a box: a 4-panel kick base is built under it and the box is raised by the plinth height'}"
+             >
+               ${COMPONENT_ICONS.plinth}
+-              <span class="icon-label">Plinth</span>
++              <span class="icon-label">${plinthToolActive ? 'Cancel' : 'Plinth'}</span>
+             </button>
+ 
+           </div>
+@@ -900,8 +900,8 @@ export function renderPanelList(
+ 
+ 
+   /* ==========================================================
+-     ADD PLINTH (no pick mode — builds under the currently selected
+-     box's own Bottom panel; button disabled above without one)
++     ADD PLINTH (pick mode — deselects everything, then the next
++     clicked box gets the plinth and is raised by its height)
+      ========================================================== */
+ 
+   container

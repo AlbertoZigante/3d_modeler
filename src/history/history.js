@@ -218,6 +218,12 @@ export class SetPlinthHeightCommand extends ModelCommand {
   }
 }
 
+export class SetPlinthEdgeFitCommand extends ModelCommand {
+  constructor(options) {
+    super({ ...options, label: 'Change plinth edge' });
+  }
+}
+
 export class RenamePanelCommand extends ModelCommand {
   constructor(options) {
     super({ ...options, label: 'Rename panel' });

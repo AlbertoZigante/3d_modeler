@@ -383,6 +383,7 @@ export function renderPanelList(
     drawerToolActive,
 
     onAddPlinth,
+    plinthToolActive,
 
   }
 ) {
@@ -416,7 +417,7 @@ export function renderPanelList(
    * collapses back to the three sections above it.
    */
   const anyToolActive =
-    !!(collinearActive || shelfMode || doorToolActive || drawerToolActive);
+    !!(collinearActive || shelfMode || doorToolActive || drawerToolActive || plinthToolActive);
 
   const propertiesSectionMarkup = `
     <div
@@ -616,13 +617,12 @@ export function renderPanelList(
 
             <button
               type="button"
-              class="component-icon-btn"
+              class="component-icon-btn ${plinthToolActive ? 'active' : ''}"
               id="add-plinth-btn"
-              ${selectedGroupId ? '' : 'disabled'}
-              title="${selectedGroupId ? "Add Plinth — builds a 4-panel kick base under the selected box's own Bottom panel" : 'Select a box first'}"
+              title="${plinthToolActive ? 'Cancel Add Plinth (Esc)' : 'Add Plinth — click, then pick a box: a 4-panel kick base is built under it and the box is raised by the plinth height'}"
             >
               ${COMPONENT_ICONS.plinth}
-              <span class="icon-label">Plinth</span>
+              <span class="icon-label">${plinthToolActive ? 'Cancel' : 'Plinth'}</span>
             </button>
 
           </div>
@@ -900,8 +900,8 @@ export function renderPanelList(
 
 
   /* ==========================================================
-     ADD PLINTH (no pick mode — builds under the currently selected
-     box's own Bottom panel; button disabled above without one)
+     ADD PLINTH (pick mode — deselects everything, then the next
+     clicked box gets the plinth and is raised by its height)
      ========================================================== */
 
   container
