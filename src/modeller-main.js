@@ -74,12 +74,9 @@ import {
 } from './shared/geometry.js';
 import { addBox, relayoutBox } from './features/box.js';
 import { isShelf } from './features/shelf.js';
-import { addPlinthAndRaiseBox, applyPlinthAdjustment, normalizePlinthEdgeFit, MIN_PLINTH_HEIGHT_MM } from './features/plinth.js';
-import { addLegsAndRaiseBox, applyLegAdjustment } from './features/leg.js';
-import { startLegMode, cancelLegMode, isLegPickActive, setLegToolContext } from './tools/leg.js';
-import { startPlinthMode, cancelPlinthMode, isPlinthPickActive, setPlinthToolContext } from './tools/plinth.js';
 import { createDoorNode, computeDoorOpenTransform, applyDoorAdjustmentsForGroup, applyPanelPatch, computeDoorPlacement, DEFAULT_DOOR_EDGE_FIT, DEFAULT_DOOR_HINGE } from './features/door.js';
-import { createDrawerFrontNodes, createDrawerBoxNodes, computeDrawerBoxPlacement, computeDrawerOpenTransform, applyDrawerAdjustmentsForGroup, computeDrawerFrontsPlacement, DEFAULT_DRAWER_EDGE_FIT, DEFAULT_DRAWER_COUNT, MAX_DRAWER_COUNT, DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM } from './features/drawer.js';
+import { createDrawerFrontNodes, createDrawerBoxNodes, computeDrawerBoxPlacement, applyDrawerAdjustmentsForGroup, computeDrawerFrontsPlacement, DEFAULT_DRAWER_EDGE_FIT, DEFAULT_DRAWER_COUNT, MAX_DRAWER_COUNT } from './features/drawer.js';
+import { addPlinthAndRaiseBox, applyPlinthAdjustment, normalizePlinthEdgeFit, DEFAULT_PLINTH_INSET_MM } from './features/plinth.js';
 import { startShelfMode, cancelShelfMode, getShelfMode, setShelfToolContext } from './tools/shelfTool.js';
 import { setBoundaryRectToolContext } from './tools/boundaryRectTool.js';
 import {
@@ -95,6 +92,12 @@ import {
   setDrawerToolContext,
 } from './tools/drawerTool.js';
 import {
+  startPlinthMode,
+  cancelPlinthMode,
+  isPlinthPickActive,
+  setPlinthToolContext,
+} from './tools/plinthTool.js';
+import {
   startCollinearMode,
   cancelCollinearMode,
   isCollinearActive,
@@ -109,8 +112,7 @@ import {
   DeleteBoxCommand, GroupPanelsCommand, UngroupPanelsCommand, DeleteShelfCommand,
   RemoveConstraintCommand, UnlinkConstraintCommand, HideBoxWallCommand, RestoreBoxWallCommand,
   ChangeEdgeFitCommand, AddDoorCommand, SetDoorHingeCommand, DeleteDoorCommand,
-  AddDrawerCommand, DeleteDrawerCommand, SetDrawerBoxMarginCommand,
-  AddLegsCommand, AddPlinthCommand, SetPlinthHeightCommand, SetPlinthEdgeFitCommand,
+  AddDrawerCommand, DeleteDrawerCommand,
 } from './history/history.js';
 initResizableLayout();
 
@@ -573,14 +575,6 @@ setShelfToolContext(toolContext);
 setCollinearToolContext(toolContext);
 setAttachToolContext(toolContext);
 setBoundaryRectToolContext(toolContext);
-setPlinthToolContext({
-  ...toolContext,
-  onBoxPicked: (groupId) => handleAddPlinth(groupId),
-});
-setLegToolContext({
-  ...toolContext,
-  onBoxPicked: (groupId) => handleAddLegs(groupId),
-});
 setDoorToolContext({
   renderAll: () => renderAll(),
   onBoundaryPicked: (boundaryResult) => {
@@ -613,6 +607,33 @@ setDrawerToolContext({
       return;
     }
     handleDrawerConfirmed(placement);
+  },
+});
+setPlinthToolContext({
+  ...toolContext,
+  onBoxPicked: (groupId) => {
+    const catalogEntry = MATERIAL_CATALOG[0];
+    const result = addPlinthAndRaiseBox(panels, groupId, {
+      material: catalogEntry?.name,
+      thicknessMm: catalogEntry?.thicknessMm ?? 18,
+    });
+    if (!result.ok) {
+      const message = result.reason === 'already-has-plinth'
+        ? 'This box already has a plinth'
+        : result.reason === 'has-legs'
+          ? "Can't add a plinth to a box that already has legs"
+          : "Couldn't place a plinth under that box";
+      showToast(message);
+      renderAll();
+      return;
+    }
+    const before = panels;
+    panels = result.panels;
+    const after = panels;
+    recordHistoryCommand(AddBoxCommand, before, after); // closest existing command — adds new structural panels under an existing box, same shape as building one
+    const firstPlinthPanel = panels.find((p) => p.isPlinthPanel && p.groupId === result.groupId);
+    setSelectedId(firstPlinthPanel?.id ?? null);
+    renderAll();
   },
 });
 
@@ -715,9 +736,13 @@ function applyRelayoutResult(result) {
     // features/drawer.js#applyDrawerAdjustmentsForGroup's own doc
     // comment.
     panels = applyDrawerAdjustmentsForGroup(panels, groupId);
-    // Plinth follows the Bottom panel's footprint (and its own edge fit).
+    // Same again for a plinth (features/plinth.js#applyPlinthAdjustment)
+    // — it's sized off the owning box's Bottom panel, so any box
+    // resize/edge-fit change leaves it stale until re-derived here.
+    // No heightMm/edgeFit passed: it re-reads its own current ones off
+    // an existing plinth panel (delta 0, so the box isn't re-raised),
+    // and it's a no-op (same array back) for a group with no plinth.
     panels = applyPlinthAdjustment(panels, groupId);
-    panels = applyLegAdjustment(panels, groupId); // legs follow the Bottom's corners
   }
   return true;
 }
@@ -735,7 +760,6 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && isDoorPickActive()) cancelDoorMode();
   if (e.key === 'Escape' && isDrawerPickActive()) cancelDrawerMode();
   if (e.key === 'Escape' && isPlinthPickActive()) cancelPlinthMode();
-  if (e.key === 'Escape' && isLegPickActive()) cancelLegMode();
 
   if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
     e.preventDefault();
@@ -793,8 +817,6 @@ const TOOL_HINTS = {
   shelfHorizontal: 'Horizontal shelf: pick one boundary of the box, then the opposite boundary, to span a shelf between them · Esc: cancel',
   shelfVertical: 'Vertical shelf: pick one boundary of the box, then the opposite boundary, to span a shelf between them · Esc: cancel',
   doorPick: 'Add door: pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or a shelf) to place the door — it\'s added immediately, in/in/in/in · Esc: cancel',
-  legPick: 'Add legs: click a box — 4 legs are placed under its Bottom panel and the box is raised by the leg height · Esc: cancel',
-  plinthPick: 'Add plinth: click a box — a plinth is built under it and the box is raised by the plinth height · Esc: cancel',
   drawerPick: 'Add drawer: pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or a shelf) to place the drawers — added immediately, in/in/in/in · Esc: cancel',
 };
 
@@ -805,8 +827,6 @@ function updateToolHint() {
   else if (getShelfMode() === 'vertical') hint = TOOL_HINTS.shelfVertical;
   else if (isDoorPickActive()) hint = TOOL_HINTS.doorPick;
   else if (isDrawerPickActive()) hint = TOOL_HINTS.drawerPick;
-  else if (isPlinthPickActive()) hint = TOOL_HINTS.plinthPick;
-  else if (isLegPickActive()) hint = TOOL_HINTS.legPick;
 
   if (hint) {
     hintBarTool.textContent = hint;
@@ -1098,13 +1118,12 @@ function renderAll() {
   const drawerBoxPanelFieldsById = new Map(
     panels.filter((p) => p.isDrawerBoxPanel).map((p) => [p.id, { isDrawerBoxPanel: true }])
   );
-  // Same re-attachment for plinth panels (walls + ribs) so scene.js/
-  // gizmos.js see isPlinthPanel and hide every resize/move handle.
+  // Same re-attachment, plinth counterpart (features/plinth.js —
+  // 4 lateral panels + ribs): without it gizmos.js's isPlinthPanel(mesh)
+  // is always false, because resolveConstraints' output (which scene.js
+  // reads) never carries this flag through on its own.
   const plinthPanelFieldsById = new Map(
     panels.filter((p) => p.isPlinthPanel).map((p) => [p.id, { isPlinthPanel: true }])
-  );
-  const legFieldsById = new Map(
-    panels.filter((p) => p.isLeg).map((p) => [p.id, { isLeg: true, displayColor: p.displayColor }])
   );
   const resolvedWithCodes = resolved.map((r) => ({
     ...r,
@@ -1113,7 +1132,6 @@ function renderAll() {
     ...drawerFrontFieldsById.get(r.id),
     ...drawerBoxPanelFieldsById.get(r.id),
     ...plinthPanelFieldsById.get(r.id),
-    ...legFieldsById.get(r.id),
   }));
 
   const visiblePanels = resolvedWithCodes.filter((p) => !p.hidden);
@@ -1133,33 +1151,10 @@ function renderAll() {
   // at the door's real CLOSED position/rotation — doorOpen is a purely
   // visual toggle (see toggleSelectedDoorOpen), not a design change,
   // and must never affect what gets measured or cut.
-  // Same visual-only idea as the door case just above, but a drawer is
-  // FIVE panels (front + its own left/right/bottom/back box) that all
-  // have to shift together by the SAME offset, not one panel rotating
-  // about its own hinge — so this is built as an id -> offset map from
-  // the RAW graph first (drawerOpen only ever lives on the front;
-  // isDrawerFront/isDrawerBoxPanel/drawerBoxFrontId are read from
-  // `panels`, never trusted off a resolved node — see this file's own
-  // drawerFrontFieldsById/drawerBoxPanelFieldsById maps just above on
-  // why), then applied by id below rather than re-deriving per panel.
-  const openDrawerShiftByPanelId = new Map();
-  panels.filter((p) => p.isDrawerFront && p.drawerOpen).forEach((frontRaw) => {
-    const transform = computeDrawerOpenTransform(frontRaw, panels, resolved);
-    if (!transform) return;
-    openDrawerShiftByPanelId.set(frontRaw.id, transform.offsetMm);
-    panels
-      .filter((p) => p.isDrawerBoxPanel && p.drawerBoxFrontId === frontRaw.id)
-      .forEach((boxPanel) => openDrawerShiftByPanelId.set(boxPanel.id, transform.offsetMm));
-  });
-
   const sceneVisiblePanels = visiblePanels.map((p) => {
-    if (p.isDoor && p.doorOpen) {
-      const open = computeDoorOpenTransform(p);
-      return open ? { ...p, position: open.position, rotation: open.rotation } : p;
-    }
-    const shift = openDrawerShiftByPanelId.get(p.id);
-    if (!shift) return p;
-    return { ...p, position: { x: p.position.x + shift.x, y: p.position.y + shift.y, z: p.position.z + shift.z } };
+    if (!p.isDoor || !p.doorOpen) return p;
+    const open = computeDoorOpenTransform(p);
+    return open ? { ...p, position: open.position, rotation: open.rotation } : p;
   });
 
   reconcile(sceneVisiblePanels, selectedId, selectedGroupId, multiSelectedIds, boxWallIds, selectedBoxWallId);
@@ -1176,20 +1171,18 @@ function renderAll() {
     onAddHorizontal: addHorizontalPanel,
     onAddParallel: addParallelPanel,
     onAddBox: handleAddBox,
-    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startCollinearMode())),
+    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), startCollinearMode())),
     collinearActive: isCollinearActive(),
     collinearGapMm: getCollinearGapMm(),
     onCollinearGapChange: setCollinearGapMm, // deliberately no renderAll() here — see toolbar.js's own comment on why
-    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startShelfMode('horizontal'))),
-    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startShelfMode('vertical'))),
+    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), startShelfMode('horizontal'))),
+    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), startShelfMode('vertical'))),
     shelfMode: getShelfMode(),
-    onAddDoor: () => (isDoorPickActive() ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startDoorMode())),
+    onAddDoor: () => (isDoorPickActive() ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDrawerMode(), cancelPlinthMode(), startDoorMode())),
     doorToolActive: isDoorPickActive(),
-    onAddDrawer: () => (isDrawerPickActive() ? cancelDrawerMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelPlinthMode(), cancelLegMode(), startDrawerMode())),
+    onAddDrawer: () => (isDrawerPickActive() ? cancelDrawerMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelPlinthMode(), startDrawerMode())),
     drawerToolActive: isDrawerPickActive(),
-    onAddPlinth: () => (isPlinthPickActive() ? cancelPlinthMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelLegMode(), startPlinthMode())),
-    onAddLegs: () => (isLegPickActive() ? cancelLegMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), startLegMode())),
-    legToolActive: isLegPickActive(),
+    onAddPlinth: () => (isPlinthPickActive() ? cancelPlinthMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), startPlinthMode())),
     plinthToolActive: isPlinthPickActive(),
   });
 
@@ -1253,16 +1246,6 @@ function renderInspectorOnly() {
       ? groupMembers[0].material
       : null;
 
-  // A drawer front always carries drawerBoxSpec (createDrawerFrontNodes
-  // stores it unconditionally), even when its box failed to build
-  // (computeDrawerBoxPlacement returned ok:false — too little room, or
-  // too little real clearance). drawerBoxSpec truthiness alone can't
-  // tell margin fields / the Open button whether there's an actual box
-  // to adjust or open, so this checks for the box's own panels
-  // directly, same way applyDrawerAdjustmentsForGroup itself finds
-  // them.
-  const drawerHasBox = !!(selectedPanel?.isDrawerFront && panels.some((p) => p.isDrawerBoxPanel && p.drawerBoxFrontId === selectedPanel.id));
-
   if (inspectorEl) {
     renderProperties(inspectorEl, {
       selectedPanel,
@@ -1271,7 +1254,6 @@ function renderInspectorOnly() {
       groupMemberCount,
       groupMaterial,
       hiddenGroupMembers,
-      drawerHasBox,
       restoreError: restoreBlockedMessage,
       onFieldChange: updateSelectedField,
       onTransformFieldChange: updateSelectedTransformField,
@@ -1287,10 +1269,9 @@ function renderInspectorOnly() {
       onDoorHingeChange: updateSelectedDoorHinge,
       onDrawerFrontEdgeFitChange: updateSelectedDrawerFrontEdgeFit,
       onDrawerFrontCountChange: updateSelectedDrawerFrontCount,
-      onToggleDrawerOpen: toggleSelectedDrawerOpen,
-      onDrawerBoxMarginChange: updateSelectedDrawerBoxMargin,
+      onPlinthEdgeFitChange: updateSelectedPlinthEdgeFit,
       onPlinthHeightChange: updateSelectedPlinthHeight,
-      onPlinthEdgeChange: updateSelectedPlinthEdge,
+      onPlinthInsetChange: updateSelectedPlinthInset,
     });
   }
 
@@ -1786,134 +1767,6 @@ function toggleSelectedDoorOpen() {
   renderAll();
 }
 
-// Same ephemeral, non-history reasoning as toggleSelectedDoorOpen just
-// above — only `drawerOpen` on the front itself is toggled here; the
-// shift applied to all 5 of the drawer's own panels is computed fresh
-// every render (see renderAll()'s own openDrawerShiftByPanelId), never
-// stored.
-function toggleSelectedDrawerOpen() {
-  const selectedId = getSelectedId();
-  const node = panels.find((p) => p.id === selectedId);
-  if (!node || !node.isDrawerFront) return;
-
-  panels = panels.map((p) => (p.id === selectedId ? { ...p, drawerOpen: !p.drawerOpen } : p));
-  renderAll();
-}
-
-// Unlike drawerOpen above, the box's own top/bottom margins ARE a
-// design decision (they change the box's real built geometry), so this
-// goes through history like any other field edit. Clamped to its own
-// floor HERE, not just inside features/drawer.js#computeDrawerBoxPlacement,
-// so the field shown in the inspector never lies about what the box
-// actually built.
-function updateSelectedDrawerBoxMargin(field, rawValue) {
-  const selectedId = getSelectedId();
-  const node = panels.find((p) => p.id === selectedId);
-  if (!node || !node.isDrawerFront || !node.drawerBoxSpec) return;
-
-  const floor = field === 'topMarginMm' ? DEFAULT_DRAWER_BOX_TOP_MARGIN_MM : DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM;
-  const clamped = Math.max(floor, rawValue);
-  if (node.drawerBoxSpec[field] === clamped) return;
-
-  const before = panels;
-  panels = panels.map((p) => (p.id === selectedId ? { ...p, drawerBoxSpec: { ...p.drawerBoxSpec, [field]: clamped } } : p));
-  // Re-derives this front's own box (and only this front's — see
-  // applyDrawerAdjustmentsForGroup's own per-stack loop) against the
-  // just-updated spec, same recompute path a boundary-panel resize
-  // already drives.
-  panels = applyDrawerAdjustmentsForGroup(panels, node.groupId);
-  const after = panels;
-  recordHistoryCommand(SetDrawerBoxMarginCommand, before, after);
-  renderAll();
-}
-
-// Right-toolbar edge fields: one edge's in/out and/or inset mm.
-function updateSelectedPlinthEdge(edge, patch) {
-  const node = panels.find((p) => p.id === getSelectedId());
-  if (!node || !node.isPlinthPanel) return;
-
-  const current = normalizePlinthEdgeFit(node.plinthEdgeFit);
-  const next = { ...current, [edge]: { ...current[edge], ...patch } };
-  const before = panels;
-  const after = applyPlinthAdjustment(panels, node.groupId, undefined, next);
-  if (after === before) {
-    showToast("Not enough room for that plinth edge setting");
-    renderAll(); // reset the field to the stored value
-    return;
-  }
-  panels = after;
-  recordHistoryCommand(SetPlinthEdgeFitCommand, before, after);
-  renderAll();
-}
-
-// Legs tool callback — same flow as the plinth: tool start deselected
-// everything, then the person picked a box. Builds 4 legs on the
-// Bottom's corners and raises the box by the leg height (ONE history step).
-function handleAddLegs(groupId) {
-  const result = addLegsAndRaiseBox(panels, groupId);
-  if (!result.ok) {
-    showToast(result.reason === 'already-has-legs'
-      ? 'That box already has legs'
-      : result.reason === 'has-plinth'
-        ? 'That box has a plinth — legs and plinth cannot be combined'
-        : result.reason === 'no-bottom-panel'
-          ? 'That box has no Bottom panel to put legs under'
-          : 'The Bottom panel is too small for legs');
-    renderAll();
-    return;
-  }
-  const before = panels;
-  panels = result.panels;
-  recordHistoryCommand(AddLegsCommand, before, panels);
-  setSelectedGroupId(groupId);
-  setSelectedId(null);
-  renderAll();
-}
-
-// Plinth tool callback — the person clicked Plinth (everything got
-// deselected, see tools/plinth.js) and then picked a box. Builds the
-// plinth under it and raises the box by the plinth's height, as ONE
-// history step.
-function handleAddPlinth(groupId) {
-  const result = addPlinthAndRaiseBox(panels, groupId, {});
-  if (!result.ok) {
-    showToast(result.reason === 'already-has-plinth'
-      ? 'That box already has a plinth — select it to change its height'
-      : result.reason === 'has-legs'
-        ? 'That box has legs — legs and plinth cannot be combined'
-      : result.reason === 'no-bottom-panel'
-        ? 'That box has no Bottom panel to build a plinth under'
-        : 'Not enough room under that box for a plinth');
-    renderAll();
-    return;
-  }
-  const before = panels;
-  panels = result.panels;
-  recordHistoryCommand(AddPlinthCommand, before, panels);
-  // Select one plinth panel so its edge/height fields show in the
-  // right toolbar (same as a freshly added door/drawer).
-  setSelectedGroupId(groupId);
-  setSelectedId(panels.find((p) => p.groupId === groupId && p.plinthRole === 'left')?.id ?? null);
-  renderAll();
-}
-
-// ui/properties.js's Plinth height field — goes through history; the
-// box is raised/lowered by the height change so the plinth's bottom
-// stays where it was (see features/plinth.js#applyPlinthAdjustment).
-function updateSelectedPlinthHeight(rawValue) {
-  const selectedId = getSelectedId();
-  const node = panels.find((p) => p.id === selectedId);
-  if (!node || !node.isPlinthPanel) return;
-
-  const clamped = Math.max(MIN_PLINTH_HEIGHT_MM, rawValue);
-  const before = panels;
-  const after = applyPlinthAdjustment(panels, node.groupId, clamped);
-  if (after === before) return;
-  panels = after;
-  recordHistoryCommand(SetPlinthHeightCommand, before, after);
-  renderAll();
-}
-
 // Unlike doorOpen above, which side a door hinges on IS a design
 // decision (affects assembly/hardware later), so this goes through
 // history like any other field edit.
@@ -2027,6 +1880,70 @@ function updateSelectedDrawerFrontCount(count) {
   const after = panels;
   recordHistoryCommand(AddDrawerCommand, before, after); // rebuilding the stack is closer to "add" than any edit command
   setSelectedId(newFronts[0].id);
+  renderAll();
+}
+
+// A plinth's height and per-edge fit/inset both go through the same
+// features/plinth.js#applyPlinthAdjustment — unlike a drawer's count
+// (above), it patches the EXISTING perimeter panels in place (keeping
+// their ids) and only adds/drops rib panels as needed, so there's no
+// tear-down-and-rebuild here. `node` can be any panel in the plinth
+// (perimeter or rib) — height/edgeFit are shared by the whole plinth,
+// same reasoning as a drawer stack's shared edgeFit.
+function updateSelectedPlinthHeight(height) {
+  const selectedId = getSelectedId();
+  const node = panels.find((p) => p.id === selectedId);
+  if (!node || !node.isPlinthPanel) return;
+
+  const newHeight = Number(height);
+  if (!Number.isFinite(newHeight) || newHeight <= 0 || newHeight === node.height) return;
+
+  const before = panels;
+  panels = applyPlinthAdjustment(panels, node.groupId, newHeight, node.plinthEdgeFit);
+  const after = panels;
+  recordHistoryCommand(ChangeEdgeFitCommand, before, after);
+  renderAll();
+}
+
+function updateSelectedPlinthEdgeFit(edge, fit) {
+  const selectedId = getSelectedId();
+  const node = panels.find((p) => p.id === selectedId);
+  if (!node || !node.isPlinthPanel) return;
+
+  const current = node.plinthEdgeFit || {};
+  if (current[edge]?.fit === fit) return;
+
+  const newEdgeFit = normalizePlinthEdgeFit({
+    ...current,
+    [edge]: { ...current[edge], fit, insetMm: current[edge]?.insetMm ?? DEFAULT_PLINTH_INSET_MM },
+  });
+
+  const before = panels;
+  panels = applyPlinthAdjustment(panels, node.groupId, node.height, newEdgeFit);
+  const after = panels;
+  recordHistoryCommand(ChangeEdgeFitCommand, before, after);
+  renderAll();
+}
+
+function updateSelectedPlinthInset(edge, cm) {
+  const selectedId = getSelectedId();
+  const node = panels.find((p) => p.id === selectedId);
+  if (!node || !node.isPlinthPanel) return;
+
+  const mm = Number(cm) * 10;
+  if (!Number.isFinite(mm) || mm < 0) return;
+  const current = node.plinthEdgeFit || {};
+  if (current[edge]?.insetMm === mm) return;
+
+  const newEdgeFit = normalizePlinthEdgeFit({
+    ...current,
+    [edge]: { ...current[edge], insetMm: mm },
+  });
+
+  const before = panels;
+  panels = applyPlinthAdjustment(panels, node.groupId, node.height, newEdgeFit);
+  const after = panels;
+  recordHistoryCommand(ChangeEdgeFitCommand, before, after);
   renderAll();
 }
 

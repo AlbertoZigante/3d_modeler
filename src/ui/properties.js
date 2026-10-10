@@ -27,8 +27,8 @@
 import { getDisplayName, MATERIAL_CATALOG } from '../modeller/modules.js';
 import { renderDoorSchema } from './doorSchema.js';
 import { renderDrawerSchema } from './drawerSchema.js';
-import { DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM } from '../features/drawer.js';
-import { MIN_PLINTH_HEIGHT_MM, PLINTH_EDGES, normalizePlinthEdgeFit } from '../features/plinth.js';
+import { renderPlinthSchema } from './plinthSchema.js';
+import { renderBoxWallSchema } from './boxWallSchema.js';
 
 const DIM_FIELDS = ['width', 'height']; // thickness is derived from material — see below, never a typed field
 
@@ -56,11 +56,9 @@ export function renderProperties(
     onDoorHingeChange,
     onDrawerFrontEdgeFitChange,
     onDrawerFrontCountChange,
-    drawerHasBox,
-    onToggleDrawerOpen,
-    onDrawerBoxMarginChange,
+    onPlinthEdgeFitChange,
     onPlinthHeightChange,
-    onPlinthEdgeChange,
+    onPlinthInsetChange,
   }
 ) {
   if (selectedGroupId && !selectedPanel) {
@@ -118,7 +116,7 @@ export function renderProperties(
       </div>` : ''}
 
     <div class="dims-row dims-row-compact">
-      ${DIM_FIELDS.map((f) => dimFieldHTML(f, selectedPanel, resolvedPanel, locked[f], selectedPanel.isDoor, true)).join('')}
+      ${DIM_FIELDS.map((f) => dimFieldHTML(f, selectedPanel, resolvedPanel, locked[f], selectedPanel.isDoor || selectedPanel.isPlinthPanel, true)).join('')}
       <div class="field-row">
         <label title="Thickness — set by Material, below">T 🔒</label>
         <div class="field-input-wrap locked">
@@ -136,7 +134,7 @@ export function renderProperties(
 
     ${selectedPanel.edgeFit && !selectedPanel.isDoor && !selectedPanel.isDrawerFront ? edgeFitSectionHTML(selectedPanel.edgeFit) : ''}
     ${selectedPanel.isDoor ? doorSectionHTML(selectedPanel, hiddenGroupMembers || [], restoreError) : ''}
-    ${selectedPanel.isDrawerFront ? drawerSectionHTML(selectedPanel, hiddenGroupMembers || [], restoreError, !!drawerHasBox) : ''}
+    ${selectedPanel.isDrawerFront ? drawerSectionHTML(selectedPanel, hiddenGroupMembers || [], restoreError) : ''}
     ${selectedPanel.isPlinthPanel ? plinthSectionHTML(selectedPanel) : ''}
   `;
 
@@ -186,23 +184,19 @@ export function renderProperties(
   container.querySelector('#remove-btn').addEventListener('click', onRemove);
 
   // ---- edge fit (only present for a box's Front/Back wall — see the
-  // `selectedPanel.edgeFit` check above) ----
-  // Each select commits its own pick immediately via
-  // onEdgeFitFieldChange (modeller-main.js's own `pendingEdgeFit` —
-  // see that file's comment on why this can't just be read fresh off
-  // these <select> elements at Apply time anymore: a re-render
-  // triggered by anything else — most commonly resizing a DIFFERENT
-  // box wall mid-edit — recreates this whole section from the node's
-  // actual committed edgeFit, wiping whatever was picked-but-not-yet-
-  // applied here). Apply itself now takes no arguments; the value it
-  // commits was already tracked the moment each select changed.
-  container.querySelectorAll('.edge-fit-field').forEach((select) => {
-    select.addEventListener('change', () => {
-      onEdgeFitFieldChange(select.dataset.edge, select.value);
+  // `selectedPanel.edgeFit` check above). Each arrow click commits
+  // immediately via onEdgeFitFieldChange+onEdgeFitChange in the same
+  // click — same pattern as the door/drawer/plinth schemas below,
+  // not a separate pending-state-plus-Apply form anymore.
+  container.querySelectorAll('.box-wall-edge-arrow').forEach((g) => {
+    g.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const edge = g.dataset.edge;
+      const current = (selectedPanel.edgeFit || {})[edge] === 'out' ? 'out' : 'in';
+      onEdgeFitFieldChange(edge, current === 'out' ? 'in' : 'out');
+      onEdgeFitChange();
     });
-  });
-  container.querySelector('#apply-edge-fit-btn')?.addEventListener('click', () => {
-    onEdgeFitChange();
   });
 
   // ---- door (edge fit + hinge live, via the shared door schema; open/
@@ -255,28 +249,24 @@ export function renderProperties(
     onDrawerFrontCountChange(event.target.value);
   });
 
-  // ---- drawer box (top/bottom margins + open/close — only present
-  // when hasBox, see drawerSectionHTML's own gate).
-  container.querySelectorAll('.drawer-margin-field').forEach((input) => {
-    input.addEventListener('change', () => {
-      onDrawerBoxMarginChange(input.dataset.field, Number(input.value));
+  // ---- plinth (edge fit live via the schema; height + each edge's
+  // cm inset are plain fields — see plinthSectionHTML above for why).
+  container.querySelectorAll('.plinth-edge-arrow').forEach((g) => {
+    g.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const edge = g.dataset.edge;
+      const current = (selectedPanel.plinthEdgeFit || {})[edge]?.fit === 'out' ? 'out' : 'in';
+      onPlinthEdgeFitChange(edge, current === 'out' ? 'in' : 'out');
     });
   });
-  container.querySelector('#toggle-drawer-open-btn')?.addEventListener('click', () => {
-    onToggleDrawerOpen();
+  container.querySelector('#plinth-height-field')?.addEventListener('change', (event) => {
+    onPlinthHeightChange(event.target.value);
   });
-
-  // ---- plinth (height — only present for an isPlinthPanel selection,
-  // see plinthSectionHTML's own comment on why this is its own field
-  // rather than the generic dim-field path).
-  container.querySelector('.plinth-height-field')?.addEventListener('change', (event) => {
-    onPlinthHeightChange(Number(event.target.value));
-  });
-  container.querySelectorAll('.plinth-edge-fit').forEach((select) => {
-    select.addEventListener('change', () => onPlinthEdgeChange(select.dataset.edge, { fit: select.value }));
-  });
-  container.querySelectorAll('.plinth-edge-inset').forEach((input) => {
-    input.addEventListener('change', () => onPlinthEdgeChange(input.dataset.edge, { insetMm: Number(input.value) }));
+  container.querySelectorAll('.plinth-inset-field').forEach((input) => {
+    input.addEventListener('change', (event) => {
+      onPlinthInsetChange(event.target.dataset.edge, event.target.value);
+    });
   });
 
   wireRestoreFaceButtons(container, onRestoreFace);
@@ -287,30 +277,22 @@ export function renderProperties(
 // edge, whether that edge sits flush INSIDE the neighboring wall
 // ('in' — an inset door/front, the long-standing default) or flush
 // OUTSIDE it, covering that wall's edge ('out' — an overlay
-// door/front). The 4 selects don't apply live — Apply commits all 4
-// at once as ONE history entry (see modeller-main.js#updateSelectedEdgeFit),
-// so switching a couple of edges mid-thought doesn't spam undo.
-const EDGE_FIT_ROWS = [
-  ['left', 'Left edge (vs Left wall)'],
-  ['right', 'Right edge (vs Right wall)'],
-  ['bottom', 'Bottom edge (vs Bottom wall)'],
-  ['top', 'Top edge (vs Top wall)'],
-];
-
+// door/front). Each arrow click below commits immediately as its own
+// history entry (see modeller-main.js#applyPendingEdgeFit) — same
+// shape as doorSectionHTML's schema just above, not a batched form.
+//
+// Same "arrows, live apply" treatment as doorSectionHTML/
+// drawerSectionHTML/plinthSectionHTML — was selects + a batched Apply
+// button (see modeller-main.js#applyPendingEdgeFit, still what this
+// wires to; only the UI changed, not the underlying commit path).
 function edgeFitSectionHTML(edgeFit) {
   return `
     <div class="divider"></div>
     <div class="section-title">Edge fit</div>
-    ${EDGE_FIT_ROWS.map(([edge, label]) => `
-      <div class="field-row">
-        <label>${label}</label>
-        <select class="field-input edge-fit-field" data-edge="${edge}">
-          <option value="in" ${edgeFit[edge] !== 'out' ? 'selected' : ''}>In (inset)</option>
-          <option value="out" ${edgeFit[edge] === 'out' ? 'selected' : ''}>Out (overlay)</option>
-        </select>
-      </div>
-    `).join('')}
-    <button class="add-btn" id="apply-edge-fit-btn">Apply edge fit</button>
+    <div class="properties-hint">
+      Click an edge's arrow to flip it in/out.
+    </div>
+    ${renderBoxWallSchema(edgeFit)}
   `;
 }
 
@@ -371,19 +353,7 @@ function doorSectionHTML(door, hiddenGroupMembers, restoreError) {
 // modeller-main.js#updateSelectedDrawerFrontCount — changing it tears
 // down and rebuilds the whole stack, unlike edge fit, so it isn't
 // something the schema itself can represent as a click).
-//
-// Below the schema/count: the drawer's own BOX — top/bottom margin
-// fields and an Open/Close button, gated on `hasBox` (does this front
-// actually have its own left/right/bottom/back panels built right
-// now — drawerBoxSpec itself is always present on a front even when
-// the box failed to build, see modeller-main.js's own drawerHasBox
-// comment, so that alone can't gate this). The two margin inputs use
-// their OWN class (drawer-margin-field), deliberately not the generic
-// dim-field one wired to onFieldChange below — these live at
-// drawerBoxSpec.<field>, not on the panel directly, so writing
-// through the generic path would silently set the wrong property.
-function drawerSectionHTML(front, hiddenGroupMembers, restoreError, hasBox) {
-  const spec = front.drawerBoxSpec || {};
+function drawerSectionHTML(front, hiddenGroupMembers, restoreError) {
   return `
     <div class="divider"></div>
     <div class="section-title">Drawer</div>
@@ -395,54 +365,53 @@ function drawerSectionHTML(front, hiddenGroupMembers, restoreError, hasBox) {
       <label>Number of drawers</label>
       <input type="number" class="field-input" id="drawer-front-count-field" min="1" max="10" step="1" value="${Number(front.drawerCount ?? 1)}" />
     </div>
-    ${hasBox ? `
-      <div class="divider"></div>
-      <div class="section-title">Drawer box</div>
-      ${numberFieldHTML('Top margin', 'topMarginMm', spec.topMarginMm ?? DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, 'mm', { min: DEFAULT_DRAWER_BOX_TOP_MARGIN_MM }, 'drawer-margin-field')}
-      ${numberFieldHTML('Bottom margin', 'bottomMarginMm', spec.bottomMarginMm ?? DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM, 'mm', { min: DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM }, 'drawer-margin-field')}
-      <button class="add-btn" id="toggle-drawer-open-btn">${front.drawerOpen ? 'Close drawer' : 'Open drawer'}</button>
-    ` : `
-      <div class="empty-state">This drawer has no box built yet — nothing here to adjust or open.</div>
-    `}
     ${restoreFaceListHTML(hiddenGroupMembers, restoreError)}
   `;
 }
 
-// Shown for ANY of the 4 plinth panels — all 4 share one height, so
-// this field edits whichever one happens to be selected but applies to
-// the whole plinth (modeller-main.js#updateSelectedPlinthHeight finds
-// the rest by groupId+isPlinthPanel, see features/plinth.js#
-// applyPlinthAdjustment). Deliberately NOT the generic dim-field path:
-// same reasoning as drawerSectionHTML's own margin fields just above —
-// editing one panel's own height directly would desync it from its 3
-// siblings, since nothing here re-derives the other 3 to match. (This
-// is the same gap drawer box panels already have for their own W/H/T —
-// see features/drawer.js#createDrawerBoxNodes's own header on
-// lockedMoveAxes; there's no lockedFields-for-dimensions mechanism in
-// this codebase yet, only for position, so it isn't solved here either
-// — the dedicated field below is the intended way in, same as the
-// drawer box margins, not a true lock against the generic one.)
-function plinthSectionHTML(panel) {
+// No restoreFaceListHTML here, unlike doorSectionHTML/drawerSectionHTML
+// — a plinth doesn't replace/hide any existing box wall (it's built
+// underneath the box's own Bottom, which stays exactly as it was —
+// see features/plinth.js's own header comment), so there's never a
+// hidden face to restore. `plinth` here can be ANY of its 4 (or more,
+// with reinforcement ribs) sibling panels — plinthEdgeFit/height are
+// shared by the whole plinth (see features/plinth.js#createPlinthNodes),
+// so whichever one is selected edits the same live stack, same
+// reasoning as drawerSectionHTML above. Height and each edge's cm
+// inset are plain fields (not schema clicks) since they're typed
+// numbers, not a toggle — see ui/plinthSchema.js's own header comment.
+function plinthSectionHTML(plinth) {
+  const edgeFit = plinth.plinthEdgeFit || {};
+  const edgeRow = (edge, label) => {
+    const e = edgeFit[edge] || {};
+    const cm = (Number.isFinite(e.insetMm) ? e.insetMm : 30) / 10;
+    return `
+      <div class="field-row">
+        <label>${label}</label>
+        <div class="field-input-wrap">
+          <input type="number" min="0" step="0.5" value="${cm}" class="field-input plinth-inset-field" data-edge="${edge}" />
+          <span class="field-unit">cm</span>
+        </div>
+      </div>`;
+  };
   return `
     <div class="divider"></div>
     <div class="section-title">Plinth</div>
-    ${numberFieldHTML('Height', 'heightMm', panel.height, 'mm', { min: MIN_PLINTH_HEIGHT_MM }, 'plinth-height-field')}
-    <div class="section-title" title="Out = flush with the box's Bottom panel edge. In = set back by the given mm.">Edges</div>
-    ${PLINTH_EDGES.map((edge) => {
-      const e = normalizePlinthEdgeFit(panel.plinthEdgeFit)[edge];
-      return `
+    <div class="properties-hint">
+      Click an edge's arrow to flip it in/out — set each inset edge's distance below.
+    </div>
+    ${renderPlinthSchema(edgeFit)}
     <div class="field-row">
-      <label>${edge[0].toUpperCase()}${edge.slice(1)}</label>
+      <label>Height</label>
       <div class="field-input-wrap">
-        <select class="field-input plinth-edge-fit" data-edge="${edge}">
-          <option value="out" ${e.fit === 'out' ? 'selected' : ''}>Out</option>
-          <option value="in" ${e.fit === 'in' ? 'selected' : ''}>In</option>
-        </select>
-        <input type="number" min="0" step="any" value="${e.insetMm}" data-edge="${edge}" class="field-input plinth-edge-inset" ${e.fit === 'in' ? '' : 'disabled'} />
+        <input type="number" min="1" value="${Math.round(plinth.height)}" class="field-input" id="plinth-height-field" />
         <span class="field-unit">mm</span>
       </div>
-    </div>`;
-    }).join('')}
+    </div>
+    ${edgeRow('left', 'Left inset')}
+    ${edgeRow('right', 'Right inset')}
+    ${edgeRow('back', 'Back inset')}
+    ${edgeRow('front', 'Front inset')}
   `;
 }
 

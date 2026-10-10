@@ -353,9 +353,15 @@ const FACE_RESIZE_INFO = {
   // Same reasoning as isDrawerFront above, drawer BOX panel
   // counterpart (left/right/bottom/back).
   function isDrawerBoxPanel(mesh) {
-    // Plinth panels are locked exactly like a drawer's own box panels:
-    // derived from the owning box, never moved/resized by hand.
-    return !!(mesh?.userData?.isDrawerBoxPanel || mesh?.userData?.isPlinthPanel || mesh?.userData?.isLeg);
+    return !!mesh?.userData?.isDrawerBoxPanel;
+  }
+
+  // Same reasoning again, plinth counterpart (4 lateral panels + ribs
+  // — see features/plinth.js#createPlinthNodes): fully derived from
+  // the box above it and the Plinth section's own height/edge-fit
+  // fields, never moved or resized by hand (no black resize dots).
+  function isPlinthPanel(mesh) {
+    return !!mesh?.userData?.isPlinthPanel;
   }
 
   const FACE_NAMES = ['right', 'left', 'top', 'bottom', 'front', 'back'];
@@ -391,7 +397,7 @@ const FACE_RESIZE_INFO = {
     // Do not use resizeProxy here. A resizeProxy describes how some
     // dependent box dimension is resolved; it is not the permission
     // to resize the wall itself.
-    if (!mesh || isBoxWall(mesh) || isDoor(mesh) || isDrawerFront(mesh) || isDrawerBoxPanel(mesh)) {
+    if (!mesh || isBoxWall(mesh) || isDoor(mesh) || isDrawerFront(mesh) || isDrawerBoxPanel(mesh) || isPlinthPanel(mesh)) {
       return;
     }
 
@@ -494,7 +500,7 @@ const FACE_RESIZE_INFO = {
   function handleFacePointerDown(e) {
     const mesh = transformMove.object;
 
-    if (!mesh || isBoxWall(mesh) || isDoor(mesh) || isDrawerFront(mesh) || isDrawerBoxPanel(mesh) || !getMeshEntry || !resizeHandleGroup.visible) {
+    if (!mesh || isBoxWall(mesh) || isDoor(mesh) || isDrawerFront(mesh) || isDrawerBoxPanel(mesh) || isPlinthPanel(mesh) || !getMeshEntry || !resizeHandleGroup.visible) {
       return;
     }
 
@@ -726,7 +732,7 @@ const FACE_RESIZE_INFO = {
       transformMove.attach(mesh);
     }
 
-    if (isDoor(mesh) || isDrawerFront(mesh) || isDrawerBoxPanel(mesh)) {
+    if (isDoor(mesh) || isDrawerFront(mesh) || isDrawerBoxPanel(mesh) || isPlinthPanel(mesh)) {
       // No move, no resize — see isDoor's own comment above (same
       // reasoning for a drawer front). Checked FIRST and
       // unconditionally (not folded into the lockedFields checks

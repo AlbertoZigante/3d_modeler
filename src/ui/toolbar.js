@@ -189,14 +189,6 @@ const COMPONENT_ICONS = {
       <rect x="4" y="17" width="16" height="4" />
     </svg>
   `,
-  // Dashed cabinet body resting on four short solid feet.
-  legs: `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="4" y="3" width="16" height="12" stroke-dasharray="1.6 2.2" opacity="0.6" />
-      <rect x="5" y="16" width="3" height="5" />
-      <rect x="16" y="16" width="3" height="5" />
-    </svg>
-  `,
   // Standard CAD dimension annotation — two extension lines (the
   // edges being measured) joined by a line with arrowheads pointing
   // out to each one. Reads as "the distance/size between these two
@@ -250,14 +242,6 @@ function ensureComponentIconStyles() {
       background: #e0904a;
       border-color: #c97b38;
       color: #fff;
-    }
-    .component-icon-btn:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-    .component-icon-btn:disabled:hover {
-      background: var(--toolbar-btn-bg, #fff);
-      border-color: var(--toolbar-border, #d8d0c4);
     }
     .component-icon-btn svg {
       width: 22px;
@@ -392,8 +376,6 @@ export function renderPanelList(
 
     onAddPlinth,
     plinthToolActive,
-    onAddLegs,
-    legToolActive,
 
   }
 ) {
@@ -427,7 +409,7 @@ export function renderPanelList(
    * collapses back to the three sections above it.
    */
   const anyToolActive =
-    !!(collinearActive || shelfMode || doorToolActive || drawerToolActive || plinthToolActive || legToolActive);
+    !!(collinearActive || shelfMode || doorToolActive || drawerToolActive || plinthToolActive);
 
   const propertiesSectionMarkup = `
     <div
@@ -461,6 +443,7 @@ export function renderPanelList(
             shelfMode,
             doorToolActive,
             drawerToolActive,
+            plinthToolActive,
           })}
         </div>
 
@@ -629,20 +612,10 @@ export function renderPanelList(
               type="button"
               class="component-icon-btn ${plinthToolActive ? 'active' : ''}"
               id="add-plinth-btn"
-              title="${plinthToolActive ? 'Cancel Add Plinth (Esc)' : 'Add Plinth — click, then pick a box: a 4-panel kick base is built under it and the box is raised by the plinth height'}"
+              title="${plinthToolActive ? 'Cancel Add Plinth (Esc)' : 'Add Plinth — click any panel of a box to build a plinth under it and raise the box onto it'}"
             >
               ${COMPONENT_ICONS.plinth}
-              <span class="icon-label">${plinthToolActive ? 'Cancel' : 'Plinth'}</span>
-            </button>
-
-            <button
-              type="button"
-              class="component-icon-btn ${legToolActive ? 'active' : ''}"
-              id="add-legs-btn"
-              title="${legToolActive ? 'Cancel Add Legs (Esc)' : 'Add Legs — click, then pick a box: 4 black legs (3x3 cm, 7 cm high, 1 cm from the Bottom edge) are placed under it and the box is raised by 7 cm'}"
-            >
-              ${COMPONENT_ICONS.legs}
-              <span class="icon-label">${legToolActive ? 'Cancel' : 'Legs'}</span>
+              <span class="icon-label">${plinthToolActive ? 'Cancel' : 'Add Plinth'}</span>
             </button>
 
           </div>
@@ -919,33 +892,6 @@ export function renderPanelList(
     );
 
 
-  /* ==========================================================
-     ADD PLINTH (pick mode — deselects everything, then the next
-     clicked box gets the plinth and is raised by its height)
-     ========================================================== */
-
-  container
-    .querySelector(
-      '#add-plinth-btn'
-    )
-    ?.addEventListener(
-      'click',
-      (event) => {
-
-        event.preventDefault();
-        event.stopPropagation();
-
-        onAddPlinth?.();
-      }
-    );
-
-
-  container.querySelector('#add-legs-btn')?.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    onAddLegs?.();
-  });
-
   container
     .querySelector(
       '#shelf-h-btn'
@@ -1036,6 +982,25 @@ export function renderPanelList(
       }
     );
 
+  /* ==========================================================
+     ADD PLINTH (pick any panel of a box, place 4 lateral panels + ribs)
+     ========================================================== */
+
+  container
+    .querySelector(
+      '#add-plinth-btn'
+    )
+    ?.addEventListener(
+      'click',
+      (event) => {
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        onAddPlinth?.();
+      }
+    );
+
 
   const gapInput =
     container.querySelector(
@@ -1086,6 +1051,7 @@ function renderPropertiesContent({
   shelfMode,
   doorToolActive,
   drawerToolActive,
+  plinthToolActive,
 }) {
 
   if (collinearActive) {
@@ -1160,6 +1126,16 @@ function renderPropertiesContent({
           Pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or shelves) to place drawer front(s) into.
           Two of one boundary type + two of another; whichever axis is left over becomes the front's facing direction.
           2 drawers are placed immediately, in/in/in/in — select one afterward to fine-tune the fit.
+        </div>
+      </div>
+    `;
+  }
+
+  if (plinthToolActive) {
+    return `
+      <div class="properties-section-content">
+        <div class="properties-hint">
+          Click any panel of a box to build a plinth under it and raise the box onto it — placed immediately at the default height, flush on every side. Select one of its panels afterward to fine-tune the height and each edge's fit/inset.
         </div>
       </div>
     `;
