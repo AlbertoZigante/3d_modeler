@@ -278,6 +278,12 @@ export class UnlinkConstraintCommand extends ModelCommand {
   }
 }
 
+export class EditQuoteCommand extends ModelCommand {
+  constructor(options) {
+    super({ ...options, label: 'Edit distance' });
+  }
+}
+
 export class HideBoxWallCommand extends ModelCommand {
   constructor(options) {
     super({ ...options, label: 'Hide box wall' });

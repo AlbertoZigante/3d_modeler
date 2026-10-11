@@ -311,6 +311,18 @@ function ensureComponentIconStyles() {
       border: 1px solid #d8d0c4;
     }
 
+    .quote-actions { display: flex; gap: 8px; }
+    .quote-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .quote-preview-warn {
+      font-size: 12.5px; line-height: 1.4; color: #8a4b00; background: #fff4e0;
+      border: 1px solid #f0c987; border-radius: 5px; padding: 7px 8px;
+    }
+    .quote-preview-ok { font-size: 12.5px; color: #1f6b3a; }
+    .quote-btn {
+      flex: 1; padding: 7px 8px; font-size: 12.5px; font-weight: 600;
+      border-radius: 5px; border: 1px solid #c9c0b0; background: #f3ede0; cursor: pointer;
+    }
+    .quote-btn.primary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
     .properties-gap-row {
       display: flex;
       align-items: center;
@@ -380,6 +392,13 @@ export function renderPanelList(
     collinearGapMm,
     onCollinearGapChange,
 
+    onAddDimension,
+    quoteToolActive,
+    quotePending,
+    onQuoteValueChange,
+    onQuoteApply,
+    onQuoteCancel,
+
     onShelfHorizontal,
     onShelfVertical,
     shelfMode,
@@ -427,7 +446,7 @@ export function renderPanelList(
    * collapses back to the three sections above it.
    */
   const anyToolActive =
-    !!(collinearActive || shelfMode || doorToolActive || drawerToolActive || plinthToolActive || legToolActive);
+    !!(collinearActive || quoteToolActive || shelfMode || doorToolActive || drawerToolActive || plinthToolActive || legToolActive);
 
   const propertiesSectionMarkup = `
     <div
@@ -458,6 +477,8 @@ export function renderPanelList(
           ${renderPropertiesContent({
             collinearActive,
             collinearGapMm,
+            quoteToolActive,
+            quotePending,
             shelfMode,
             doorToolActive,
             drawerToolActive,
@@ -693,12 +714,12 @@ export function renderPanelList(
 
             <button
               type="button"
-              class="component-icon-btn"
+              class="component-icon-btn ${quoteToolActive ? 'active' : ''}"
               id="add-dimension-btn"
-              title="Dimension — set a distance between two elements, or a panel's size — not wired yet"
+              title="${quoteToolActive ? 'Cancel Dimension (Esc)' : 'Dimension — impose a distance between two panels (sizes can\'t be set)'}"
             >
               ${COMPONENT_ICONS.dimension}
-              <span class="icon-label">Dimension</span>
+              <span class="icon-label">${quoteToolActive ? 'Cancel' : 'Dimension'}</span>
             </button>
 
           </div>
@@ -1037,6 +1058,37 @@ export function renderPanelList(
     );
 
 
+  container.querySelector('#add-dimension-btn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onAddDimension?.();
+  });
+
+  const quoteInput = container.querySelector('#quote-value-input');
+  quoteInput?.addEventListener('input', (event) => {
+    const value = parseFloat(event.target.value);
+    const preview = onQuoteValueChange?.(Number.isFinite(value) ? value : 0);
+    // update only the preview box + Apply state — a full re-render would drop the input's focus
+    const box = container.querySelector('#quote-preview');
+    if (box) box.innerHTML = quotePreviewHTML(preview);
+    const applyBtn = container.querySelector('#quote-apply-btn');
+    if (applyBtn) applyBtn.disabled = !!(preview && !preview.ok);
+  });
+  quoteInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      onQuoteApply?.();
+    }
+  });
+  container.querySelector('#quote-apply-btn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    onQuoteApply?.();
+  });
+  container.querySelector('#quote-cancel-btn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    onQuoteCancel?.();
+  });
+
   const gapInput =
     container.querySelector(
       '#collinear-gap-input'
@@ -1072,6 +1124,21 @@ export function renderPanelList(
 }
 
 
+// Live feedback under the Distance field: blocking reason (red, Apply
+// disabled), the conflicts this value would cause (orange, Apply still
+// allowed — detect and surface), or a "fits" confirmation.
+function quotePreviewHTML(preview) {
+  if (!preview) return '';
+  if (!preview.ok) {
+    return `<div class="properties-error">${escapeAttribute(preview.blocking)}</div>`;
+  }
+  if (preview.conflicts.length) {
+    return `<div class="quote-preview-warn">${preview.conflicts
+      .map((m) => `⚠ ${escapeAttribute(m)}`).join('<br>')}</div>`;
+  }
+  return '<div class="quote-preview-ok">✓ Fits — no conflicts</div>';
+}
+
 /* ============================================================
    PROPERTIES SECTION CONTENT
    ============================================================ */
@@ -1083,10 +1150,45 @@ export function renderPanelList(
 function renderPropertiesContent({
   collinearActive,
   collinearGapMm,
+  quoteToolActive,
+  quotePending,
   shelfMode,
   doorToolActive,
   drawerToolActive,
 }) {
+
+  if (quoteToolActive) {
+    if (!quotePending) {
+      return `
+        <div class="properties-section-content">
+          <div class="properties-hint">
+            Pick a face on one panel, then the facing face on another panel.
+            Only the distance between them can be set — panel sizes and
+            system-managed parts (plinth, doors, drawers, legs, box walls) can't be moved.
+          </div>
+        </div>
+      `;
+    }
+    return `
+      <div class="properties-section-content">
+        <div class="properties-hint">
+          <strong>${escapeAttribute(quotePending.drivenName)}</strong> will be positioned
+          relative to <strong>${escapeAttribute(quotePending.anchorName)}</strong>.
+          Current gap: ${escapeAttribute(Math.round(quotePending.measuredMm * 10) / 10)} mm.
+        </div>
+        <div class="properties-gap-row">
+          <label for="quote-value-input" title="Clear distance between the two faces, in mm">Distance (mm)</label>
+          <input type="number" id="quote-value-input" min="0" step="1"
+            value="${escapeAttribute(quotePending.valueMm)}" />
+        </div>
+        <div id="quote-preview">${quotePreviewHTML(quotePending.preview)}</div>
+        <div class="quote-actions">
+          <button type="button" id="quote-apply-btn" class="quote-btn primary" ${quotePending.preview && !quotePending.preview.ok ? 'disabled' : ''}>Apply</button>
+          <button type="button" id="quote-cancel-btn" class="quote-btn">Cancel</button>
+        </div>
+      </div>
+    `;
+  }
 
   if (collinearActive) {
     return `

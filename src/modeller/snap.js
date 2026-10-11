@@ -305,6 +305,49 @@ function applyAttachedTo(node, constraint, resolvedById, byId, r) {
   r.lockedFields[constraint.field] = true;
 }
 
+/**
+ * `distance` — a user-imposed QUOTE: the clear gap (mm, >= 0) between
+ * one face of an anchor panel and the facing face of THIS panel.
+ *
+ *   { id, type: 'distance', kind: 'quote', field: 'positionX'|'positionY'|'positionZ',
+ *     myFace, from: { node, face }, value, overridden }
+ *
+ * It lives on the DRIVEN node (same convention as attachedTo) and sets
+ * POSITION only — it never reads or writes width/height/thickness, so a
+ * quote can never resize a panel. The driven panel sits on the side the
+ * anchor face points to (that face's outward normal), `value` away from
+ * it; `myFace` must therefore face back toward the anchor.
+ */
+function applyDistance(node, constraint, resolvedById, byId, r) {
+  const axisKey = FIELD_TO_AXIS[constraint.field];
+  if (!axisKey || !constraint.field.startsWith('position')) {
+    throw new Error('a distance quote can only drive a position field, never a size');
+  }
+  if (!constraint.myFace || !LOCAL_FACES[constraint.myFace]) {
+    throw new Error('missing or unknown "myFace" for distance quote');
+  }
+  if (!(typeof constraint.value === 'number' && constraint.value >= 0)) {
+    throw new Error('a distance quote needs a value of 0 mm or more');
+  }
+  const anchorResolved = resolvedById.get(constraint.from?.node);
+  if (!anchorResolved) throw new Error(`references missing panel "${constraint.from?.node}"`);
+  const anchorAligned = getAlignedAxis(anchorResolved.rotation, constraint.from.face);
+  const myAligned = getAlignedAxis(r.rotation, constraint.myFace);
+  if (!anchorAligned || anchorAligned.axis !== axisKey || !myAligned || myAligned.axis !== axisKey) {
+    throw new Error(
+      `both faces must be aligned with the ${axisKey.toUpperCase()} axis — angled/non-axis-aligned quotes aren't supported yet`
+    );
+  }
+  if (myAligned.sign !== -anchorAligned.sign) {
+    throw new Error('the two faces must face each other along the quoted axis');
+  }
+  const anchorMm = resolveFacePointMm(constraint.from, axisKey, resolvedById, byId);
+  const myFaceMm = anchorMm + anchorAligned.sign * constraint.value;
+  const dimField = FACE_TO_DIM_FIELD[constraint.myFace];
+  r.position[axisKey] = myFaceMm - myAligned.sign * (r[dimField] / 2);
+  r.lockedFields[constraint.field] = true;
+}
+
 export function resolveConstraints(panels) {
   const byId = new Map(panels.map((p) => [p.id, p]));
   const resolvedById = new Map();
@@ -336,8 +379,10 @@ export function resolveConstraints(panels) {
     // attachedTo on the same node both matter, in exactly this
     // dependency direction — caught by simulating it against this
     // resolver directly, not by inspection.
+    // `distance` (a user quote) only ever sets POSITION, so like
+    // attachedTo it must run after every spansBetween.
     const orderedConstraints = [...(node.constraints || [])].sort(
-      (a, b) => (a.type === 'attachedTo' ? 1 : 0) - (b.type === 'attachedTo' ? 1 : 0)
+      (a, b) => (a.type !== 'spansBetween' ? 1 : 0) - (b.type !== 'spansBetween' ? 1 : 0)
     );
     orderedConstraints.forEach((constraint) => {
       if (constraint.overridden) return;
@@ -346,6 +391,8 @@ export function resolveConstraints(panels) {
           applySpansBetween(node, constraint, resolvedById, byId, r);
         } else if (constraint.type === 'attachedTo') {
           applyAttachedTo(node, constraint, resolvedById, byId, r);
+        } else if (constraint.type === 'distance') {
+          applyDistance(node, constraint, resolvedById, byId, r);
         } else {
           r.warnings.push(`unknown constraint type "${constraint.type}"`);
         }
