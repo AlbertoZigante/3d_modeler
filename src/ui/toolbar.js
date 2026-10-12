@@ -395,6 +395,7 @@ export function renderPanelList(
     onAddDimension,
     quoteToolActive,
     quotePending,
+    quoteMessage,
     onQuoteValueChange,
     onQuoteApply,
     onQuoteCancel,
@@ -479,6 +480,7 @@ export function renderPanelList(
             collinearGapMm,
             quoteToolActive,
             quotePending,
+            quoteMessage,
             shelfMode,
             doorToolActive,
             drawerToolActive,
@@ -1152,6 +1154,7 @@ function renderPropertiesContent({
   collinearGapMm,
   quoteToolActive,
   quotePending,
+  quoteMessage,
   shelfMode,
   doorToolActive,
   drawerToolActive,
@@ -1162,22 +1165,29 @@ function renderPropertiesContent({
       return `
         <div class="properties-section-content">
           <div class="properties-hint">
-            Pick a face on one panel, then the facing face on another panel.
+            Click one panel, then click the other panel you want to measure to
+            (any surface on the same axis is fine — the facing faces are found for you).
             Only the distance between them can be set — panel sizes and
             system-managed parts (plinth, doors, drawers, legs, box walls) can't be moved.
           </div>
+          ${quoteMessage ? `<div class="properties-error">${escapeAttribute(quoteMessage)}</div>` : ''}
         </div>
       `;
     }
     return `
       <div class="properties-section-content">
         <div class="properties-hint">
-          <strong>${escapeAttribute(quotePending.drivenName)}</strong> will be positioned
-          relative to <strong>${escapeAttribute(quotePending.anchorName)}</strong>.
-          Current gap: ${escapeAttribute(Math.round(quotePending.measuredMm * 10) / 10)} mm.
+          ${quotePending.mode === 'box'
+            ? `Resizing the box: <strong>${escapeAttribute(quotePending.drivenName)}</strong>
+               (clear distance between the facing walls).
+               Current: ${escapeAttribute(Math.round(quotePending.measuredMm * 10) / 10)} mm.
+               <strong>${escapeAttribute(quotePending.anchorName)}</strong> stays put; the other walls re-fit.`
+            : `<strong>${escapeAttribute(quotePending.drivenName)}</strong> will be positioned
+               relative to <strong>${escapeAttribute(quotePending.anchorName)}</strong>.
+               Current gap: ${escapeAttribute(Math.round(quotePending.measuredMm * 10) / 10)} mm.`}
         </div>
         <div class="properties-gap-row">
-          <label for="quote-value-input" title="Clear distance between the two faces, in mm">Distance (mm)</label>
+          <label for="quote-value-input" title="Clear distance between the two faces, in mm">${quotePending.mode === 'box' ? 'Interior size (mm)' : 'Distance (mm)'}</label>
           <input type="number" id="quote-value-input" min="0" step="1"
             value="${escapeAttribute(quotePending.valueMm)}" />
         </div>

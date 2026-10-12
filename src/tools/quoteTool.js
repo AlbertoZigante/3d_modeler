@@ -23,7 +23,9 @@
 import { setSelectedId, setSelectedGroupId } from '../modeller/selection.js';
 import { showToast, hideToast } from '../ui/toast.js';
 import { getDisplayName } from '../modeller/modules.js';
-import { addQuote, measureGap, previewQuote } from '../engine/quotes.js';
+import {
+  addQuote, measureGap, previewQuote, resolveFacingFaces, planBoxDimension, previewBoxDimension, boxDimensionOffset,
+} from '../engine/quotes.js';
 import { AddConstraintCommand } from '../history/history.js';
 
 /** @type {Object|null} same toolContext object the other tools receive */
@@ -33,6 +35,18 @@ let quoteActive = false;
 let quotePick1 = null; // { nodeId, faceName } | null
 // { drivenId, myFace, from:{node,face}, measuredMm, valueMm, drivenName, anchorName } | null
 let quotePending = null;
+// Last problem/hint shown in the Properties panel (in addition to the
+// toast, which auto-hides and is easy to miss): string | null.
+let quoteMessage = null;
+
+function say(text, autoHide = true) {
+  quoteMessage = text;
+  showToast(text, autoHide);
+}
+
+export function getQuoteMessage() {
+  return quoteMessage;
+}
 
 export function setQuoteToolContext(context) {
   ctx = context;
@@ -44,6 +58,9 @@ export function getQuotePending() {
   return quotePending;
 }
 function computePreview() {
+  if (quotePending.mode === 'box') {
+    return previewBoxDimension(ctx.getPanels(), quotePending.plan, quotePending.valueMm);
+  }
   const { drivenId, myFace, from, valueMm } = quotePending;
   return previewQuote(ctx.getPanels(), { drivenId, myFace, from, value: valueMm });
 }
@@ -65,6 +82,7 @@ export function startQuoteMode() {
   quoteActive = true;
   quotePick1 = null;
   quotePending = null;
+  quoteMessage = null;
   setSelectedId(null);
   setSelectedGroupId(null);
   ctx.clearMultiSelected();
@@ -79,6 +97,7 @@ export function cancelQuoteMode() {
   quoteActive = false;
   quotePick1 = null;
   quotePending = null;
+  quoteMessage = null;
   setSelectedId(null);
   ctx.setFaceHighlight(null, null);
   ctx.setFacePickMode(false, null);
@@ -93,24 +112,70 @@ function resetPicks() {
 }
 
 function handleFacePick(nodeId, faceName) {
+  try {
+    pickFace(nodeId, faceName);
+  } catch (err) {
+    // Never fail silently inside an event handler.
+    console.error('Dimension tool:', err);
+    quotePick1 = null;
+    quotePending = null;
+    ctx.setFaceHighlight(null, null);
+    say(`Dimension tool error: ${err.message}`);
+    ctx.renderAll();
+  }
+}
+
+function pickFace(nodeId, faceName) {
   // A third click after a pending quote starts a fresh pair.
   if (quotePending) resetPicks();
+  quoteMessage = null;
 
   if (!quotePick1) {
     quotePick1 = { nodeId, faceName };
     ctx.setFaceHighlight(nodeId, faceName);
-    showToast('Now pick the facing face on the OTHER panel', false);
+    say('Now click the OTHER panel (any surface facing the same direction is fine)', false);
     ctx.renderAll();
     return;
   }
   if (quotePick1.nodeId === nodeId) {
-    showToast('Pick a face on a DIFFERENT panel');
+    say('Pick a DIFFERENT panel for the second click');
+    ctx.renderAll();
     return;
   }
 
   const panels = ctx.getPanels();
-  const a = quotePick1;
-  const b = { nodeId, faceName };
+
+  // Clicks land on visible outer surfaces, which usually point the same
+  // way; resolve them to the two faces that actually face each other.
+  const facing = resolveFacingFaces(panels, quotePick1, { nodeId, faceName });
+  if (!facing.ok) {
+    quotePick1 = null;
+    ctx.setFaceHighlight(null, null);
+    say(`${facing.message} Click the first panel again.`);
+    ctx.renderAll();
+    return;
+  }
+  const a = facing.a;
+  const b = facing.b;
+
+  // Two walls of the SAME box: the distance between them is the box's
+  // own interior size — apply it by moving a wall (relayoutBox re-fits
+  // the rest), not as a stored constraint. See engine/quotes.js#planBoxDimension.
+  const plan = planBoxDimension(panels, a, b);
+  if (plan) {
+    quotePending = {
+      mode: 'box', plan,
+      measuredMm: plan.measuredMm,
+      valueMm: Math.round(plan.measuredMm * 10) / 10,
+      drivenName: `Box interior ${plan.label}`,
+      anchorName: plan.anchorName,
+    };
+    quotePending.preview = computePreview();
+    ctx.setFaceHighlight(b.nodeId, b.faceName);
+    say(`Interior ${plan.label} of the box — type the new value, then Apply`, false);
+    ctx.renderAll();
+    return;
+  }
 
   // Try both role assignments; first = reference, second = driven.
   const attempts = [
@@ -131,12 +196,8 @@ function handleFacePick(nodeId, faceName) {
   if (!chosen) {
     quotePick1 = null;
     ctx.setFaceHighlight(null, null);
-    if (attempts.every((x) => x.notFacing)) {
-      showToast('Those faces must be parallel and face each other (e.g. a shelf underside and the upper face below it)');
-    } else {
-      const why = attempts.find((x) => !x.notFacing);
-      showToast(why?.message || "Can't dimension that pair");
-    }
+    const why = attempts.find((x) => !x.notFacing);
+    say(`${why?.message || "Can't dimension that pair of panels."} Click the first panel again.`);
     ctx.renderAll();
     return;
   }
@@ -153,13 +214,27 @@ function handleFacePick(nodeId, faceName) {
   };
   quotePending.preview = computePreview();
   ctx.setFaceHighlight(chosen.driven.nodeId, chosen.driven.faceName);
-  showToast(`${quotePending.drivenName} will be positioned relative to ${quotePending.anchorName} — set the distance, then Apply`, false);
+  say(`${quotePending.drivenName} will be positioned relative to ${quotePending.anchorName} — set the distance, then Apply`, false);
   ctx.renderAll();
 }
 
 /** Commits the pending quote. Returns true on success (tool then closes). */
 export function applyQuote() {
   if (!quotePending) return false;
+  if (quotePending.mode === 'box') {
+    const { plan, valueMm } = quotePending;
+    const preview = previewBoxDimension(ctx.getPanels(), plan, valueMm);
+    if (!preview.ok) {
+      say(preview.blocking);
+      ctx.renderAll();
+      return false;
+    }
+    const offset = boxDimensionOffset(ctx.getPanels(), plan, valueMm);
+    // main's applyBoxDimension moves the wall, runs relayoutBox, records ONE history step
+    if (!ctx.applyBoxDimension(plan.moveId, offset)) return false;
+    cancelQuoteMode();
+    return true;
+  }
   const { drivenId, myFace, from, valueMm } = quotePending;
   const before = ctx.getPanels();
   const result = addQuote(before, { drivenId, myFace, from, value: valueMm });

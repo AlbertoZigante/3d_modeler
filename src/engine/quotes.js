@@ -29,6 +29,7 @@
 import { resolveConstraints } from '../modeller/snap.js';
 import { detectJoints } from './joints.js';
 import { findQuoteConflicts } from './quoteConflicts.js';
+import { relayoutBox } from '../features/box.js';
 import { getAlignedAxis, getPanelOwnership, nextConstraintId, FACE_TO_DIM_FIELD, LOCAL_FACES } from '../modeller/modules.js';
 
 const AXIS_TO_POSITION_FIELD = { x: 'positionX', y: 'positionY', z: 'positionZ' };
@@ -77,6 +78,54 @@ export function measureGap(panels, drivenId, myFace, from) {
   const m = getAlignedAxis(me.rotation, myFace);
   if (!a || !m || a.axis !== m.axis || a.sign !== -m.sign) return null;
   return (resolvedFacePoint(me, myFace, a.axis) - resolvedFacePoint(anchor, from.face, a.axis)) * a.sign;
+}
+
+/**
+ * Turns two PICKED faces into the pair of faces that really FACE EACH
+ * OTHER. A person clicking in the viewport almost always hits the
+ * visible outer surfaces (e.g. the top of a shelf and the top of the
+ * panel below it), which point the same way and so can't be measured;
+ * what they mean is "the distance between these two panels along that
+ * axis". So:
+ *   - the two picks must lie on the same main axis (parallel faces);
+ *   - if the picked faces already face each other (gap >= 0) they are
+ *     kept exactly as picked (lets someone measure to a specific face);
+ *   - otherwise each panel's face looking toward the other panel is used.
+ *
+ * @param {{nodeId:string, faceName:string}} a
+ * @param {{nodeId:string, faceName:string}} b
+ * @returns {{ok:true, a, b, corrected:boolean}|{ok:false, reason:string, message:string}}
+ */
+export function resolveFacingFaces(panels, a, b) {
+  const resolved = new Map(resolveConstraints(panels).map((r) => [r.id, r]));
+  const ra = resolved.get(a.nodeId);
+  const rb = resolved.get(b.nodeId);
+  if (!ra || !rb) return fail('missing-panel', 'Panel not found.');
+  const alA = getAlignedAxis(ra.rotation, a.faceName);
+  const alB = getAlignedAxis(rb.rotation, b.faceName);
+  if (!alA || !alB || alA.axis !== alB.axis) {
+    return fail('not-parallel', 'Pick two faces that are parallel (for example both top/bottom surfaces, or both left/right surfaces) so a distance can be measured.');
+  }
+  const axis = alA.axis;
+  const tol = -0.01;
+  if (alA.sign === -alB.sign) {
+    const gap = (resolvedFacePoint(rb, b.faceName, axis) - resolvedFacePoint(ra, a.faceName, axis)) * alA.sign;
+    if (gap >= tol) return { ok: true, a, b, corrected: false };
+  }
+  // Use the faces that look toward each other.
+  const dir = Math.sign(rb.position[axis] - ra.position[axis]) || 1;
+  const faceToward = (r, sign) => Object.keys(LOCAL_FACES).find((f) => {
+    const al = getAlignedAxis(r.rotation, f);
+    return al && al.axis === axis && al.sign === sign;
+  });
+  const fa = faceToward(ra, dir);
+  const fb = faceToward(rb, -dir);
+  if (!fa || !fb) return fail('not-parallel', 'Those panels have no faces on a common axis.');
+  const gap = (resolvedFacePoint(rb, fb, axis) - resolvedFacePoint(ra, fa, axis)) * dir;
+  if (gap < tol) {
+    return fail('overlap', `Those two panels overlap along ${axis.toUpperCase()}, so there is no gap to dimension.`);
+  }
+  return { ok: true, a: { nodeId: a.nodeId, faceName: fa }, b: { nodeId: b.nodeId, faceName: fb }, corrected: true };
 }
 
 /**
@@ -197,4 +246,83 @@ export function previewQuote(panels, spec) {
   const known = new Set(audit(panels).map((v) => v.key));
   const fresh = audit(added.panels).filter((v) => !known.has(v.key));
   return { ok: true, conflicts: fresh.map((v) => v.message) };
+}
+
+// ---------------------------------------------------------------
+// BOX DIMENSIONS — a distance between two walls of the SAME box.
+//
+// The six walls of a box are system-owned: relayoutBox() recomputes
+// their sizes from where the walls sit, so a persistent `distance`
+// constraint on a wall would fight it. But the clear distance between
+// two facing walls (Left/Right = interior width, Top/Bottom = interior
+// height, Back/Front = interior depth) IS the box's size, and it is
+// still "a distance between two elements", so the Dimension tool
+// accepts it. It is applied as a one-shot MOVE of the wall on the
+// positive side along that axis, after which relayoutBox() re-fits the
+// other walls (and doors, drawers, plinth, legs follow). No constraint
+// is stored: the box geometry itself is the record.
+// ---------------------------------------------------------------
+const BOX_AXIS_LABEL = { x: 'width', y: 'height', z: 'depth' };
+
+/**
+ * @param {{nodeId:string, faceName:string}} a - facing faces, as returned by resolveFacingFaces
+ * @param {{nodeId:string, faceName:string}} b
+ * @returns {null | {ok:true, groupId, axis, label, moveId, anchorId, measuredMm, moveName, anchorName}}
+ *   null when the two panels are not walls of one box (ordinary quote rules apply).
+ */
+export function planBoxDimension(panels, a, b) {
+  const na = panels.find((p) => p.id === a.nodeId);
+  const nb = panels.find((p) => p.id === b.nodeId);
+  if (!na?.isBoxWall || !nb?.isBoxWall || !na.groupId || na.groupId !== nb.groupId) return null;
+
+  const resolved = new Map(resolveConstraints(panels).map((r) => [r.id, r]));
+  const ra = resolved.get(a.nodeId);
+  const rb = resolved.get(b.nodeId);
+  const alA = getAlignedAxis(ra.rotation, a.faceName);
+  const alB = getAlignedAxis(rb.rotation, b.faceName);
+  if (!alA || !alB || alA.axis !== alB.axis || alA.sign !== -alB.sign) return null;
+  const axis = alA.axis;
+
+  // The wall on the positive side moves; the other one stays put.
+  const moveIsB = rb.position[axis] >= ra.position[axis];
+  const mover = moveIsB ? nb : na;
+  const stay = moveIsB ? na : nb;
+  const measuredMm = (resolvedFacePoint(rb, b.faceName, axis) - resolvedFacePoint(ra, a.faceName, axis)) * alA.sign;
+  return {
+    ok: true, groupId: na.groupId, axis, label: BOX_AXIS_LABEL[axis],
+    moveId: mover.id, anchorId: stay.id, measuredMm,
+    moveName: nameOf(mover), anchorName: nameOf(stay),
+  };
+}
+
+/** The new offset of the moving wall for a requested interior distance. */
+export function boxDimensionOffset(panels, plan, valueMm) {
+  const mover = panels.find((p) => p.id === plan.moveId);
+  return { ...mover.offset, [plan.axis]: mover.offset[plan.axis] + (valueMm - plan.measuredMm) };
+}
+
+const RELAYOUT_REASONS = {
+  'min-dim': "Can't shrink the box that far — the walls would overlap.",
+};
+
+/** Dry run of a box dimension: same shape as previewQuote's result. */
+export function previewBoxDimension(panels, plan, valueMm) {
+  if (!(typeof valueMm === 'number' && Number.isFinite(valueMm) && valueMm > 0)) {
+    return { ok: false, blocking: 'The interior distance must be greater than 0 mm.', conflicts: [] };
+  }
+  const offset = boxDimensionOffset(panels, plan, valueMm);
+  const candidate = panels.map((p) => (p.id === plan.moveId ? { ...p, offset } : p));
+  const r = relayoutBox(candidate, plan.groupId);
+  if (r.ok) return { ok: true, conflicts: [] };
+  let blocking = RELAYOUT_REASONS[r.reason];
+  if (!blocking && r.hitAxis) {
+    const what = r.hitAxis === 'y' ? 'height' : r.hitAxis === 'x' ? 'width' : 'depth';
+    blocking = `That would take the box past the design's overall ${what} limit.`;
+  }
+  if (!blocking && r.reason?.startsWith('panel-size:')) blocking = 'That would make a wall larger than the maximum panel size.';
+  if (!blocking && r.reason?.startsWith('min-gap:')) {
+    const [x, y] = r.reason.slice('min-gap:'.length).split('/');
+    blocking = `${x} and ${y} would end up too close together.`;
+  }
+  return { ok: false, blocking: blocking || "The box can't be resized to that value.", conflicts: [] };
 }

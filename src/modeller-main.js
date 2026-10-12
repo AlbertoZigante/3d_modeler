@@ -104,10 +104,14 @@ import {
 } from './tools/collinearTool.js';
 import { setAttachToolContext } from './tools/attachTool.js';
 import {
+  startQuoteMode, cancelQuoteMode, isQuoteActive, getQuotePending, getQuoteMessage, setQuoteValue, applyQuote, setQuoteToolContext,
+} from './tools/quoteTool.js';
+import { updateQuote, removeQuote } from './engine/quotes.js';
+import {
   history, createStateCommand, MovePanelCommand, MoveGroupCommand, ResizePanelCommand, ChangeMaterialCommand,
   ChangeGroupMaterialCommand, RenamePanelCommand, AddPanelCommand, DeletePanelCommand, AddBoxCommand,
   DeleteBoxCommand, GroupPanelsCommand, UngroupPanelsCommand, DeleteShelfCommand,
-  RemoveConstraintCommand, UnlinkConstraintCommand, HideBoxWallCommand, RestoreBoxWallCommand,
+  RemoveConstraintCommand, UnlinkConstraintCommand, EditQuoteCommand, HideBoxWallCommand, RestoreBoxWallCommand,
   ChangeEdgeFitCommand, AddDoorCommand, SetDoorHingeCommand, DeleteDoorCommand,
   AddDrawerCommand, DeleteDrawerCommand, SetDrawerBoxMarginCommand,
   AddLegsCommand, AddPlinthCommand, SetPlinthHeightCommand, SetPlinthEdgeFitCommand,
@@ -323,7 +327,7 @@ document.getElementById('export-bom-pdf-btn')?.addEventListener('click', () => {
 });
 
 // ---- Scene (view layer). Consumes RESOLVED panels only. ----
-const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight, setPanelHighlightSet } = createModellerScene(canvas, main, {
+const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight, setPanelHighlightSet, setDimensions } = createModellerScene(canvas, main, {
   axesCanvas,
   pipCanvas,
   onPipModeClick: (mode) => switchView(mode),
@@ -572,6 +576,28 @@ const toolContext = {
 setShelfToolContext(toolContext);
 setCollinearToolContext(toolContext);
 setAttachToolContext(toolContext);
+setQuoteToolContext({
+  ...toolContext,
+  // Dimension tool, two walls of one box: move the positive-side wall,
+  // let relayoutBox() re-fit the rest (doors, drawers, plinth, legs
+  // follow inside applyRelayoutResult), ONE history step. Same
+  // validate-then-commit path as dragging a wall or typing its offset.
+  applyBoxDimension: (wallId, offset) => {
+    const wall = panels.find((p) => p.id === wallId);
+    if (!wall) return false;
+    const before = panels;
+    updateNode(wallId, { offset });
+    const result = relayoutBox(panels, wall.groupId);
+    if (!applyRelayoutResult(result)) {
+      panels = before;
+      renderAll();
+      return false;
+    }
+    recordHistoryCommand(MovePanelCommand, before, panels);
+    renderAll();
+    return true;
+  },
+});
 setBoundaryRectToolContext(toolContext);
 setPlinthToolContext({
   ...toolContext,
@@ -722,6 +748,10 @@ function applyRelayoutResult(result) {
   return true;
 }
 
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && isQuoteActive()) cancelQuoteMode();
+});
+
 // Escape cancels an in-progress collinear or shelf pick — same as it
 // already does for nothing else in this app (no other modal/
 // multi-step tool exists yet) — scoped narrowly so it can't interfere
@@ -789,6 +819,7 @@ view2dBtn.addEventListener('click', () => switchView('2d'));
 let currentViewIs3d = true;
 
 const TOOL_HINTS = {
+  quote: 'Dimension: click one panel, then another, type the distance (mm) and press Apply. Two walls of one box (Left/Right, Top/Bottom, Back/Front) resize the box interior · Esc: cancel',
   collinear: 'Collinear: click a face/edge on one panel, then a parallel face/edge on another panel to align them · Esc: cancel',
   shelfHorizontal: 'Horizontal shelf: pick one boundary of the box, then the opposite boundary, to span a shelf between them · Esc: cancel',
   shelfVertical: 'Vertical shelf: pick one boundary of the box, then the opposite boundary, to span a shelf between them · Esc: cancel',
@@ -800,7 +831,8 @@ const TOOL_HINTS = {
 
 function updateToolHint() {
   let hint = null;
-  if (isCollinearActive()) hint = TOOL_HINTS.collinear;
+  if (isQuoteActive()) hint = TOOL_HINTS.quote;
+  else if (isCollinearActive()) hint = TOOL_HINTS.collinear;
   else if (getShelfMode() === 'horizontal') hint = TOOL_HINTS.shelfHorizontal;
   else if (getShelfMode() === 'vertical') hint = TOOL_HINTS.shelfVertical;
   else if (isDoorPickActive()) hint = TOOL_HINTS.doorPick;
@@ -1030,6 +1062,9 @@ function checkJointWarnings(resolvedPanels) {
   // resolved graph since the min-gap sweep needs each panel's own
   // pre-resolve `.offset` field (see collectAxisSlabs).
   const { violations } = validateDesign(panels, resolvedPanels, { collisions });
+  // Quote annotations are drawn here (not next to reconcile) so a
+  // conflicting quote can be coloured red in the same pass.
+  setDimensions(panels, resolvedPanels, new Set(violations.filter((v) => v.type === 'quoteConflict').flatMap((v) => v.drivenIds || [])));
   const newViolations = violations.filter((v) => !knownViolationKeys.has(v.key));
   knownViolationKeys = new Set(violations.map((v) => v.key));
 
@@ -1176,19 +1211,26 @@ function renderAll() {
     onAddHorizontal: addHorizontalPanel,
     onAddParallel: addParallelPanel,
     onAddBox: handleAddBox,
-    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startCollinearMode())),
+    onAddDimension: () => (isQuoteActive() ? cancelQuoteMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startQuoteMode())),
+    quoteToolActive: isQuoteActive(),
+    quotePending: getQuotePending(),
+    quoteMessage: getQuoteMessage(),
+    onQuoteValueChange: setQuoteValue, // no renderAll() — same reason as the collinear gap input
+    onQuoteApply: applyQuote,
+    onQuoteCancel: cancelQuoteMode,
+    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), startCollinearMode())),
     collinearActive: isCollinearActive(),
     collinearGapMm: getCollinearGapMm(),
     onCollinearGapChange: setCollinearGapMm, // deliberately no renderAll() here — see toolbar.js's own comment on why
-    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startShelfMode('horizontal'))),
-    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startShelfMode('vertical'))),
+    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), startShelfMode('horizontal'))),
+    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), startShelfMode('vertical'))),
     shelfMode: getShelfMode(),
-    onAddDoor: () => (isDoorPickActive() ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startDoorMode())),
+    onAddDoor: () => (isDoorPickActive() ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), startDoorMode())),
     doorToolActive: isDoorPickActive(),
-    onAddDrawer: () => (isDrawerPickActive() ? cancelDrawerMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelPlinthMode(), cancelLegMode(), startDrawerMode())),
+    onAddDrawer: () => (isDrawerPickActive() ? cancelDrawerMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), startDrawerMode())),
     drawerToolActive: isDrawerPickActive(),
-    onAddPlinth: () => (isPlinthPickActive() ? cancelPlinthMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelLegMode(), startPlinthMode())),
-    onAddLegs: () => (isLegPickActive() ? cancelLegMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), startLegMode())),
+    onAddPlinth: () => (isPlinthPickActive() ? cancelPlinthMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelLegMode(), cancelQuoteMode(), startPlinthMode())),
+    onAddLegs: () => (isLegPickActive() ? cancelLegMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelQuoteMode(), startLegMode())),
     legToolActive: isLegPickActive(),
     plinthToolActive: isPlinthPickActive(),
   });
@@ -1299,6 +1341,7 @@ function renderInspectorOnly() {
       selectedPanel,
       allPanels: panels,
       onUnlinkConstraint: unlinkOrRemoveConstraint,
+      onQuoteChange: changeQuoteValue,
     });
   }
 }
@@ -2042,6 +2085,29 @@ function updateSelectedDrawerFrontCount(count) {
 // isBoxWall.
 // -------------------------------------------------------------
 
+// Edits the mm of an existing quote from the Relations panel. Rejected
+// values (negative, resolver warning) leave the design untouched.
+function changeQuoteValue(constraintId, value) {
+  const selectedId = getSelectedId();
+  const before = panels;
+  const result = updateQuote(panels, selectedId, constraintId, value);
+  if (!result.ok) { showToast(result.message); renderAll(); return; }
+  panels = result.panels;
+  const violation = resolveConstraints(panels).find((r) => r.id === selectedId);
+  if (violation) {
+    const dims = { width: violation.width, height: violation.height, thickness: violation.thickness };
+    const hitAxis = findDesignLimitViolation(violation.rotation, violation.position, dims);
+    if (hitAxis) {
+      panels = before; // out of the allowed design volume — refuse
+      showDesignLimitError(hitAxis);
+      renderAll();
+      return;
+    }
+  }
+  recordHistoryCommand(EditQuoteCommand, before, panels);
+  renderAll();
+}
+
 // identifier is either a FIELD NAME (soft "Unlink" — mark the active
 // constraint on that field overridden, keep its definition) or a
 // CONSTRAINT ID with { remove: true } (hard delete regardless of
@@ -2053,6 +2119,17 @@ function unlinkOrRemoveConstraint(identifier, opts = {}) {
 
   if (opts.remove) {
     const before = panels;
+    const target = (node.constraints || []).find((c) => c.id === identifier);
+    if (target?.type === 'distance') {
+      // A quote is removed through the engine so the panel keeps its
+      // current position instead of jumping back to its base offset.
+      const result = removeQuote(panels, selectedId, identifier);
+      if (!result.ok) { showToast(result.message); return; }
+      panels = result.panels;
+      recordHistoryCommand(RemoveConstraintCommand, before, panels);
+      renderAll();
+      return;
+    }
     const nextConstraints = (node.constraints || []).filter((c) => c.id !== identifier);
     updateNode(selectedId, { constraints: nextConstraints });
     const after = panels;

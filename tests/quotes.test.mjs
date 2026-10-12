@@ -18,7 +18,8 @@ import { computeDimensionSpecs } from '../src/modeller/dimensions.js';
 import { findQuoteConflicts } from '../src/engine/quoteConflicts.js';
 import { validateDesign } from '../src/engine/validator.js';
 import { detectJoints } from '../src/engine/joints.js';
-import { previewQuote } from '../src/engine/quotes.js';
+import { previewQuote, resolveFacingFaces, planBoxDimension, boxDimensionOffset, previewBoxDimension } from '../src/engine/quotes.js';
+import { relayoutBox } from '../src/features/box.js';
 import { addQuote, updateQuote, removeQuote, measureGap, canBeDriven } from '../src/engine/quotes.js';
 
 await ensureMaterialCatalog();
@@ -184,6 +185,80 @@ section('previewQuote — live feedback while typing', () => {
   const base = addQuote(panels, spec(5000));
   const again = previewQuote(base.panels.map((p) => (p.id === shelf.id ? { ...p, constraints: [] } : p)), spec(150));
   assert(again.ok && again.conflicts.length === 0, 'preview after clearing is clean');
+});
+
+section('resolveFacingFaces — clicks on outer surfaces (same direction)', () => {
+  const base = boxWithShelf();
+  const { shelf, bottom, nodes } = base;
+  const panels = base.panels.map((p) => (p.id === shelf.id ? { ...p, offset: { x: 0, y: 200, z: 0 } } : p)); // shelf floating above the Bottom
+  const top = wall(nodes, 'top');
+  const pick = (id, faceName) => ({ nodeId: id, faceName });
+  // top surface of the shelf + top surface of the Bottom: both point UP
+  const sameDir = resolveFacingFaces(panels, pick(shelf.id, 'back'), pick(bottom.id, 'back'));
+  assert(sameDir.ok && sameDir.corrected, 'same-direction picks are corrected');
+  const onShelf = [sameDir.a, sameDir.b].find((f) => f.nodeId === shelf.id);
+  const onBottom = [sameDir.a, sameDir.b].find((f) => f.nodeId === bottom.id);
+  assertEqual(onShelf.faceName, 'front', 'shelf underside chosen');
+  assertEqual(onBottom.faceName, 'back', 'Bottom upper face chosen');
+  const q = addQuote(panels, { drivenId: shelf.id, myFace: onShelf.faceName, from: { node: bottom.id, face: onBottom.faceName }, value: 100 });
+  assert(q.ok, `corrected faces produce an acceptable quote (${q.message || ''})`);
+  // already-facing picks are kept as they are
+  const facing = resolveFacingFaces(panels, pick(bottom.id, 'back'), pick(shelf.id, 'front'));
+  assert(facing.ok && !facing.corrected, 'already-facing picks are not altered');
+  // picks on the wrong (outer) faces still resolve to the inner gap
+  const reversed = resolveFacingFaces(panels, pick(shelf.id, 'front'), pick(bottom.id, 'front'));
+  assert(reversed.ok && reversed.corrected, 'outer-face picks resolve to the facing pair');
+  // the panel above
+  assert(resolveFacingFaces(panels, pick(shelf.id, 'back'), pick(top.id, 'back')).ok, 'works for the panel above too');
+  // overlapping panels have no gap to dimension
+  const overlap = resolveFacingFaces(base.panels, pick(shelf.id, 'back'), pick(bottom.id, 'back'));
+  assert(!overlap.ok && overlap.reason === 'overlap', 'overlapping panels are refused with a reason');
+  // perpendicular picks are refused with an explanation
+  const perp = resolveFacingFaces(panels, pick(shelf.id, 'back'), pick(wall(nodes, 'left').id, 'right'));
+  assert(!perp.ok && perp.reason === 'not-parallel', 'perpendicular faces are refused');
+});
+
+section('box dimensions — two walls of one box resize its interior', () => {
+  const { nodes, groupId } = addBox([]);
+  const w = (n) => wall(nodes, n);
+  const pick = (id, faceName) => ({ nodeId: id, faceName });
+  const interior = (panels, a, b, axis) => {
+    const r = new Map(resolveConstraints(panels).map((x) => [x.id, x]));
+    return Math.abs(r.get(a.id).position[axis] - r.get(b.id).position[axis]) - (r.get(a.id).thickness + r.get(b.id).thickness) / 2;
+  };
+  // click the outer surfaces of Left and Right (width), Top and Bottom (height), Back and Front (depth)
+  const cases = [['left', 'right', 'x', 'width', 700], ['bottom', 'top', 'y', 'height', 500], ['back', 'front', 'z', 'depth', 300]];
+  cases.forEach(([n1, n2, axis, label, target]) => {
+    const A = w(n1), B = w(n2);
+    const faces = resolveFacingFaces(nodes, pick(A.id, 'front'), pick(B.id, 'front'));
+    const aF = faces.ok ? faces.a : null;
+    // use whichever faces the resolver found; if the two walls are not parallel on 'front', fall back to brute force over face names
+    let plan = null, fa = null, fb = null;
+    for (const f1 of ['front', 'back', 'top', 'bottom', 'left', 'right']) for (const f2 of ['front', 'back', 'top', 'bottom', 'left', 'right']) {
+      if (plan) break;
+      const rf = resolveFacingFaces(nodes, pick(A.id, f1), pick(B.id, f2));
+      if (rf.ok) { const p = planBoxDimension(nodes, rf.a, rf.b); if (p && p.axis === axis) { plan = p; fa = rf.a; fb = rf.b; } }
+    }
+    assert(plan && plan.label === label, `${n1}/${n2}: box dimension recognised as ${label}`);
+    const before = interior(nodes, A, B, axis);
+    assertEqual(Math.round(plan.measuredMm), Math.round(before), `${label}: measured interior matches geometry`);
+    const offset = boxDimensionOffset(nodes, plan, target);
+    const moved = nodes.map((p) => (p.id === plan.moveId ? { ...p, offset } : p));
+    const rl = relayoutBox(moved, groupId);
+    assert(rl.ok, `${label}: relayoutBox accepts ${target} mm`);
+    const applied = moved.map((p) => { const patch = rl.patches.find((x) => x.id === p.id); return patch ? { ...p, width: patch.width, height: patch.height, offset: patch.offset } : p; });
+    assertEqual(Math.round(interior(applied, A, B, axis)), target, `${label}: interior becomes exactly ${target} mm`);
+    assert(previewBoxDimension(nodes, plan, target).ok, `${label}: preview ok`);
+  });
+  const w1 = w('left'), w2 = w('right');
+  let plan = null;
+  for (const f1 of ['front', 'back', 'top', 'bottom', 'left', 'right']) for (const f2 of ['front', 'back', 'top', 'bottom', 'left', 'right']) { if (plan) break; const rf = resolveFacingFaces(nodes, pick(w1.id, f1), pick(w2.id, f2)); if (rf.ok) plan = planBoxDimension(nodes, rf.a, rf.b); }
+  assert(!previewBoxDimension(nodes, plan, 0).ok, 'zero interior refused');
+  assert(!previewBoxDimension(nodes, plan, 99999).ok, 'beyond the design limits refused with a reason');
+  // a shelf and a wall are NOT a box dimension (ordinary quote rules apply)
+  const { panels, shelf, bottom } = boxWithShelf();
+  const rf = resolveFacingFaces(panels.map((p) => (p.id === shelf.id ? { ...p, offset: { x: 0, y: 200, z: 0 } } : p)), pick(shelf.id, 'back'), pick(bottom.id, 'back'));
+  assertEqual(planBoxDimension(panels, rf.a, rf.b), null, 'shelf + wall is not a box dimension');
 });
 
 report();
