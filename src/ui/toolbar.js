@@ -394,11 +394,7 @@ export function renderPanelList(
 
     onAddDimension,
     quoteToolActive,
-    quotePending,
     quoteMessage,
-    onQuoteValueChange,
-    onQuoteApply,
-    onQuoteCancel,
 
     onShelfHorizontal,
     onShelfVertical,
@@ -479,7 +475,6 @@ export function renderPanelList(
             collinearActive,
             collinearGapMm,
             quoteToolActive,
-            quotePending,
             quoteMessage,
             shelfMode,
             doorToolActive,
@@ -1066,31 +1061,6 @@ export function renderPanelList(
     onAddDimension?.();
   });
 
-  const quoteInput = container.querySelector('#quote-value-input');
-  quoteInput?.addEventListener('input', (event) => {
-    const value = parseFloat(event.target.value);
-    const preview = onQuoteValueChange?.(Number.isFinite(value) ? value : 0);
-    // update only the preview box + Apply state — a full re-render would drop the input's focus
-    const box = container.querySelector('#quote-preview');
-    if (box) box.innerHTML = quotePreviewHTML(preview);
-    const applyBtn = container.querySelector('#quote-apply-btn');
-    if (applyBtn) applyBtn.disabled = !!(preview && !preview.ok);
-  });
-  quoteInput?.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      onQuoteApply?.();
-    }
-  });
-  container.querySelector('#quote-apply-btn')?.addEventListener('click', (event) => {
-    event.preventDefault();
-    onQuoteApply?.();
-  });
-  container.querySelector('#quote-cancel-btn')?.addEventListener('click', (event) => {
-    event.preventDefault();
-    onQuoteCancel?.();
-  });
-
   const gapInput =
     container.querySelector(
       '#collinear-gap-input'
@@ -1126,21 +1096,6 @@ export function renderPanelList(
 }
 
 
-// Live feedback under the Distance field: blocking reason (red, Apply
-// disabled), the conflicts this value would cause (orange, Apply still
-// allowed — detect and surface), or a "fits" confirmation.
-function quotePreviewHTML(preview) {
-  if (!preview) return '';
-  if (!preview.ok) {
-    return `<div class="properties-error">${escapeAttribute(preview.blocking)}</div>`;
-  }
-  if (preview.conflicts.length) {
-    return `<div class="quote-preview-warn">${preview.conflicts
-      .map((m) => `⚠ ${escapeAttribute(m)}`).join('<br>')}</div>`;
-  }
-  return '<div class="quote-preview-ok">✓ Fits — no conflicts</div>';
-}
-
 /* ============================================================
    PROPERTIES SECTION CONTENT
    ============================================================ */
@@ -1153,7 +1108,6 @@ function renderPropertiesContent({
   collinearActive,
   collinearGapMm,
   quoteToolActive,
-  quotePending,
   quoteMessage,
   shelfMode,
   doorToolActive,
@@ -1161,41 +1115,15 @@ function renderPropertiesContent({
 }) {
 
   if (quoteToolActive) {
-    if (!quotePending) {
-      return `
-        <div class="properties-section-content">
-          <div class="properties-hint">
-            Click one panel, then click the other panel you want to measure to
-            (any surface on the same axis is fine — the facing faces are found for you).
-            Only the distance between them can be set — panel sizes and
-            system-managed parts (plinth, doors, drawers, legs, box walls) can't be moved.
-          </div>
-          ${quoteMessage ? `<div class="properties-error">${escapeAttribute(quoteMessage)}</div>` : ''}
-        </div>
-      `;
-    }
     return `
       <div class="properties-section-content">
         <div class="properties-hint">
-          ${quotePending.mode === 'box'
-            ? `Resizing the box: <strong>${escapeAttribute(quotePending.drivenName)}</strong>
-               (clear distance between the facing walls).
-               Current: ${escapeAttribute(Math.round(quotePending.measuredMm * 10) / 10)} mm.
-               <strong>${escapeAttribute(quotePending.anchorName)}</strong> stays put; the other walls re-fit.`
-            : `<strong>${escapeAttribute(quotePending.drivenName)}</strong> will be positioned
-               relative to <strong>${escapeAttribute(quotePending.anchorName)}</strong>.
-               Current gap: ${escapeAttribute(Math.round(quotePending.measuredMm * 10) / 10)} mm.`}
+          Click one panel, then another. The distance between them appears in the
+          viewport (grey) &mdash; click it, type a value and press Enter to impose it.
+          Two walls of one box resize the box interior. Only distances can be set,
+          never sizes; system-managed parts (plinth, doors, drawers, legs) can't be moved.
         </div>
-        <div class="properties-gap-row">
-          <label for="quote-value-input" title="Clear distance between the two faces, in mm">${quotePending.mode === 'box' ? 'Interior size (mm)' : 'Distance (mm)'}</label>
-          <input type="number" id="quote-value-input" min="0" step="1"
-            value="${escapeAttribute(quotePending.valueMm)}" />
-        </div>
-        <div id="quote-preview">${quotePreviewHTML(quotePending.preview)}</div>
-        <div class="quote-actions">
-          <button type="button" id="quote-apply-btn" class="quote-btn primary" ${quotePending.preview && !quotePending.preview.ok ? 'disabled' : ''}>Apply</button>
-          <button type="button" id="quote-cancel-btn" class="quote-btn">Cancel</button>
-        </div>
+        ${quoteMessage ? `<div class="properties-error">${escapeAttribute(quoteMessage)}</div>` : ''}
       </div>
     `;
   }

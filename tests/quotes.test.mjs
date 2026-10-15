@@ -14,11 +14,12 @@ import { computePlinthPlacement, createPlinthNodes } from '../src/features/plint
 import { createPanelNode, getPanelOwnership, isSystemManaged } from '../src/modeller/modules.js';
 import { resolveConstraints } from '../src/modeller/snap.js';
 import { HORIZONTAL_ROTATION } from '../src/shared/geometry.js';
-import { computeDimensionSpecs } from '../src/modeller/dimensions.js';
+import * as THREE from 'three';
+import { computeDimensionSpecs, computeCandidateSpecs, candidateSpecForPair, specGeometry, projectSpec, dragToOffsetMm, FONT_PX, ARROW_PX } from '../src/modeller/dimensions.js';
 import { findQuoteConflicts } from '../src/engine/quoteConflicts.js';
 import { validateDesign } from '../src/engine/validator.js';
 import { detectJoints } from '../src/engine/joints.js';
-import { previewQuote, resolveFacingFaces, planBoxDimension, boxDimensionOffset, previewBoxDimension } from '../src/engine/quotes.js';
+import { planDimension, setQuoteOffset, previewQuote, resolveFacingFaces, planBoxDimension, boxDimensionOffset, previewBoxDimension } from '../src/engine/quotes.js';
 import { relayoutBox } from '../src/features/box.js';
 import { addQuote, updateQuote, removeQuote, measureGap, canBeDriven } from '../src/engine/quotes.js';
 
@@ -259,6 +260,157 @@ section('box dimensions — two walls of one box resize its interior', () => {
   const { panels, shelf, bottom } = boxWithShelf();
   const rf = resolveFacingFaces(panels.map((p) => (p.id === shelf.id ? { ...p, offset: { x: 0, y: 200, z: 0 } } : p)), pick(shelf.id, 'back'), pick(bottom.id, 'back'));
   assertEqual(planBoxDimension(panels, rf.a, rf.b), null, 'shelf + wall is not a box dimension');
+});
+
+section('dimension lines — default position, offset, extension lines', () => {
+  const { panels, shelf, bottom } = boxWithShelf();
+  const r = addQuote(panels, { drivenId: shelf.id, myFace: 'front', from: front(bottom.id, 'back'), value: 250 });
+  const resolved = resolveConstraints(r.panels);
+  const rs = new Map(resolved.map((p) => [p.id, p]));
+  const sp = computeDimensionSpecs(r.panels, resolved)[0];
+  assertEqual(sp.perp, 'x', 'a vertical quote slides along X');
+  const rightMost = Math.max(rs.get(shelf.id).position.x + rs.get(shelf.id).width / 2, rs.get(bottom.id).position.x + rs.get(bottom.id).width / 2);
+  assert(sp.from.x > rightMost, 'by default the dimension line sits OUTSIDE the panels, not on top of them');
+  assert(sp.ext.length > 0, 'extension lines connect the panel edges to the dimension line');
+  assertEqual(sp.offsetMm, 0, 'no stored offset yet');
+
+  const moved = setQuoteOffset(r.panels, shelf.id, r.constraint.id, 120);
+  assert(moved.ok, 'setQuoteOffset ok');
+  const sp2 = computeDimensionSpecs(moved.panels, resolveConstraints(moved.panels))[0];
+  assertEqual(Math.round(sp2.from.x - sp.from.x), 120, 'the stored offset shifts the line by 120 mm');
+  assertEqual(Math.round(Math.abs(sp2.to.y - sp2.from.y)), 250, 'shifting never changes the quoted distance');
+  assertEqual(res(moved.panels, shelf.id).position.y, res(r.panels, shelf.id).position.y, 'shifting never moves a panel');
+  const inside = specGeometry(sp, 250 - sp.autoPerpMm); // line at x=250, the middle of both panels
+  assertEqual(inside.ext.length, 0, 'no extension lines when the line is inside the panels');
+  assert(!setQuoteOffset(r.panels, shelf.id, r.constraint.id, NaN).ok, 'invalid offset refused');
+});
+
+section('dimension lines — constant screen size, drag follows the cursor at any zoom', () => {
+  const { panels, shelf, bottom } = boxWithShelf();
+  const r = addQuote(panels, { drivenId: shelf.id, myFace: 'front', from: front(bottom.id, 'back'), value: 250 });
+  const sp = computeDimensionSpecs(r.panels, resolveConstraints(r.panels))[0];
+  assert(FONT_PX > 0 && ARROW_PX > 0, 'text and arrow sizes are fixed pixel constants (no zoom input)');
+  const W = 800, H = 600;
+  const ortho = (half) => { const c = new THREE.OrthographicCamera(-half * W / H, half * W / H, half, -half, 0.1, 100); c.position.set(0, 0, 10); c.lookAt(0, 0, 0); c.updateMatrixWorld(); c.updateProjectionMatrix(); return c; };
+  const far = projectSpec(sp, ortho(2), W, H);
+  const near = projectSpec(sp, ortho(1), W, H);
+  const len = (L) => Math.hypot(L.p2.x - L.p1.x, L.p2.y - L.p1.y);
+  assert(len(near) > len(far) * 1.9, 'zooming in makes the line longer on screen');
+  [far, near].forEach((L, i) => {
+    const px = 40; // drag the line 40 px to the right
+    const mm = dragToOffsetMm({ x: px, y: 0 }, L.axisVec, 100);
+    const after = projectSpec(sp, i === 0 ? ortho(2) : ortho(1), W, H, sp.offsetMm + mm);
+    assertEqual(Math.round(after.p1.x - L.p1.x), px, `drag of ${px}px moves the line exactly ${px}px on screen (zoom ${i === 0 ? 'out' : 'in'})`);
+  });
+  assertEqual(dragToOffsetMm({ x: 10, y: 10 }, { x: 0, y: 0 }), 0, 'axis along the view direction cannot be dragged');
+  const persp = new THREE.PerspectiveCamera(45, W / H, 0.1, 100); persp.position.set(1, 1, 3); persp.lookAt(0, 0.5, 0); persp.updateMatrixWorld(); persp.updateProjectionMatrix();
+  const P = projectSpec(sp, persp, W, H);
+  assert(!P.behind && Number.isFinite(P.p1.x), 'works with the perspective camera as well');
+});
+
+section('candidates — grey measured dimensions for every neighbouring pair', () => {
+  const base = boxWithShelf();
+  const { shelf, bottom, nodes } = base;
+  const panels = base.panels.map((p) => (p.id === shelf.id ? { ...p, offset: { x: 0, y: 200, z: 0 } } : p));
+  const resolved = resolveConstraints(panels);
+  const rs = new Map(resolved.map((r) => [r.id, r]));
+  const cands = computeCandidateSpecs(panels, resolved, []);
+  const find = (idA, idB) => cands.find((c) => c.id.startsWith(`cand:${idA}|${idB}|`));
+  const top = wall(nodes, 'top');
+  const gapBelow = find(bottom.id, shelf.id);
+  assert(gapBelow, 'a candidate between the Bottom and the shelf above it');
+  const expected = (rs.get(shelf.id).position.y - rs.get(shelf.id).thickness / 2) - (rs.get(bottom.id).position.y + rs.get(bottom.id).thickness / 2);
+  assertEqual(Math.round(gapBelow.valueMm), Math.round(expected), 'its value is the instantaneous gap');
+  assert(find(shelf.id, top.id), 'a candidate between the shelf and the Top above it');
+  const kinds = new Set(cands.map((c) => c.kind));
+  assert(kinds.size === 1 && kinds.has('candidate'), 'all are marked as candidates (not imposed)');
+  // the box interior is offered through the walls pass, even with a shelf in between
+  const L = wall(nodes, 'left'), R = wall(nodes, 'right');
+  assert(find(L.id, R.id), 'interior width: Left-Right');
+  assert(find(bottom.id, top.id), 'interior height: Bottom-Top (the shelf in between does not hide it)');
+  const backW = wall(nodes, 'back'), frontW = wall(nodes, 'front');
+  assert(!find(backW.id, frontW.id), 'no depth candidate while the Front wall is hidden (open front)');
+  const shown = panels.map((p) => (p.id === frontW.id ? { ...p, hidden: false } : p));
+  assert(computeCandidateSpecs(shown, resolveConstraints(shown), []).some((c) => c.id.startsWith(`cand:${backW.id}|${frontW.id}|`)), 'interior depth: Back-Front once the Front wall is shown');
+  // faces of a candidate are really facing, and plan to the right kind of dimension
+  const p1 = planDimension(panels, gapBelow.faceA, gapBelow.faceB);
+  assert(p1.ok && p1.mode === 'quote', 'shelf/Bottom candidate plans an ordinary quote');
+  assertEqual(p1.drivenId, shelf.id, 'the shelf is the panel that moves');
+  const lr = find(L.id, R.id);
+  const p2 = planDimension(panels, lr.faceA, lr.faceB);
+  assert(p2.ok && p2.mode === 'box', 'Left-Right candidate plans a box resize');
+  // an imposed quote replaces its grey candidate
+  const q = addQuote(panels, { drivenId: shelf.id, myFace: gapBelow.faceB.faceName, from: { node: bottom.id, face: gapBelow.faceA.faceName }, value: 150 });
+  assert(q.ok, 'candidate faces produce an acceptable quote');
+  const rq = resolveConstraints(q.panels);
+  const imposed = computeDimensionSpecs(q.panels, rq);
+  assertEqual(imposed[0].kind, 'imposed', 'imposed specs are marked imposed');
+  assert(!computeCandidateSpecs(q.panels, rq, imposed).some((c) => c.id.startsWith(`cand:${bottom.id}|${shelf.id}|`)), 'the covered pair no longer has a grey candidate');
+  // the pair just picked can be drawn on its own
+  const one = candidateSpecForPair(resolved, gapBelow.faceA, gapBelow.faceB);
+  assertEqual(one.id, gapBelow.id, 'candidateSpecForPair matches the generated candidate');
+  // system panels (plinth, legs, doors...) are never offered
+  const plinthPanels = [...panels, createPanelNode({ name: 'Plinth Back', isPlinthPanel: true, rotation: HORIZONTAL_ROTATION, width: 300, height: 100, basePosition: { x: 250, y: -80, z: 0 } })];
+  assert(!computeCandidateSpecs(plinthPanels, resolveConstraints(plinthPanels), []).some((c) => c.title.includes('Plinth')), 'system-managed panels are left out');
+});
+
+section('planDimension — a box wall only moves when it is the only solution', () => {
+  const base = boxWithShelf();
+  const { shelf, bottom, nodes } = base;
+  const top = wall(nodes, 'top');
+  const panels = base.panels.map((p) => (p.id === shelf.id ? { ...p, offset: { x: 0, y: 200, z: 0 } } : p));
+  const pick = (id, faceName) => ({ nodeId: id, faceName });
+  const facing = (A, B) => resolveFacingFaces(panels, pick(A.id, 'back'), pick(B.id, 'back'));
+  // free shelf + Top wall, in BOTH selection orders: the shelf moves, never the wall
+  [[shelf, top], [top, shelf]].forEach(([A, B], i) => {
+    const f = facing(A, B);
+    const plan = planDimension(panels, f.a, f.b);
+    assert(plan.ok && plan.mode === 'quote', `order ${i + 1}: an ordinary quote`);
+    assertEqual(plan.drivenId, shelf.id, `order ${i + 1}: the shelf is the panel that moves`);
+  });
+  // shelf already fixed by a quote from the Bottom: now the Top wall is the only solution
+  const fixed = addQuote(panels, { drivenId: shelf.id, myFace: 'front', from: front(bottom.id, 'back'), value: 200 });
+  assert(fixed.ok, 'shelf fixed 200 mm above the Bottom');
+  [[shelf, top], [top, shelf]].forEach(([A, B], i) => {
+    const f = resolveFacingFaces(fixed.panels, pick(A.id, 'back'), pick(B.id, 'back'));
+    const plan = planDimension(fixed.panels, f.a, f.b);
+    assert(plan.ok && plan.mode === 'box' && plan.plan.kind === 'wall-move', `fixed shelf, order ${i + 1}: the box wall moves instead`);
+    assertEqual(plan.plan.moveId, top.id, `fixed shelf, order ${i + 1}: it is the Top wall that moves`);
+    assert(/fixed/.test(plan.notice), 'the person is told why');
+    const target = 120;
+    assert(previewBoxDimension(fixed.panels, plan.plan, target).ok, 'the wall move is accepted by relayoutBox');
+    const offset = boxDimensionOffset(fixed.panels, plan.plan, target);
+    const moved = fixed.panels.map((p) => (p.id === top.id ? { ...p, offset } : p));
+    const rl = relayoutBox(moved, top.groupId);
+    const applied = moved.map((p) => { const patch = rl.patches.find((x) => x.id === p.id); return patch ? { ...p, width: patch.width, height: patch.height, offset: patch.offset } : p; });
+    const rs = new Map(resolveConstraints(applied).map((r) => [r.id, r]));
+    const gap = (rs.get(top.id).position.y - rs.get(top.id).thickness / 2) - (rs.get(shelf.id).position.y + rs.get(shelf.id).thickness / 2);
+    assertEqual(Math.round(gap), target, `fixed shelf, order ${i + 1}: the gap becomes ${target} mm`);
+  });
+  // a shelf whose axis is locked behaves the same way (Left wall, X axis)
+  const left = wall(nodes, 'left');
+  const fl = resolveFacingFaces(panels, pick(shelf.id, 'front'), pick(left.id, 'front'));
+  if (fl.ok) {
+    const plan = planDimension(panels, fl.a, fl.b);
+    assert(!plan.ok || plan.mode === 'box', 'locked-axis shelf: wall moves only as the fallback');
+  }
+});
+
+section('the same pair can not be dimensioned twice', () => {
+  const base = boxWithShelf();
+  const { shelf, bottom, nodes } = base;
+  const panels = base.panels.map((p) => (p.id === shelf.id ? { ...p, offset: { x: 0, y: 200, z: 0 } } : p));
+  const first = addQuote(panels, { drivenId: shelf.id, myFace: 'front', from: front(bottom.id, 'back'), value: 150 });
+  assert(first.ok, 'first dimension accepted');
+  const again = addQuote(first.panels, { drivenId: shelf.id, myFace: 'front', from: front(bottom.id, 'back'), value: 90 });
+  assert(!again.ok && again.reason === 'duplicate', 'the same quote again is refused (same direction)');
+  assert(/already have a dimension/.test(again.message) && /Esc/.test(again.message), 'and the message says how to change or delete it');
+  const swapped = addQuote(first.panels, { drivenId: bottom.id, myFace: 'back', from: front(shelf.id, 'front'), value: 150 });
+  assert(!swapped.ok, 'the reverse direction (Bottom from the shelf) is refused too');
+  const pick = (id, faceName) => ({ nodeId: id, faceName });
+  const f = resolveFacingFaces(first.panels, pick(shelf.id, 'back'), pick(bottom.id, 'back'));
+  const plan = planDimension(first.panels, f.a, f.b);
+  assert(!plan.ok && plan.reason === 'duplicate', 'planDimension reports the duplicate (no wall is moved to work around it)');
 });
 
 report();

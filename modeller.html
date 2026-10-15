@@ -282,6 +282,25 @@
     }
 
 
+    .history-btn.quotes-toggle {
+      width: auto;
+      padding: 0 10px;
+      gap: 6px;
+      margin-left: 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .history-btn.quotes-toggle.on {
+      background: #1d4ed8;
+      border-color: #1d4ed8;
+      color: #fff;
+    }
+    .history-btn.quotes-toggle.on.all {
+      background: #5b6577;
+      border-color: #5b6577;
+    }
+    .quote-overlay-passive * { pointer-events: none !important; }
+
     .history-btn.validate-btn {
 
       width: auto;
@@ -2151,6 +2170,22 @@
 
     </div>
 
+
+    <button
+      type="button"
+      class="history-btn quotes-toggle on"
+      id="toggle-quotes-btn"
+      title="Showing your dimensions"
+      aria-label="Show or hide dimensions"
+    >
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 11.5h12" />
+        <path d="M2 9.5v4" />
+        <path d="M14 9.5v4" />
+        <path d="M4.5 6.5h7" />
+      </svg>
+      <span id="quotes-mode-label">Quotes</span>
+    </button>
 
     <div class="spacer"></div>
 

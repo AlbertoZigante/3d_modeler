@@ -104,14 +104,16 @@ import {
 } from './tools/collinearTool.js';
 import { setAttachToolContext } from './tools/attachTool.js';
 import {
-  startQuoteMode, cancelQuoteMode, isQuoteActive, getQuotePending, getQuoteMessage, setQuoteValue, applyQuote, setQuoteToolContext,
+  startQuoteMode, cancelQuoteMode, isQuoteActive, getQuotePending, getQuoteMessage, setQuoteToolContext,
 } from './tools/quoteTool.js';
-import { updateQuote, removeQuote } from './engine/quotes.js';
+import {
+  updateQuote, removeQuote, setQuoteOffset, addQuote, planDimension, previewBoxDimension, boxDimensionOffset,
+} from './engine/quotes.js';
 import {
   history, createStateCommand, MovePanelCommand, MoveGroupCommand, ResizePanelCommand, ChangeMaterialCommand,
   ChangeGroupMaterialCommand, RenamePanelCommand, AddPanelCommand, DeletePanelCommand, AddBoxCommand,
   DeleteBoxCommand, GroupPanelsCommand, UngroupPanelsCommand, DeleteShelfCommand,
-  RemoveConstraintCommand, UnlinkConstraintCommand, EditQuoteCommand, HideBoxWallCommand, RestoreBoxWallCommand,
+  RemoveConstraintCommand, UnlinkConstraintCommand, EditQuoteCommand, MoveDimensionCommand, HideBoxWallCommand, RestoreBoxWallCommand,
   ChangeEdgeFitCommand, AddDoorCommand, SetDoorHingeCommand, DeleteDoorCommand,
   AddDrawerCommand, DeleteDrawerCommand, SetDrawerBoxMarginCommand,
   AddLegsCommand, AddPlinthCommand, SetPlinthHeightCommand, SetPlinthEdgeFitCommand,
@@ -327,7 +329,11 @@ document.getElementById('export-bom-pdf-btn')?.addEventListener('click', () => {
 });
 
 // ---- Scene (view layer). Consumes RESOLVED panels only. ----
-const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight, setPanelHighlightSet, setDimensions } = createModellerScene(canvas, main, {
+// Top-bar "Quotes" button state: 'user' (imposed dimensions), 'all' (also a grey
+// measured dimension for every neighbouring pair) or 'off' (hidden, still applied).
+let dimensionMode = 'user';
+
+const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight, setPanelHighlightSet, setDimensions, setDimensionHandlers, setDimensionsInteractive } = createModellerScene(canvas, main, {
   axesCanvas,
   pipCanvas,
   onPipModeClick: (mode) => switchView(mode),
@@ -576,28 +582,7 @@ const toolContext = {
 setShelfToolContext(toolContext);
 setCollinearToolContext(toolContext);
 setAttachToolContext(toolContext);
-setQuoteToolContext({
-  ...toolContext,
-  // Dimension tool, two walls of one box: move the positive-side wall,
-  // let relayoutBox() re-fit the rest (doors, drawers, plinth, legs
-  // follow inside applyRelayoutResult), ONE history step. Same
-  // validate-then-commit path as dragging a wall or typing its offset.
-  applyBoxDimension: (wallId, offset) => {
-    const wall = panels.find((p) => p.id === wallId);
-    if (!wall) return false;
-    const before = panels;
-    updateNode(wallId, { offset });
-    const result = relayoutBox(panels, wall.groupId);
-    if (!applyRelayoutResult(result)) {
-      panels = before;
-      renderAll();
-      return false;
-    }
-    recordHistoryCommand(MovePanelCommand, before, panels);
-    renderAll();
-    return true;
-  },
-});
+setQuoteToolContext(toolContext);
 setBoundaryRectToolContext(toolContext);
 setPlinthToolContext({
   ...toolContext,
@@ -1064,7 +1049,12 @@ function checkJointWarnings(resolvedPanels) {
   const { violations } = validateDesign(panels, resolvedPanels, { collisions });
   // Quote annotations are drawn here (not next to reconcile) so a
   // conflicting quote can be coloured red in the same pass.
-  setDimensions(panels, resolvedPanels, new Set(violations.filter((v) => v.type === 'quoteConflict').flatMap((v) => v.drivenIds || [])));
+  setDimensions(
+    panels,
+    resolvedPanels,
+    new Set(violations.filter((v) => v.type === 'quoteConflict').flatMap((v) => v.drivenIds || [])),
+    { mode: dimensionMode, pendingPair: getQuotePending()?.pair || null },
+  );
   const newViolations = violations.filter((v) => !knownViolationKeys.has(v.key));
   knownViolationKeys = new Set(violations.map((v) => v.key));
 
@@ -1213,11 +1203,7 @@ function renderAll() {
     onAddBox: handleAddBox,
     onAddDimension: () => (isQuoteActive() ? cancelQuoteMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startQuoteMode())),
     quoteToolActive: isQuoteActive(),
-    quotePending: getQuotePending(),
     quoteMessage: getQuoteMessage(),
-    onQuoteValueChange: setQuoteValue, // no renderAll() — same reason as the collinear gap input
-    onQuoteApply: applyQuote,
-    onQuoteCancel: cancelQuoteMode,
     onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), startCollinearMode())),
     collinearActive: isCollinearActive(),
     collinearGapMm: getCollinearGapMm(),
@@ -2087,13 +2073,12 @@ function updateSelectedDrawerFrontCount(count) {
 
 // Edits the mm of an existing quote from the Relations panel. Rejected
 // values (negative, resolver warning) leave the design untouched.
-function changeQuoteValue(constraintId, value) {
-  const selectedId = getSelectedId();
+function changeQuoteValue(constraintId, value, drivenId = getSelectedId()) {
   const before = panels;
-  const result = updateQuote(panels, selectedId, constraintId, value);
-  if (!result.ok) { showToast(result.message); renderAll(); return; }
+  const result = updateQuote(panels, drivenId, constraintId, value);
+  if (!result.ok) { showToast(result.message); renderAll(); return false; }
   panels = result.panels;
-  const violation = resolveConstraints(panels).find((r) => r.id === selectedId);
+  const violation = resolveConstraints(panels).find((r) => r.id === drivenId);
   if (violation) {
     const dims = { width: violation.width, height: violation.height, thickness: violation.thickness };
     const hitAxis = findDesignLimitViolation(violation.rotation, violation.position, dims);
@@ -2101,12 +2086,129 @@ function changeQuoteValue(constraintId, value) {
       panels = before; // out of the allowed design volume — refuse
       showDesignLimitError(hitAxis);
       renderAll();
-      return;
+      return false;
     }
   }
   recordHistoryCommand(EditQuoteCommand, before, panels);
   renderAll();
+  return true;
 }
+
+// Dimension annotations in the viewport (modeller/dimensions.js): click a
+// label to retype its value, press its x to remove it, drag it to slide
+// the dimension line out of the way (cosmetic, undoable).
+function removeQuoteById(drivenId, constraintId) {
+  const before = panels;
+  const result = removeQuote(panels, drivenId, constraintId);
+  if (!result.ok) { showToast(result.message); return; }
+  panels = result.panels;
+  recordHistoryCommand(RemoveConstraintCommand, before, panels);
+  renderAll();
+}
+
+function changeQuoteOffset(drivenId, constraintId, offsetMm) {
+  const before = panels;
+  const result = setQuoteOffset(panels, drivenId, constraintId, offsetMm);
+  if (!result.ok) return;
+  panels = result.panels;
+  recordHistoryCommand(MoveDimensionCommand, before, panels);
+  renderAll();
+}
+
+// Two walls of one box: move the positive-side wall and let relayoutBox()
+// re-fit the rest (doors, drawers, plinth, legs follow inside
+// applyRelayoutResult), ONE history step. Same validate-then-commit path as
+// dragging a wall or typing its offset.
+function applyBoxDimension(wallId, offset) {
+  const wall = panels.find((p) => p.id === wallId);
+  if (!wall) return false;
+  const before = panels;
+  updateNode(wallId, { offset });
+  const result = relayoutBox(panels, wall.groupId);
+  if (!applyRelayoutResult(result)) {
+    panels = before;
+    renderAll();
+    return false;
+  }
+  recordHistoryCommand(MovePanelCommand, before, panels);
+  renderAll();
+  return true;
+}
+
+// Imposes a planned dimension (engine/quotes.js#planDimension) at `value` mm:
+// a `distance` constraint (with the line's dragged position), or a box resize.
+function commitDimension(plan, value, offsetMm = 0) {
+  if (plan.mode === 'box') {
+    const preview = previewBoxDimension(panels, plan.plan, value);
+    if (!preview.ok) { showToast(preview.blocking); return false; }
+    const done = applyBoxDimension(plan.plan.moveId, boxDimensionOffset(panels, plan.plan, value));
+    if (done && plan.notice) showToast(plan.notice); // e.g. the panel was fixed, so a box wall moved instead
+    return done;
+  }
+  const before = panels;
+  const added = addQuote(panels, { drivenId: plan.drivenId, myFace: plan.myFace, from: plan.from, value });
+  if (!added.ok) { showToast(added.message); return false; }
+  let next = added.panels;
+  if (offsetMm) {
+    const moved = setQuoteOffset(next, plan.drivenId, added.constraint.id, offsetMm);
+    if (moved.ok) next = moved.panels;
+  }
+  updateNode(plan.drivenId, { constraints: next.find((p) => p.id === plan.drivenId).constraints });
+  recordHistoryCommand(AddConstraintCommand, before, panels);
+  renderAll();
+  return true;
+}
+
+// Viewport dimensions (modeller/dimensions.js). spec.kind is "imposed" (a
+// stored quote: retype / remove / move it) or "candidate" (a grey measured
+// value: typing a number imposes it).
+function onDimensionEdit(spec, value) {
+  if (spec.kind === 'imposed') return changeQuoteValue(spec.constraintId, value, spec.drivenId);
+  // A grey (measured) dimension only starts acting on the geometry when the
+  // person gives it a DIFFERENT value. Confirming the value it already shows
+  // changes nothing and imposes nothing.
+  if (Math.abs(value - spec.valueMm) < 0.05) {
+    showToast('Value unchanged — nothing imposed. Type a different value to apply a dimension.');
+    return true;
+  }
+  const plan = planDimension(panels, spec.faceA, spec.faceB);
+  if (!plan.ok) { showToast(plan.message); return false; }
+  const ok = commitDimension(plan, value, spec.offsetMm);
+  if (ok && isQuoteActive()) cancelQuoteMode();
+  return ok;
+}
+function onDimensionRemove(spec) {
+  if (spec.kind === 'imposed') removeQuoteById(spec.drivenId, spec.constraintId);
+}
+function onDimensionMove(spec, offsetMm) {
+  if (spec.kind === 'imposed') changeQuoteOffset(spec.drivenId, spec.constraintId, offsetMm);
+}
+setDimensionHandlers({ onEditValue: onDimensionEdit, onRemove: onDimensionRemove, onMove: onDimensionMove });
+setDimensionsInteractive(true);
+
+// Top-bar "Quotes" button cycles: user (imposed only) -> all (+ a grey
+// measured dimension for every neighbouring pair, to impose faster) -> off
+// (hidden; imposed ones stay applied, they are constraints).
+const toggleQuotesBtn = document.getElementById('toggle-quotes-btn');
+const quotesLabelEl = document.getElementById('quotes-mode-label');
+const QUOTE_MODES = {
+  user: { next: 'all', label: 'Quotes', title: 'Showing your dimensions — click to also show every measurable distance (grey) so you can impose them faster' },
+  all: { next: 'off', label: 'Quotes: all', title: 'Showing all distances: grey = measured only, black = imposed by you. Click to hide dimensions' },
+  off: { next: 'user', label: 'Quotes: off', title: 'Dimensions hidden (imposed ones stay applied) — click to show them' },
+};
+function syncQuotesButton() {
+  const m = QUOTE_MODES[dimensionMode];
+  toggleQuotesBtn?.classList.toggle('on', dimensionMode !== 'off');
+  toggleQuotesBtn?.classList.toggle('all', dimensionMode === 'all');
+  toggleQuotesBtn?.setAttribute('title', m.title);
+  if (quotesLabelEl) quotesLabelEl.textContent = m.label;
+}
+toggleQuotesBtn?.addEventListener('click', () => {
+  dimensionMode = QUOTE_MODES[dimensionMode].next;
+  syncQuotesButton();
+  renderAll();
+});
+syncQuotesButton();
 
 // identifier is either a FIELD NAME (soft "Unlink" — mark the active
 // constraint on that field overridden, keep its definition) or a

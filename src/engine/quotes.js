@@ -30,7 +30,7 @@ import { resolveConstraints } from '../modeller/snap.js';
 import { detectJoints } from './joints.js';
 import { findQuoteConflicts } from './quoteConflicts.js';
 import { relayoutBox } from '../features/box.js';
-import { getAlignedAxis, getPanelOwnership, nextConstraintId, FACE_TO_DIM_FIELD, LOCAL_FACES } from '../modeller/modules.js';
+import { getAlignedAxis, getPanelOwnership, nextConstraintId, FIELD_TO_AXIS, FACE_TO_DIM_FIELD, LOCAL_FACES } from '../modeller/modules.js';
 
 const AXIS_TO_POSITION_FIELD = { x: 'positionX', y: 'positionY', z: 'positionZ' };
 
@@ -158,6 +158,16 @@ export function addQuote(panels, spec) {
   }
   const axis = aAnchor.axis;
 
+  // The same pair can't be dimensioned twice along one axis — in either
+  // direction (A from B, or B from A). Re-picking it is how a person
+  // reaches the existing dimension, so say where it is.
+  const sameFieldAxis = (c) => c.type === 'distance' && !c.overridden && FIELD_TO_AXIS[c.field] === axis;
+  const already = (driven.constraints || []).some((c) => sameFieldAxis(c) && c.from?.node === anchor.id)
+    || (anchor.constraints || []).some((c) => sameFieldAxis(c) && c.from?.node === driven.id);
+  if (already) {
+    return fail('duplicate', `${nameOf(driven)} and ${nameOf(anchor)} already have a dimension along ${axis.toUpperCase()}. Click its value to change it, or click its line and press Esc to delete it.`);
+  }
+
   const drivable = canBeDriven(driven, axis);
   if (!drivable.ok) return drivable;
 
@@ -203,6 +213,19 @@ export function updateQuote(panels, drivenId, constraintId, value) {
   const driven = next.find((p) => p.id === drivenId);
   const { ownership } = getPanelOwnership(driven);
   if (ownership === 'system') return fail('system-owned', `${nameOf(driven)} is managed by the system.`);
+  return { ok: true, panels: next };
+}
+
+/**
+ * Stores where the person dragged a dimension line: a shift (mm) along
+ * the line's perpendicular direction, relative to its automatic position
+ * just outside the panels. Cosmetic only — never moves a panel.
+ */
+export function setQuoteOffset(panels, drivenId, constraintId, offsetMm) {
+  if (!Number.isFinite(offsetMm)) return fail('bad-value', 'Invalid dimension position.');
+  const next = replaceConstraint(panels, drivenId, constraintId,
+    (list) => list.map((c) => (c.id === constraintId ? { ...c, dimOffsetMm: offsetMm } : c)));
+  if (!next) return fail('not-a-quote', 'Quote not found.');
   return { ok: true, panels: next };
 }
 
@@ -289,8 +312,8 @@ export function planBoxDimension(panels, a, b) {
   const stay = moveIsB ? na : nb;
   const measuredMm = (resolvedFacePoint(rb, b.faceName, axis) - resolvedFacePoint(ra, a.faceName, axis)) * alA.sign;
   return {
-    ok: true, groupId: na.groupId, axis, label: BOX_AXIS_LABEL[axis],
-    moveId: mover.id, anchorId: stay.id, measuredMm,
+    ok: true, kind: 'box', groupId: na.groupId, axis, label: BOX_AXIS_LABEL[axis],
+    moveId: mover.id, anchorId: stay.id, measuredMm, moveSign: 1,
     moveName: nameOf(mover), anchorName: nameOf(stay),
   };
 }
@@ -298,7 +321,8 @@ export function planBoxDimension(panels, a, b) {
 /** The new offset of the moving wall for a requested interior distance. */
 export function boxDimensionOffset(panels, plan, valueMm) {
   const mover = panels.find((p) => p.id === plan.moveId);
-  return { ...mover.offset, [plan.axis]: mover.offset[plan.axis] + (valueMm - plan.measuredMm) };
+  // moveSign +1: the moving wall is on the positive side (growing the gap moves it up the axis); -1: the opposite.
+  return { ...mover.offset, [plan.axis]: mover.offset[plan.axis] + (plan.moveSign ?? 1) * (valueMm - plan.measuredMm) };
 }
 
 const RELAYOUT_REASONS = {
@@ -307,8 +331,10 @@ const RELAYOUT_REASONS = {
 
 /** Dry run of a box dimension: same shape as previewQuote's result. */
 export function previewBoxDimension(panels, plan, valueMm) {
-  if (!(typeof valueMm === 'number' && Number.isFinite(valueMm) && valueMm > 0)) {
-    return { ok: false, blocking: 'The interior distance must be greater than 0 mm.', conflicts: [] };
+  // A box interior must stay > 0; a wall moved to meet a fixed panel may touch it (0).
+  const minOk = plan.kind === 'wall-move' ? valueMm >= 0 : valueMm > 0;
+  if (!(typeof valueMm === 'number' && Number.isFinite(valueMm) && minOk)) {
+    return { ok: false, blocking: plan.kind === 'wall-move' ? 'The distance must be 0 mm or more.' : 'The interior distance must be greater than 0 mm.', conflicts: [] };
   }
   const offset = boxDimensionOffset(panels, plan, valueMm);
   const candidate = panels.map((p) => (p.id === plan.moveId ? { ...p, offset } : p));
@@ -325,4 +351,84 @@ export function previewBoxDimension(panels, plan, valueMm) {
     blocking = `${x} and ${y} would end up too close together.`;
   }
   return { ok: false, blocking: blocking || "The box can't be resized to that value.", conflicts: [] };
+}
+
+/**
+ * ONE entry point for "dimension this pair of facing faces", used by the
+ * Dimension tool and by every dimension drawn in the viewport (a grey
+ * measured one becomes an imposed one through here).
+ *
+ * @param {{nodeId, faceName}} a  facing faces (see resolveFacingFaces)
+ * @param {{nodeId, faceName}} b
+ * @returns {{ok:true, mode:'box', plan, measuredMm}
+ *          |{ok:true, mode:'quote', drivenId, myFace, from, measuredMm}
+ *          |{ok:false, message}}
+ *   mode "box":   two walls of one box -> resize the box interior (planBoxDimension)
+ *   mode "quote": an ordinary `distance` constraint on whichever panel may move.
+ *                 The panel allowed to move is the driven one; if both could,
+ *                 the FIRST (a) is the fixed reference.
+ */
+export function planDimension(panels, a, b) {
+  const box = planBoxDimension(panels, a, b);
+  if (box) return { ok: true, mode: 'box', plan: box, measuredMm: box.measuredMm };
+
+  const attempts = [
+    { driven: b, anchor: a },
+    { driven: a, anchor: b },
+  ].map(({ driven, anchor }) => {
+    const gap = measureGap(panels, driven.nodeId, driven.faceName, { node: anchor.nodeId, face: anchor.faceName });
+    if (gap === null) return { ok: false, notFacing: true };
+    const value = Math.max(0, Math.round(gap * 10) / 10);
+    const r = addQuote(panels, {
+      drivenId: driven.nodeId, myFace: driven.faceName,
+      from: { node: anchor.nodeId, face: anchor.faceName }, value,
+    });
+    return { ...r, driven, anchor, gap };
+  });
+  const chosen = attempts.find((x) => x.ok);
+  if (chosen) {
+    return {
+      ok: true, mode: 'quote', drivenId: chosen.driven.nodeId, myFace: chosen.driven.faceName,
+      from: { node: chosen.anchor.nodeId, face: chosen.anchor.faceName }, measuredMm: chosen.gap,
+    };
+  }
+  // Last resort. A box wall is NEVER moved just because it was clicked: the
+  // other panel moves (above). Only when that panel cannot — its position is
+  // already fixed by another relation, or its axis is locked — is the wall
+  // moved instead, which resizes the box (relayoutBox re-fits the rest).
+  const nodeOf = (id) => panels.find((p) => p.id === id);
+  const sides = [{ wall: a, other: b }, { wall: b, other: a }];
+  const side = sides.find(({ wall, other }) => nodeOf(wall.nodeId)?.isBoxWall && !nodeOf(other.nodeId)?.isBoxWall);
+  if (side) {
+    const wallNode = nodeOf(side.wall.nodeId);
+    const otherNode = nodeOf(side.other.nodeId);
+    const otherFailure = attempts.find((x) => x.driven?.nodeId === side.other.nodeId);
+    const movable = ['axis-locked', 'already-driven'].includes(otherFailure?.reason);
+    const resolved = new Map(resolveConstraints(panels).map((r) => [r.id, r]));
+    const rw = resolved.get(wallNode.id);
+    const ro = resolved.get(otherNode.id);
+    const al = getAlignedAxis(rw.rotation, side.wall.faceName);
+    // The wall can only be moved along its own thickness axis (that is what resizes the box).
+    if (movable && al && al.axis === wallNode.thicknessAxis) {
+      const axis = al.axis;
+      const gap = measureGap(panels, side.other.nodeId, side.other.faceName, { node: side.wall.nodeId, face: side.wall.faceName });
+      const wallAbove = rw.position[axis] >= ro.position[axis];
+      const mg = wallAbove
+        ? measureGap(panels, side.wall.nodeId, side.wall.faceName, { node: side.other.nodeId, face: side.other.faceName })
+        : gap;
+      if (mg !== null && mg >= 0) {
+        return {
+          ok: true, mode: 'box', measuredMm: mg,
+          notice: `${nameOf(otherNode)} is fixed, so the box wall ${nameOf(wallNode)} moves instead (the box is resized).`,
+          plan: {
+            ok: true, kind: 'wall-move', groupId: wallNode.groupId, axis, label: 'distance',
+            moveId: wallNode.id, anchorId: otherNode.id, measuredMm: mg, moveSign: wallAbove ? 1 : -1,
+            moveName: nameOf(wallNode), anchorName: nameOf(otherNode),
+          },
+        };
+      }
+    }
+  }
+  const why = attempts.find((x) => !x.notFacing);
+  return { ok: false, reason: why?.reason || 'not-facing', message: why?.message || "Can't dimension that pair of panels." };
 }
