@@ -1,0 +1,894 @@
+diff --git a/modeller.html b/modeller.html
+index 9668ca6..f396a9b 100644
+--- a/modeller.html
++++ b/modeller.html
+@@ -295,10 +295,6 @@
+       border-color: #1d4ed8;
+       color: #fff;
+     }
+-    .history-btn.quotes-toggle.on.all {
+-      background: #5b6577;
+-      border-color: #5b6577;
+-    }
+     .quote-overlay-passive * { pointer-events: none !important; }
+ 
+     .history-btn.validate-btn {
+@@ -2175,7 +2171,7 @@
+       type="button"
+       class="history-btn quotes-toggle on"
+       id="toggle-quotes-btn"
+-      title="Showing your dimensions"
++      title="Grey = measured, black = imposed, red = conflict"
+       aria-label="Show or hide dimensions"
+     >
+       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+diff --git a/src/engine/quotes.js b/src/engine/quotes.js
+index dbf8b72..bb82449 100644
+--- a/src/engine/quotes.js
++++ b/src/engine/quotes.js
+@@ -30,7 +30,7 @@ import { resolveConstraints } from '../modeller/snap.js';
+ import { detectJoints } from './joints.js';
+ import { findQuoteConflicts } from './quoteConflicts.js';
+ import { relayoutBox } from '../features/box.js';
+-import { getAlignedAxis, getPanelOwnership, nextConstraintId, FIELD_TO_AXIS, FACE_TO_DIM_FIELD, LOCAL_FACES } from '../modeller/modules.js';
++import { getAlignedAxis, getPanelOwnership, nextConstraintId, FIELD_TO_AXIS, FACE_TO_DIM_FIELD, LOCAL_FACES, computeWorldHalfExtents } from '../modeller/modules.js';
+ 
+ const AXIS_TO_POSITION_FIELD = { x: 'positionX', y: 'positionY', z: 'positionZ' };
+ 
+@@ -260,15 +260,25 @@ export function removeQuote(panels, drivenId, constraintId) {
+  */
+ export function previewQuote(panels, spec) {
+   const added = addQuote(panels, spec);
+-  if (!added.ok) return { ok: false, blocking: added.message, conflicts: [] };
++  if (!added.ok) return { ok: false, blocking: added.message, conflicts: [], conflictIds: [] };
++  return { ...newConflicts(panels, added.panels), ok: true };
++}
+ 
++/**
++ * Conflicts that `next` has and `prev` did not (same audit as the red lines
++ * in the viewport). `conflictIds` = ids of the quoted panels involved, used
++ * to flash the quotes in the way in red.
++ */
++export function newConflicts(prev, next) {
+   const audit = (list) => {
+     const resolved = resolveConstraints(list);
+     return findQuoteConflicts(list, resolved, { collisions: detectJoints(resolved).collisions });
+   };
+-  const known = new Set(audit(panels).map((v) => v.key));
+-  const fresh = audit(added.panels).filter((v) => !known.has(v.key));
+-  return { ok: true, conflicts: fresh.map((v) => v.message) };
++  const known = new Set(audit(prev).map((v) => v.key));
++  const fresh = audit(next).filter((v) => !known.has(v.key));
++  const ids = new Set();
++  fresh.forEach((v) => [...(v.drivenIds || []), ...(v.panelIds || [])].forEach((id) => ids.add(id)));
++  return { conflicts: fresh.map((v) => v.message), conflictIds: [...ids] };
+ }
+ 
+ // ---------------------------------------------------------------
+@@ -310,7 +320,11 @@ export function planBoxDimension(panels, a, b) {
+   const moveIsB = rb.position[axis] >= ra.position[axis];
+   const mover = moveIsB ? nb : na;
+   const stay = moveIsB ? na : nb;
+-  const measuredMm = (resolvedFacePoint(rb, b.faceName, axis) - resolvedFacePoint(ra, a.faceName, axis)) * alA.sign;
++  // OUTSIDE-to-OUTSIDE: the box's overall size (the inner space is what is left
++  // between the walls' inner faces, which is where shelves go).
++  const half = (r) => computeWorldHalfExtents(r)[axis];
++  const [lowR, upR] = rb.position[axis] >= ra.position[axis] ? [ra, rb] : [rb, ra];
++  const measuredMm = (upR.position[axis] + half(upR)) - (lowR.position[axis] - half(lowR));
+   return {
+     ok: true, kind: 'box', groupId: na.groupId, axis, label: BOX_AXIS_LABEL[axis],
+     moveId: mover.id, anchorId: stay.id, measuredMm, moveSign: 1,
+diff --git a/src/features/door.js b/src/features/door.js
+index ed45265..6f8807a 100644
+--- a/src/features/door.js
++++ b/src/features/door.js
+@@ -216,7 +216,25 @@ export function computeDoorOpenTransform(door) {
+   position[horizontalAxis] = hingeCoord; // the hinge edge itself never moves
+   position[door.normalAxis] = door.position[door.normalAxis] + doorSign * halfWidth; // swings outward, away from the box, by its own half-width
+ 
+-  return { rotation: ROTATION_FOR_NORMAL_AXIS[horizontalAxis], position };
++  // Opening = rotating the CLOSED door about the vertical line through its
++  // hinge, by +90° or -90° about world Y, whichever carries the free edge
++  // (the one opposite the hinge, where the handle sits) from its closed
++  // direction onto doorSign * normalAxis (outward). Which of the two it is
++  // depends on the hinge side, so one fixed rotation for both hinges swung
++  // a left-hinged door mirrored: the handle ended up at the hinge end and on
++  // the wrong face. Rotating the door's own closed orientation keeps the
++  // handle (a child of the door mesh) exactly where it was on the door.
++  const closed = ROTATION_FOR_NORMAL_AXIS[door.normalAxis];
++  const free = { x: 0, z: 0 };
++  free[horizontalAxis] = door.hinge === 'right' ? -1 : 1; // from the hinge toward the free edge, closed
++  const out = { x: 0, z: 0 };
++  out[door.normalAxis] = doorSign;
++  const rotatedBy90 = { x: free.z, z: -free.x }; // world-Y +90° applied to `free`: (x, z) -> (z, -x)
++  const angle = rotatedBy90.x === out.x && rotatedBy90.z === out.z ? 90 : -90;
++  const y = ((((closed.y || 0) + angle) + 540) % 360) - 180;
++  const rotation = { x: closed.x || 0, y, z: closed.z || 0 };
++
++  return { rotation, position };
+ }
+ 
+ // Whether `node`'s given dimField is governed by an ACTIVE spansBetween
+diff --git a/src/modeller-main.js b/src/modeller-main.js
+index fd1525d..b5b17ff 100644
+--- a/src/modeller-main.js
++++ b/src/modeller-main.js
+@@ -38,6 +38,9 @@ import {
+   MATERIAL_CATALOG,
+   loadMaterialCatalog,
+   getDisplayName,
++  computeWorldHalfExtents,
++  FLOOR_MM,
++  FIELD_TO_AXIS,
+ } from './modeller/modules.js';
+ import { resolveConstraints } from './modeller/snap.js';
+ import { createModellerScene } from './modeller/scene.js';
+@@ -107,7 +110,7 @@ import {
+   startQuoteMode, cancelQuoteMode, isQuoteActive, getQuotePending, getQuoteMessage, setQuoteToolContext,
+ } from './tools/quoteTool.js';
+ import {
+-  updateQuote, removeQuote, setQuoteOffset, addQuote, planDimension, previewBoxDimension, boxDimensionOffset,
++  updateQuote, removeQuote, setQuoteOffset, addQuote, newConflicts, planDimension, previewBoxDimension, boxDimensionOffset,
+ } from './engine/quotes.js';
+ import {
+   history, createStateCommand, MovePanelCommand, MoveGroupCommand, ResizePanelCommand, ChangeMaterialCommand,
+@@ -329,9 +332,71 @@ document.getElementById('export-bom-pdf-btn')?.addEventListener('click', () => {
+ });
+ 
+ // ---- Scene (view layer). Consumes RESOLVED panels only. ----
+-// Top-bar "Quotes" button state: 'user' (imposed dimensions), 'all' (also a grey
+-// measured dimension for every neighbouring pair) or 'off' (hidden, still applied).
++// Top-bar "Quotes" button state: 'all' (grey = measured main distances not
++// imposed, black = imposed by the user, red = conflicts) or 'off' (hidden,
++// imposed ones stay applied).
+ let dimensionMode = 'user';
++// Quoted panels flashed red because a refused quote clashes with them.
++let quoteAlertIds = new Set();
++let quoteAlertTimer = null;
++function flashQuoteAlert(ids) {
++  quoteAlertIds = new Set(ids);
++  clearTimeout(quoteAlertTimer);
++  quoteAlertTimer = setTimeout(() => { quoteAlertIds = new Set(); renderAll(); }, 6000);
++}
++function clearQuoteAlert() {
++  clearTimeout(quoteAlertTimer);
++  quoteAlertIds = new Set();
++}
++
++// ---- Live dependents while dragging ------------------------------
++// A drag only patches the dragged node (cheap, once per pointer move), so a
++// panel DERIVED from it — a shelf spanning between two shelves, a quote
++// anchored to it — used to stay stale until the drag ended. When anything
++// else depends on the moving panel(s), redraw (at most once per frame).
++let liveRenderQueued = false;
++function hasDependents(ids) {
++  const set = new Set(ids);
++  return panels.some((p) => !set.has(p.id)
++    && (p.constraints || []).some((c) => !c.overridden && (set.has(c.from?.node) || set.has(c.to?.node))));
++}
++function queueLiveRender() {
++  if (liveRenderQueued) return;
++  liveRenderQueued = true;
++  requestAnimationFrame(() => { liveRenderQueued = false; renderAll(); });
++}
++
++// ---- QUOTE GUARD -------------------------------------------------
++// Quotes outrank moving/scaling: a quoted panel follows the panel it is
++// quoted to (the resolver keeps the distance), but any move/resize that would
++// break a quote — or that tries to move a panel along an axis a quote fixes —
++// is refused, the quotes involved flash red and a flag explains why.
++function hasActiveQuotes(list) {
++  return list.some((p) => (p.constraints || []).some((c) => c.type === 'distance' && !c.overridden));
++}
++/** New quote conflicts caused by going from `prev` to `panels`, or null. */
++function quoteClash(prev) {
++  if (!hasActiveQuotes(panels)) return null;
++  const clash = newConflicts(prev, panels);
++  return clash.conflicts.length ? clash : null;
++}
++function refuseForQuote(clash, what) {
++  flashQuoteAlert(clash.conflictIds);
++  showToast(`${what} — blocked by a quote (shown in red): ${clash.conflicts[0]}`);
++}
++/** The active quote that fixes `node` along `axis`, if any. */
++function quoteHoldingAxis(node, axis) {
++  return (node.constraints || []).find((c) => c.type === 'distance' && !c.overridden && FIELD_TO_AXIS[c.field] === axis) || null;
++}
++function refuseQuotedAxis(node, axis, c) {
++  const anchor = panels.find((p) => p.id === c.from?.node);
++  flashQuoteAlert([node.id]);
++  showToast(`${node.name || node.id} can't move along ${axis.toUpperCase()} — a quote fixes it ${c.value} mm from ${anchor?.name || 'another panel'}. Edit or remove the quote first.`);
++}
++function resolvedMeshPos(id) {
++  const r = resolveConstraints(panels).find((x) => x.id === id);
++  return { x: r.position.x * MM_TO_UNIT, y: r.position.y * MM_TO_UNIT, z: r.position.z * MM_TO_UNIT };
++}
+ 
+ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight, setPanelHighlightSet, setDimensions, setDimensionHandlers, setDimensionsInteractive } = createModellerScene(canvas, main, {
+   axesCanvas,
+@@ -358,17 +423,26 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
+     // -----------------------------------------------------------
+     if (node.isBoxWall) {
+       const priorOffset = node.offset;
++      const beforePanels = panels;
+       updateNode(nodeId, { offset: transform.offset, rotation: transform.rotation });
+ 
+       const result = relayoutBox(panels, node.groupId);
++      const priorPos = {
++        x: (node.basePosition.x + priorOffset.x) * MM_TO_UNIT,
++        y: (node.basePosition.y + priorOffset.y) * MM_TO_UNIT,
++        z: (node.basePosition.z + priorOffset.z) * MM_TO_UNIT,
++      };
+       if (!applyRelayoutResult(result)) {
+         updateNode(nodeId, { offset: priorOffset });
+         renderAll();
+-        return {
+-          x: (node.basePosition.x + priorOffset.x) * MM_TO_UNIT,
+-          y: (node.basePosition.y + priorOffset.y) * MM_TO_UNIT,
+-          z: (node.basePosition.z + priorOffset.z) * MM_TO_UNIT,
+-        };
++        return priorPos;
++      }
++      const clash = quoteClash(beforePanels);
++      if (clash) {
++        panels = beforePanels;
++        refuseForQuote(clash, `Can't move ${node.name || 'this wall'}`);
++        renderAll();
++        return priorPos;
+       }
+ 
+       renderAll(); // the other 5 walls all just changed — full reconcile, not just this node
+@@ -392,7 +466,23 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
+       }
+     }
+ 
++    for (const axis of ['x', 'y', 'z']) {
++      const held = quoteHoldingAxis(node, axis);
++      if (held && Math.abs(clampedOffset[axis] - node.offset[axis]) > 0.01) {
++        refuseQuotedAxis(node, axis, held);
++        renderAll();
++        return resolvedMeshPos(nodeId);
++      }
++    }
++    const beforeMove = panels;
+     updateNode(nodeId, { offset: clampedOffset, rotation: transform.rotation });
++    const moveClash = quoteClash(beforeMove);
++    if (moveClash) {
++      panels = beforeMove;
++      refuseForQuote(moveClash, `Can't move ${node.name || 'this panel'}`);
++      renderAll();
++      return resolvedMeshPos(nodeId);
++    }
+ 
+     // A shelf (or any other panel) can be one of a door's 4 boundary
+     // panels (see features/door.js#createDoorNode's boundaryIds) — if
+@@ -412,8 +502,9 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
+ 
+     if (doorsChanged) {
+       renderAll(); // more than just this node changed — full reconcile, not just the inspector
+-    } else if (nodeId === getSelectedId()) {
+-      renderInspectorOnly();
++    } else {
++      if (nodeId === getSelectedId()) renderInspectorOnly();
++      if (hasDependents([nodeId])) queueLiveRender(); // shelves/quotes derived from this panel follow it live
+     }
+     if (hitAxis) {
+       showDesignLimitError(hitAxis);
+@@ -462,6 +553,8 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
+       };
+     });
+ 
++    if (hasDependents(nodeIds)) queueLiveRender();
++
+     if (hitAxis) {
+       showDesignLimitError(hitAxis);
+       return clampedDeltaMm; // tells gizmos.js/view2d.js to snap the live meshes back to this clamped value
+@@ -543,6 +636,13 @@ function applyDimensionChange(nodeId, dims, offsetDeltaMm) {
+   }
+   const before = panels;
+   updateNode(nodeId, { width: dims.width, height: dims.height, thickness: dims.thickness, offset: proposedOffset });
++  const resizeClash = quoteClash(before);
++  if (resizeClash) {
++    panels = before;
++    refuseForQuote(resizeClash, `Can't resize ${current.name || 'this panel'}`);
++    renderAll();
++    return false;
++  }
+ 
+   // Same reasoning as onTransformChange's door catch-up above — a
+   // resize (this handler backs the resize-handle drag, mostly shelves;
+@@ -697,6 +797,29 @@ function handleDrawerConfirmed(placement) {
+ // the returned patches on success. Used at every box-wall
+ // move/resize/material call site below so that behavior — and
+ // wording — stays identical across all four.
++// The lowest point of every box must stay on the floor (FLOOR_MM) — or, when the
++// box has a plinth / legs, THEY are the lowest part and stand on the floor.
++// Quotes and box-wall dimensions can move a wall (e.g. the Bottom) and leave
++// the box floating or sunk: shift the whole group back so it rests on the floor.
++function groundBoxes() {
++  const groupIds = new Set(panels.filter((p) => p.isBoxWall && p.groupId).map((p) => p.groupId));
++  groupIds.forEach((groupId) => {
++    // Flags (isBoxWall / isPlinthPanel / isLeg) live on the RAW nodes only —
++    // the resolved copies don't carry them.
++    const rawById = new Map(panels.filter((p) => p.groupId === groupId).map((p) => [p.id, p]));
++    const resolved = resolveConstraints(panels).filter((r) => rawById.has(r.id));
++    const support = resolved.filter((r) => rawById.get(r.id).isPlinthPanel || rawById.get(r.id).isLeg);
++    const base = support.length ? support : resolved.filter((r) => rawById.get(r.id).isBoxWall && /bottom/i.test(r.name || ''));
++    if (!base.length) return;
++    const lowest = Math.min(...base.map((r) => r.position.y - computeWorldHalfExtents(r).y));
++    const dy = lowest - FLOOR_MM;
++    if (Math.abs(dy) < 0.01) return;
++    panels = panels.map((p) => (p.groupId === groupId && p.basePosition
++      ? { ...p, basePosition: { ...p.basePosition, y: p.basePosition.y - dy } }
++      : p));
++  });
++}
++
+ function applyRelayoutResult(result) {
+   if (!result.ok) {
+     if (result.hitAxis) {
+@@ -707,7 +830,15 @@ function applyRelayoutResult(result) {
+       showPanelSizeLimitError(result.reason.split(':')[1]);
+     } else if (result.reason?.startsWith('min-gap:')) {
+       const [a, b] = result.reason.slice('min-gap:'.length).split('/');
+-      showToast(`Can't fit — ${a} and ${b} would be closer than ${MIN_WALL_GAP_MM}mm`);
++      const quoted = panels.filter((p) => [a, b].includes(p.name)
++        && ((p.constraints || []).some((c) => c.type === 'distance' && !c.overridden)
++          || panels.some((o) => (o.constraints || []).some((c) => c.type === 'distance' && !c.overridden && c.from?.node === p.id))));
++      if (quoted.length) {
++        flashQuoteAlert(quoted.map((p) => p.id));
++        showToast(`Can't fit — ${a} and ${b} would be closer than ${MIN_WALL_GAP_MM}mm. A quote keeps ${quoted.map((p) => p.name).join(' / ')} at its distance (shown in red), so the move is blocked.`);
++      } else {
++        showToast(`Can't fit — ${a} and ${b} would be closer than ${MIN_WALL_GAP_MM}mm`);
++      }
+     }
+     return false;
+   }
+@@ -1052,7 +1183,7 @@ function checkJointWarnings(resolvedPanels) {
+   setDimensions(
+     panels,
+     resolvedPanels,
+-    new Set(violations.filter((v) => v.type === 'quoteConflict').flatMap((v) => v.drivenIds || [])),
++    new Set([...violations.filter((v) => v.type === 'quoteConflict').flatMap((v) => v.drivenIds || []), ...quoteAlertIds]),
+     { mode: dimensionMode, pendingPair: getQuotePending()?.pair || null },
+   );
+   const newViolations = violations.filter((v) => !knownViolationKeys.has(v.key));
+@@ -1081,7 +1212,22 @@ function checkJointWarnings(resolvedPanels) {
+   showToast(parts.join('  •  '));
+ }
+ 
++// An exception in any part of the render (panel list, inspector...) must not
++// leave the viewport and the quote lines stale until the next click: report it
++// and still refresh the quotes.
+ function renderAll() {
++  try {
++    renderAllInner();
++  } catch (err) {
++    console.error('renderAll failed:', err);
++    showToast(`Internal error while redrawing: ${err?.message || err}`);
++    try {
++      setDimensions(panels, resolveConstraints(panels), new Set(quoteAlertIds), { mode: dimensionMode, pendingPair: getQuotePending()?.pair || null });
++    } catch (err2) { console.error(err2); }
++  }
++}
++
++function renderAllInner() {
+   const selectedId = getSelectedId();
+   const selectedGroupId = getSelectedGroupId();
+   const selectedBoxWallId = selectedId && panels.find((p) => p.id === selectedId)?.isBoxWall ? selectedId : null;
+@@ -1201,7 +1347,7 @@ function renderAll() {
+     onAddHorizontal: addHorizontalPanel,
+     onAddParallel: addParallelPanel,
+     onAddBox: handleAddBox,
+-    onAddDimension: () => (isQuoteActive() ? cancelQuoteMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startQuoteMode())),
++    onAddDimension: () => (isQuoteActive() ? cancelQuoteMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), showQuotes(), startQuoteMode())),
+     quoteToolActive: isQuoteActive(),
+     quoteMessage: getQuoteMessage(),
+     onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), startCollinearMode())),
+@@ -1571,6 +1717,13 @@ function updateSelectedTransformField(group, axis, value) {
+       renderAll();
+       return;
+     }
++    const wallClash = quoteClash(before);
++    if (wallClash) {
++      panels = before;
++      refuseForQuote(wallClash, `Can't move ${node.name || 'this wall'}`);
++      renderAll();
++      return;
++    }
+ 
+     const after = panels;
+     recordHistoryCommand(MovePanelCommand, before, after);
+@@ -1588,7 +1741,18 @@ function updateSelectedTransformField(group, axis, value) {
+     }
+   }
+   const before = panels;
++  if (group === 'offset') {
++    const held = quoteHoldingAxis(node, axis);
++    if (held) { refuseQuotedAxis(node, axis, held); renderAll(); return; }
++  }
+   updateNode(selectedId, { [group]: { ...node[group], [axis]: value } });
++  const fieldClash = quoteClash(before);
++  if (fieldClash) {
++    panels = before;
++    refuseForQuote(fieldClash, `Can't change ${node.name || 'this panel'}`);
++    renderAll();
++    return;
++  }
+   const after = panels;
+   recordHistoryCommand(MovePanelCommand, before, after);
+   renderAll();
+@@ -2077,7 +2241,16 @@ function changeQuoteValue(constraintId, value, drivenId = getSelectedId()) {
+   const before = panels;
+   const result = updateQuote(panels, drivenId, constraintId, value);
+   if (!result.ok) { showToast(result.message); renderAll(); return false; }
++  const clash = newConflicts(before, result.panels);
++  if (clash.conflicts.length) {
++    flashQuoteAlert(clash.conflictIds);
++    showToast(`Value refused — it conflicts with other quotes (shown in red): ${clash.conflicts[0]}`);
++    renderAll();
++    return false;
++  }
++  clearQuoteAlert();
+   panels = result.panels;
++  groundBoxes();
+   const violation = resolveConstraints(panels).find((r) => r.id === drivenId);
+   if (violation) {
+     const dims = { width: violation.width, height: violation.height, thickness: violation.thickness };
+@@ -2119,7 +2292,7 @@ function changeQuoteOffset(drivenId, constraintId, offsetMm) {
+ // re-fit the rest (doors, drawers, plinth, legs follow inside
+ // applyRelayoutResult), ONE history step. Same validate-then-commit path as
+ // dragging a wall or typing its offset.
+-function applyBoxDimension(wallId, offset) {
++function applyBoxDimension(wallId, offset, remember = null) {
+   const wall = panels.find((p) => p.id === wallId);
+   if (!wall) return false;
+   const before = panels;
+@@ -2130,6 +2303,22 @@ function applyBoxDimension(wallId, offset) {
+     renderAll();
+     return false;
+   }
++  const boxClash = quoteClash(before);
++  if (boxClash) {
++    panels = before;
++    refuseForQuote(boxClash, "Can't resize the box that way");
++    renderAll();
++    return false;
++  }
++  groundBoxes();
++  if (remember) {
++    // Keep the dimension on screen: the wall that stayed put remembers it.
++    const holder = panels.find((p) => p.id === remember.holderId);
++    if (holder) {
++      const kept = holder.boxDims?.[remember.axis];
++      updateNode(holder.id, { boxDims: { ...(holder.boxDims || {}), [remember.axis]: { otherId: remember.otherId, offsetMm: kept?.offsetMm ?? remember.offsetMm ?? 0 } } });
++    }
++  }
+   recordHistoryCommand(MovePanelCommand, before, panels);
+   renderAll();
+   return true;
+@@ -2141,19 +2330,32 @@ function commitDimension(plan, value, offsetMm = 0) {
+   if (plan.mode === 'box') {
+     const preview = previewBoxDimension(panels, plan.plan, value);
+     if (!preview.ok) { showToast(preview.blocking); return false; }
+-    const done = applyBoxDimension(plan.plan.moveId, boxDimensionOffset(panels, plan.plan, value));
++    const done = applyBoxDimension(plan.plan.moveId, boxDimensionOffset(panels, plan.plan, value), {
++      holderId: plan.plan.anchorId, otherId: plan.plan.moveId, axis: plan.plan.axis, offsetMm,
++    });
+     if (done && plan.notice) showToast(plan.notice); // e.g. the panel was fixed, so a box wall moved instead
+     return done;
+   }
+   const before = panels;
+   const added = addQuote(panels, { drivenId: plan.drivenId, myFace: plan.myFace, from: plan.from, value });
+   if (!added.ok) { showToast(added.message); return false; }
++  // A quote that contradicts others is NOT applied: the quotes in its way
++  // are shown in red instead.
++  const clash = newConflicts(panels, added.panels);
++  if (clash.conflicts.length) {
++    flashQuoteAlert(clash.conflictIds);
++    showToast(`Quote refused — it conflicts with other quotes (shown in red): ${clash.conflicts[0]}`);
++    renderAll();
++    return false;
++  }
++  clearQuoteAlert();
+   let next = added.panels;
+   if (offsetMm) {
+     const moved = setQuoteOffset(next, plan.drivenId, added.constraint.id, offsetMm);
+     if (moved.ok) next = moved.panels;
+   }
+   updateNode(plan.drivenId, { constraints: next.find((p) => p.id === plan.drivenId).constraints });
++  groundBoxes();
+   recordHistoryCommand(AddConstraintCommand, before, panels);
+   renderAll();
+   return true;
+@@ -2175,31 +2377,63 @@ function onDimensionEdit(spec, value) {
+   if (!plan.ok) { showToast(plan.message); return false; }
+   const ok = commitDimension(plan, value, spec.offsetMm);
+   if (ok && isQuoteActive()) cancelQuoteMode();
++  // Belt and braces: redraw once more after the input/focus events that follow
++  // the Enter key have settled, so the new quote and the moved panel show now.
++  if (ok) requestAnimationFrame(() => renderAll());
+   return ok;
+ }
++function setBoxDimEntry(spec, patch) {
++  const holder = panels.find((p) => p.id === spec.holderId);
++  if (!holder?.boxDims) return false;
++  const before = panels;
++  const next = { ...holder.boxDims };
++  if (patch === null) delete next[spec.axis]; else next[spec.axis] = { ...next[spec.axis], ...patch };
++  updateNode(holder.id, { boxDims: next });
++  recordHistoryCommand(patch === null ? RemoveConstraintCommand : MoveDimensionCommand, before, panels);
++  renderAll();
++  return true;
++}
+ function onDimensionRemove(spec) {
++  if (spec.kind === 'boxdim') { setBoxDimEntry(spec, null); return; } // hides the dimension only — the box keeps its size
+   if (spec.kind === 'imposed') removeQuoteById(spec.drivenId, spec.constraintId);
++  requestAnimationFrame(() => renderAll());
+ }
+ function onDimensionMove(spec, offsetMm) {
++  if (spec.kind === 'boxdim') { setBoxDimEntry(spec, { offsetMm }); return; }
+   if (spec.kind === 'imposed') changeQuoteOffset(spec.drivenId, spec.constraintId, offsetMm);
+ }
+-setDimensionHandlers({ onEditValue: onDimensionEdit, onRemove: onDimensionRemove, onMove: onDimensionMove });
++// An exception inside a quote edit must neither leave the screen stale (the
++// quote may already be stored) nor stay silent: redraw, show the message.
++function safely(fn, fallback) {
++  return (...args) => {
++    try {
++      return fn(...args);
++    } catch (err) {
++      console.error('quote action failed:', err);
++      showToast(`Internal error: ${err?.message || err}`);
++      try { renderAll(); } catch (e2) { console.error(e2); }
++      return fallback;
++    }
++  };
++}
++setDimensionHandlers({ onEditValue: safely(onDimensionEdit, false), onRemove: safely(onDimensionRemove), onMove: safely(onDimensionMove) });
+ setDimensionsInteractive(true);
+ 
+-// Top-bar "Quotes" button cycles: user (imposed only) -> all (+ a grey
+-// measured dimension for every neighbouring pair, to impose faster) -> off
+-// (hidden; imposed ones stay applied, they are constraints).
++// Top-bar "Quotes" button toggles: on = every main distance (grey = measured,
++// not imposed · black = imposed by you · red = in conflict) -> off (hidden;
++// imposed ones stay applied, they are constraints).
+ const toggleQuotesBtn = document.getElementById('toggle-quotes-btn');
+ const quotesLabelEl = document.getElementById('quotes-mode-label');
+ const QUOTE_MODES = {
+-  user: { next: 'all', label: 'Quotes', title: 'Showing your dimensions — click to also show every measurable distance (grey) so you can impose them faster' },
+-  all: { next: 'off', label: 'Quotes: all', title: 'Showing all distances: grey = measured only, black = imposed by you. Click to hide dimensions' },
+-  off: { next: 'user', label: 'Quotes: off', title: 'Dimensions hidden (imposed ones stay applied) — click to show them' },
++  user: { next: 'off', label: 'Quotes', title: 'Your quotes: black = imposed by you · red = conflict. Click to hide' },
++  off: { next: 'user', label: 'Quotes: off', title: 'Quotes hidden (imposed ones stay applied) — click to show them' },
+ };
++function showQuotes() {
++  if (dimensionMode === 'off') { dimensionMode = 'user'; syncQuotesButton(); }
++}
+ function syncQuotesButton() {
+   const m = QUOTE_MODES[dimensionMode];
+   toggleQuotesBtn?.classList.toggle('on', dimensionMode !== 'off');
+-  toggleQuotesBtn?.classList.toggle('all', dimensionMode === 'all');
+   toggleQuotesBtn?.setAttribute('title', m.title);
+   if (quotesLabelEl) quotesLabelEl.textContent = m.label;
+ }
+@@ -2208,7 +2442,6 @@ toggleQuotesBtn?.addEventListener('click', () => {
+   syncQuotesButton();
+   renderAll();
+ });
+-syncQuotesButton();
+ 
+ // identifier is either a FIELD NAME (soft "Unlink" — mark the active
+ // constraint on that field overridden, keep its definition) or a
+diff --git a/src/modeller/dimensions.js b/src/modeller/dimensions.js
+index bded5d1..f0415d9 100644
+--- a/src/modeller/dimensions.js
++++ b/src/modeller/dimensions.js
+@@ -159,6 +159,41 @@ export function computeDimensionSpecs(rawPanels, resolvedPanels) {
+   return specs;
+ }
+ 
++/**
++ * BOX dimensions: the overall (outside-to-outside) width / height / depth the
++ * person set with the Dimension tool. They are not stored as quotes (the walls
++ * are moved directly), so the wall that stayed put remembers them in
++ * `boxDims = { x|y|z: { otherId, offsetMm } }`; they are drawn here as
++ * permanent black dimensions that follow the box.
++ */
++export function computeBoxDimensionSpecs(rawPanels, resolvedPanels) {
++  const resolved = new Map(resolvedPanels.map((r) => [r.id, r]));
++  const specs = [];
++  rawPanels.forEach((raw) => {
++    Object.entries(raw.boxDims || {}).forEach(([axis, entry]) => {
++      const a = resolved.get(raw.id);
++      const b = resolved.get(entry?.otherId);
++      if (!a || !b || a.hidden || b.hidden) return;
++      const [lower, upper] = a.position[axis] <= b.position[axis] ? [a, b] : [b, a];
++      const base = candidateSpec(lower, upper, axis, new Map(), true);
++      if (!base) return;
++      const id = `boxdim:${lower.id}|${upper.id}|${axis}`;
++      specs.push(buildSpec({
++        a: lower, d: upper, axis, anchorMm: base.anchorMm, myMm: base.myMm, offsetMm: entry.offsetMm,
++        extra: {
++          kind: 'boxdim', id, holderId: raw.id, axis,
++          faceA: base.faceA, faceB: base.faceB,
++          drivenId: upper.id, anchorId: lower.id,
++          valueMm: base.valueMm, actualMm: base.actualMm, ok: true,
++          label: base.label,
++          title: `${getDisplayName(lower)} ↔ ${getDisplayName(upper)} (outside)`,
++        },
++      }));
++    });
++  });
++  return specs;
++}
++
+ // The local face of a resolved panel that looks toward +sign (or -sign) along an axis.
+ function faceToward(r, axis, sign) {
+   return Object.keys(LOCAL_FACES).find((f) => {
+@@ -172,14 +207,15 @@ function faceToward(r, axis, sign) {
+  * panel on the negative side, `upper` on the positive side. Pure measurement —
+  * nothing is imposed. Returns null if either panel has no face on that axis.
+  */
+-function candidateSpec(lower, upper, axis, offsets) {
+-  const faceA = faceToward(lower, axis, +1);
+-  const faceB = faceToward(upper, axis, -1);
++function candidateSpec(lower, upper, axis, offsets, outer = false) {
++  // outer: the OUTSIDE faces (box wall to box wall = the box's overall size)
++  const faceA = faceToward(lower, axis, outer ? -1 : +1);
++  const faceB = faceToward(upper, axis, outer ? +1 : -1);
+   if (!faceA || !faceB) return null;
+   const hl = computeWorldHalfExtents(lower);
+   const hu = computeWorldHalfExtents(upper);
+-  const anchorMm = lower.position[axis] + hl[axis];
+-  const myMm = upper.position[axis] - hu[axis];
++  const anchorMm = lower.position[axis] + (outer ? -hl[axis] : hl[axis]);
++  const myMm = upper.position[axis] + (outer ? hu[axis] : -hu[axis]);
+   const gap = myMm - anchorMm;
+   const id = `cand:${lower.id}|${upper.id}|${axis}`;
+   return buildSpec({
+@@ -200,7 +236,7 @@ function candidateSpec(lower, upper, axis, offsets) {
+  * Candidate for two FACES the person just picked (already resolved to facing
+  * faces, see engine/quotes.js#resolveFacingFaces). null if they aren't a measurable pair.
+  */
+-export function candidateSpecForPair(resolvedPanels, a, b, offsets) {
++export function candidateSpecForPair(resolvedPanels, a, b, offsets, rawPanels) {
+   const byId = new Map(resolvedPanels.map((r) => [r.id, r]));
+   const ra = byId.get(a.nodeId);
+   const rb = byId.get(b.nodeId);
+@@ -210,7 +246,12 @@ export function candidateSpecForPair(resolvedPanels, a, b, offsets) {
+   const axis = al.axis;
+   // `a` looks toward +sign: it is the lower panel when sign is +1.
+   const [lower, upper] = al.sign > 0 ? [ra, rb] : [rb, ra];
+-  return candidateSpec(lower, upper, axis, offsets);
++  // Two walls of ONE box are measured OUTSIDE to OUTSIDE (the box's overall
++  // size); every other pair is measured between the facing (inner) faces.
++  const rawA = rawPanels?.find((p) => p.id === a.nodeId);
++  const rawB = rawPanels?.find((p) => p.id === b.nodeId);
++  const outer = !!(rawA?.isBoxWall && rawB?.isBoxWall && rawA.groupId && rawA.groupId === rawB.groupId);
++  return candidateSpec(lower, upper, axis, offsets, outer);
+ }
+ 
+ const pairKey = (a, b, axis) => `${[a, b].sort().join('|')}|${axis}`;
+@@ -376,15 +417,23 @@ export function createDimensionOverlay(host, handlers = {}) {
+     input.style.borderColor = COLORS.editing;
+     items.forEach(paint);
+   }
++  let editStartedAt = 0;
++  let editingItem = null; // the item being edited, kept in case a re-render rebuilt `items` meanwhile
+   function startEditing(item) {
+     editingId = item.spec.id;
++    editingItem = item;
++    editStartedAt = Date.now();
+     input.value = String(item.spec.valueMm);
+     input.style.borderColor = COLORS.editing;
+     input.style.display = 'block';
+     items.forEach(paint);
+     placeInput(item);
+-    input.focus();
+-    input.select();
++    const focusInput = () => { if (editingId === item.spec.id) { input.focus(); input.select(); } };
++    focusInput();
++    // The click that opened the editor is still finishing (mouseup/click can
++    // pull focus away): take it back once that is over.
++    setTimeout(focusInput, 0);
++    setTimeout(focusInput, 120);
+   }
+   function placeInput(item) {
+     if (!item?.layoutPx) return;
+@@ -394,7 +443,7 @@ export function createDimensionOverlay(host, handlers = {}) {
+     input.style.top = `${item.layoutPx.y - (FONT_PX + 10) / 2}px`;
+   }
+   function currentItem() {
+-    return items.find((i) => i.spec.id === editingId) || null;
++    return items.find((i) => i.spec.id === editingId) || (editingId && editingItem?.spec.id === editingId ? editingItem : null);
+   }
+   input.addEventListener('keydown', (e) => {
+     e.stopPropagation(); // Esc here must not also cancel the Dimension tool
+@@ -405,7 +454,7 @@ export function createDimensionOverlay(host, handlers = {}) {
+     e.preventDefault();
+     const raw = input.value.trim().replace(',', '.');
+     if (raw === '') { // empty + Enter removes an imposed dimension
+-      if (item.spec.kind === 'imposed') { const spec = item.spec; stopEditing(); handlers.onRemove?.(spec); } else stopEditing();
++      if (item.spec.kind !== 'candidate') { const spec = item.spec; stopEditing(); handlers.onRemove?.(spec); } else stopEditing();
+       return;
+     }
+     const v = Number(raw);
+@@ -414,7 +463,13 @@ export function createDimensionOverlay(host, handlers = {}) {
+     if (ok === false) input.style.borderColor = COLORS.conflict; // refused: stay open, the reason is in the toast
+     else stopEditing();
+   });
+-  input.addEventListener('blur', () => { if (editingId) stopEditing(); });
++  input.addEventListener('blur', () => {
++    if (!editingId) return;
++    // A blur right after opening is the opening click stealing focus, not the
++    // person leaving the field: keep the editor and re-focus it.
++    if (Date.now() - editStartedAt < 400) { setTimeout(() => { if (editingId) input.focus(); }, 0); return; }
++    stopEditing();
++  });
+ 
+   function select(id) {
+     selectedId = id;
+@@ -429,7 +484,7 @@ export function createDimensionOverlay(host, handlers = {}) {
+   // Esc on a selected dimension deletes it. Capture + stopPropagation so the
+   // app's own Esc handling (cancel the Dimension tool...) does not also fire.
+   const onWindowKeyDown = (e) => {
+-    if (e.key !== 'Escape' || !selectedId || editingId) return;
++    if ((e.key !== 'Escape' && e.key !== 'Delete' && e.key !== 'Backspace') || !selectedId || editingId) return;
+     const item = items.find((i) => i.spec.id === selectedId);
+     if (!item) { selectedId = null; return; }
+     e.preventDefault();
+@@ -575,12 +630,12 @@ export function createDimensionOverlay(host, handlers = {}) {
+     const nextMode = opts.mode ?? model.mode;
+     if (nextMode !== model.mode) dismissed.clear(); // changing the Quotes mode brings everything back
+     model = { raw: rawPanels, resolved: resolvedPanels, conflicted: conflictedIds, mode: nextMode, pendingPair: opts.pendingPair ?? null };
+-    const imposed = computeDimensionSpecs(rawPanels, resolvedPanels);
++    const imposed = [...computeDimensionSpecs(rawPanels, resolvedPanels), ...computeBoxDimensionSpecs(rawPanels, resolvedPanels)];
+     const shown = [];
+     if (model.mode !== 'off') shown.push(...imposed);
+     if (model.mode === 'all') shown.push(...computeCandidateSpecs(rawPanels, resolvedPanels, imposed, candidateOffsets).filter((c) => !dismissed.has(c.id)));
+     if (model.pendingPair) {
+-      const spec = candidateSpecForPair(resolvedPanels, model.pendingPair.a, model.pendingPair.b, candidateOffsets);
++      const spec = candidateSpecForPair(resolvedPanels, model.pendingPair.a, model.pendingPair.b, candidateOffsets, rawPanels);
+       if (spec) {
+         // A pair can only be dimensioned once: if it already has an imposed
+         // dimension, show THAT one (even when the mode hides imposed ones),
+diff --git a/src/modeller/view2d.js b/src/modeller/view2d.js
+index 6ab82db..84b9134 100644
+--- a/src/modeller/view2d.js
++++ b/src/modeller/view2d.js
+@@ -658,7 +658,14 @@ export function create2DControls(
+     return raycaster.intersectObjects(objects, false);
+   }
+ 
++  // True only while a press that STARTED on the canvas is in progress. The
++  // pointerup listener lives on window, so without this a click on the
++  // dimension overlay (label/line), a toolbar button or the side panel
++  // would also be taken as a face pick by the Dimension tool.
++  let pressStartedOnCanvas = false;
++
+   function handlePointerDown(e) {
++    pressStartedOnCanvas = true;
+     gestureState.moved = false;
+     gestureState.downX = e.clientX;
+     gestureState.downY = e.clientY;
+@@ -863,8 +870,10 @@ export function create2DControls(
+   }
+ 
+   function handlePointerUp(e) {
++    const startedOnCanvas = pressStartedOnCanvas;
++    pressStartedOnCanvas = false;
+     if (isFacePickMode?.()) {
+-      if (!gestureState.moved) {
++      if (startedOnCanvas && !gestureState.moved) {
+         const worldPoint = screenToWorld(e);
+         const hits = hitTest(e, meshList());
+ 
+diff --git a/src/shared/handle.js b/src/shared/handle.js
+index 4c42def..0eef5c8 100644
+--- a/src/shared/handle.js
++++ b/src/shared/handle.js
+@@ -75,7 +75,15 @@ export function computeHandlePlacement(node) {
+   // shared/frontFit.js#edgeSides). If the handle renders on the SAME
+   // side as the hinge instead of opposite, flip sideSign's two
+   // branches below.
+-  const sideSign = node.hinge === 'right' ? -1 : 1; // hinge 'right' (opening swings from the right) -> handle on the LEFT; hinge 'left' (default) -> handle on the RIGHT
++  // The free (handle) side in WORLD terms is the one opposite the hinge along
++  // the door's horizontal axis: hinge 'right' = the larger coordinate, so the
++  // handle goes to the smaller one. LOCAL +X only runs toward the larger
++  // coordinate for a door facing Z (rotation 0°); a door facing X is turned
++  // 90° about Y, which points local +X toward the SMALLER one — so there the
++  // local sign flips (otherwise the handle sat at the hinge edge).
++  const freeWorldSign = node.hinge === 'right' ? -1 : 1;
++  const localXAlongWorld = node.normalAxis === 'x' ? -1 : 1;
++  const sideSign = freeWorldSign * localXAlongWorld;
+   // Clamped to [0, width/2 - crossSection/2] — a pathologically narrow
+   // door (narrower than 2x the margin) would otherwise push the
+   // handle's offset negative, flipping it onto the WRONG side instead
+diff --git a/src/tools/quoteTool.js b/src/tools/quoteTool.js
+index f0b2148..0b7ff0a 100644
+--- a/src/tools/quoteTool.js
++++ b/src/tools/quoteTool.js
+@@ -33,11 +33,28 @@ let quotePending = null;
+ // and is easy to miss): string | null.
+ let quoteMessage = null;
+ 
++let lastSaid = { text: null, at: 0 };
+ function say(text, autoHide = true) {
+   quoteMessage = text;
++  // The same message twice in a row (a double-fired click, a repeated pick of
++  // an already dimensioned pair) is shown once, not stacked.
++  const now = Date.now();
++  if (lastSaid.text === text && now - lastSaid.at < 2500) return;
++  lastSaid = { text, at: now };
+   showToast(text, autoHide);
+ }
+ 
++// Some pointer paths report one physical click twice; ignore an identical
++// pick arriving right after the previous one.
++let lastPick = { key: null, at: 0 };
++function isEchoPick(nodeId, faceName) {
++  const now = Date.now();
++  const key = `${nodeId}:${faceName}`;
++  const echo = lastPick.key === key && now - lastPick.at < 250;
++  lastPick = { key, at: now };
++  return echo;
++}
++
+ export function setQuoteToolContext(context) {
+   ctx = context;
+ }
+@@ -85,6 +102,7 @@ function resetPicks() {
+ }
+ 
+ function handleFacePick(nodeId, faceName) {
++  if (isEchoPick(nodeId, faceName)) return;
+   try {
+     pickFace(nodeId, faceName);
+   } catch (err) {
+@@ -131,7 +149,7 @@ function pickFace(nodeId, faceName) {
+     quotePick1 = null;
+     quotePending = { pair: { a: facing.a, b: facing.b }, plan: null, duplicate: true };
+     ctx.setFaceHighlight(null, null);
+-    say(plan.message, false);
++    say(plan.message);
+     ctx.renderAll();
+     return;
+   }
+diff --git a/tests/quotes.test.mjs b/tests/quotes.test.mjs
+index 07f343d..40e5a5e 100644
+--- a/tests/quotes.test.mjs
++++ b/tests/quotes.test.mjs
+@@ -219,13 +219,13 @@ section('resolveFacingFaces — clicks on outer surfaces (same direction)', () =
+   assert(!perp.ok && perp.reason === 'not-parallel', 'perpendicular faces are refused');
+ });
+ 
+-section('box dimensions — two walls of one box resize its interior', () => {
++section('box dimensions — two walls of one box set its OUTSIDE size', () => {
+   const { nodes, groupId } = addBox([]);
+   const w = (n) => wall(nodes, n);
+   const pick = (id, faceName) => ({ nodeId: id, faceName });
+   const interior = (panels, a, b, axis) => {
+     const r = new Map(resolveConstraints(panels).map((x) => [x.id, x]));
+-    return Math.abs(r.get(a.id).position[axis] - r.get(b.id).position[axis]) - (r.get(a.id).thickness + r.get(b.id).thickness) / 2;
++    return Math.abs(r.get(a.id).position[axis] - r.get(b.id).position[axis]) + (r.get(a.id).thickness + r.get(b.id).thickness) / 2; // outer-to-outer
+   };
+   // click the outer surfaces of Left and Right (width), Top and Bottom (height), Back and Front (depth)
+   const cases = [['left', 'right', 'x', 'width', 700], ['bottom', 'top', 'y', 'height', 500], ['back', 'front', 'z', 'depth', 300]];
+@@ -242,13 +242,13 @@ section('box dimensions — two walls of one box resize its interior', () => {
+     }
+     assert(plan && plan.label === label, `${n1}/${n2}: box dimension recognised as ${label}`);
+     const before = interior(nodes, A, B, axis);
+-    assertEqual(Math.round(plan.measuredMm), Math.round(before), `${label}: measured interior matches geometry`);
++    assertEqual(Math.round(plan.measuredMm), Math.round(before), `${label}: measured outer size matches geometry`);
+     const offset = boxDimensionOffset(nodes, plan, target);
+     const moved = nodes.map((p) => (p.id === plan.moveId ? { ...p, offset } : p));
+     const rl = relayoutBox(moved, groupId);
+     assert(rl.ok, `${label}: relayoutBox accepts ${target} mm`);
+     const applied = moved.map((p) => { const patch = rl.patches.find((x) => x.id === p.id); return patch ? { ...p, width: patch.width, height: patch.height, offset: patch.offset } : p; });
+-    assertEqual(Math.round(interior(applied, A, B, axis)), target, `${label}: interior becomes exactly ${target} mm`);
++    assertEqual(Math.round(interior(applied, A, B, axis)), target, `${label}: outer size becomes exactly ${target} mm`);
+     assert(previewBoxDimension(nodes, plan, target).ok, `${label}: preview ok`);
+   });
+   const w1 = w('left'), w2 = w('right');

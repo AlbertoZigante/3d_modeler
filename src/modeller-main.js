@@ -349,6 +349,23 @@ function clearQuoteAlert() {
   quoteAlertIds = new Set();
 }
 
+// ---- Live dependents while dragging ------------------------------
+// A drag only patches the dragged node (cheap, once per pointer move), so a
+// panel DERIVED from it — a shelf spanning between two shelves, a quote
+// anchored to it — used to stay stale until the drag ended. When anything
+// else depends on the moving panel(s), redraw (at most once per frame).
+let liveRenderQueued = false;
+function hasDependents(ids) {
+  const set = new Set(ids);
+  return panels.some((p) => !set.has(p.id)
+    && (p.constraints || []).some((c) => !c.overridden && (set.has(c.from?.node) || set.has(c.to?.node))));
+}
+function queueLiveRender() {
+  if (liveRenderQueued) return;
+  liveRenderQueued = true;
+  requestAnimationFrame(() => { liveRenderQueued = false; renderAll(); });
+}
+
 // ---- QUOTE GUARD -------------------------------------------------
 // Quotes outrank moving/scaling: a quoted panel follows the panel it is
 // quoted to (the resolver keeps the distance), but any move/resize that would
@@ -485,8 +502,9 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
 
     if (doorsChanged) {
       renderAll(); // more than just this node changed — full reconcile, not just the inspector
-    } else if (nodeId === getSelectedId()) {
-      renderInspectorOnly();
+    } else {
+      if (nodeId === getSelectedId()) renderInspectorOnly();
+      if (hasDependents([nodeId])) queueLiveRender(); // shelves/quotes derived from this panel follow it live
     }
     if (hitAxis) {
       showDesignLimitError(hitAxis);
@@ -534,6 +552,8 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
         },
       };
     });
+
+    if (hasDependents(nodeIds)) queueLiveRender();
 
     if (hitAxis) {
       showDesignLimitError(hitAxis);
