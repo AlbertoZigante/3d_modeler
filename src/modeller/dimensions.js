@@ -159,6 +159,41 @@ export function computeDimensionSpecs(rawPanels, resolvedPanels) {
   return specs;
 }
 
+/**
+ * BOX dimensions: the overall (outside-to-outside) width / height / depth the
+ * person set with the Dimension tool. They are not stored as quotes (the walls
+ * are moved directly), so the wall that stayed put remembers them in
+ * `boxDims = { x|y|z: { otherId, offsetMm } }`; they are drawn here as
+ * permanent black dimensions that follow the box.
+ */
+export function computeBoxDimensionSpecs(rawPanels, resolvedPanels) {
+  const resolved = new Map(resolvedPanels.map((r) => [r.id, r]));
+  const specs = [];
+  rawPanels.forEach((raw) => {
+    Object.entries(raw.boxDims || {}).forEach(([axis, entry]) => {
+      const a = resolved.get(raw.id);
+      const b = resolved.get(entry?.otherId);
+      if (!a || !b || a.hidden || b.hidden) return;
+      const [lower, upper] = a.position[axis] <= b.position[axis] ? [a, b] : [b, a];
+      const base = candidateSpec(lower, upper, axis, new Map(), true);
+      if (!base) return;
+      const id = `boxdim:${lower.id}|${upper.id}|${axis}`;
+      specs.push(buildSpec({
+        a: lower, d: upper, axis, anchorMm: base.anchorMm, myMm: base.myMm, offsetMm: entry.offsetMm,
+        extra: {
+          kind: 'boxdim', id, holderId: raw.id, axis,
+          faceA: base.faceA, faceB: base.faceB,
+          drivenId: upper.id, anchorId: lower.id,
+          valueMm: base.valueMm, actualMm: base.actualMm, ok: true,
+          label: base.label,
+          title: `${getDisplayName(lower)} ↔ ${getDisplayName(upper)} (outside)`,
+        },
+      }));
+    });
+  });
+  return specs;
+}
+
 // The local face of a resolved panel that looks toward +sign (or -sign) along an axis.
 function faceToward(r, axis, sign) {
   return Object.keys(LOCAL_FACES).find((f) => {
@@ -172,14 +207,15 @@ function faceToward(r, axis, sign) {
  * panel on the negative side, `upper` on the positive side. Pure measurement —
  * nothing is imposed. Returns null if either panel has no face on that axis.
  */
-function candidateSpec(lower, upper, axis, offsets) {
-  const faceA = faceToward(lower, axis, +1);
-  const faceB = faceToward(upper, axis, -1);
+function candidateSpec(lower, upper, axis, offsets, outer = false) {
+  // outer: the OUTSIDE faces (box wall to box wall = the box's overall size)
+  const faceA = faceToward(lower, axis, outer ? -1 : +1);
+  const faceB = faceToward(upper, axis, outer ? +1 : -1);
   if (!faceA || !faceB) return null;
   const hl = computeWorldHalfExtents(lower);
   const hu = computeWorldHalfExtents(upper);
-  const anchorMm = lower.position[axis] + hl[axis];
-  const myMm = upper.position[axis] - hu[axis];
+  const anchorMm = lower.position[axis] + (outer ? -hl[axis] : hl[axis]);
+  const myMm = upper.position[axis] + (outer ? hu[axis] : -hu[axis]);
   const gap = myMm - anchorMm;
   const id = `cand:${lower.id}|${upper.id}|${axis}`;
   return buildSpec({
@@ -200,7 +236,7 @@ function candidateSpec(lower, upper, axis, offsets) {
  * Candidate for two FACES the person just picked (already resolved to facing
  * faces, see engine/quotes.js#resolveFacingFaces). null if they aren't a measurable pair.
  */
-export function candidateSpecForPair(resolvedPanels, a, b, offsets) {
+export function candidateSpecForPair(resolvedPanels, a, b, offsets, rawPanels) {
   const byId = new Map(resolvedPanels.map((r) => [r.id, r]));
   const ra = byId.get(a.nodeId);
   const rb = byId.get(b.nodeId);
@@ -210,7 +246,12 @@ export function candidateSpecForPair(resolvedPanels, a, b, offsets) {
   const axis = al.axis;
   // `a` looks toward +sign: it is the lower panel when sign is +1.
   const [lower, upper] = al.sign > 0 ? [ra, rb] : [rb, ra];
-  return candidateSpec(lower, upper, axis, offsets);
+  // Two walls of ONE box are measured OUTSIDE to OUTSIDE (the box's overall
+  // size); every other pair is measured between the facing (inner) faces.
+  const rawA = rawPanels?.find((p) => p.id === a.nodeId);
+  const rawB = rawPanels?.find((p) => p.id === b.nodeId);
+  const outer = !!(rawA?.isBoxWall && rawB?.isBoxWall && rawA.groupId && rawA.groupId === rawB.groupId);
+  return candidateSpec(lower, upper, axis, offsets, outer);
 }
 
 const pairKey = (a, b, axis) => `${[a, b].sort().join('|')}|${axis}`;
@@ -376,15 +417,23 @@ export function createDimensionOverlay(host, handlers = {}) {
     input.style.borderColor = COLORS.editing;
     items.forEach(paint);
   }
+  let editStartedAt = 0;
+  let editingItem = null; // the item being edited, kept in case a re-render rebuilt `items` meanwhile
   function startEditing(item) {
     editingId = item.spec.id;
+    editingItem = item;
+    editStartedAt = Date.now();
     input.value = String(item.spec.valueMm);
     input.style.borderColor = COLORS.editing;
     input.style.display = 'block';
     items.forEach(paint);
     placeInput(item);
-    input.focus();
-    input.select();
+    const focusInput = () => { if (editingId === item.spec.id) { input.focus(); input.select(); } };
+    focusInput();
+    // The click that opened the editor is still finishing (mouseup/click can
+    // pull focus away): take it back once that is over.
+    setTimeout(focusInput, 0);
+    setTimeout(focusInput, 120);
   }
   function placeInput(item) {
     if (!item?.layoutPx) return;
@@ -394,7 +443,7 @@ export function createDimensionOverlay(host, handlers = {}) {
     input.style.top = `${item.layoutPx.y - (FONT_PX + 10) / 2}px`;
   }
   function currentItem() {
-    return items.find((i) => i.spec.id === editingId) || null;
+    return items.find((i) => i.spec.id === editingId) || (editingId && editingItem?.spec.id === editingId ? editingItem : null);
   }
   input.addEventListener('keydown', (e) => {
     e.stopPropagation(); // Esc here must not also cancel the Dimension tool
@@ -405,7 +454,7 @@ export function createDimensionOverlay(host, handlers = {}) {
     e.preventDefault();
     const raw = input.value.trim().replace(',', '.');
     if (raw === '') { // empty + Enter removes an imposed dimension
-      if (item.spec.kind === 'imposed') { const spec = item.spec; stopEditing(); handlers.onRemove?.(spec); } else stopEditing();
+      if (item.spec.kind !== 'candidate') { const spec = item.spec; stopEditing(); handlers.onRemove?.(spec); } else stopEditing();
       return;
     }
     const v = Number(raw);
@@ -414,7 +463,13 @@ export function createDimensionOverlay(host, handlers = {}) {
     if (ok === false) input.style.borderColor = COLORS.conflict; // refused: stay open, the reason is in the toast
     else stopEditing();
   });
-  input.addEventListener('blur', () => { if (editingId) stopEditing(); });
+  input.addEventListener('blur', () => {
+    if (!editingId) return;
+    // A blur right after opening is the opening click stealing focus, not the
+    // person leaving the field: keep the editor and re-focus it.
+    if (Date.now() - editStartedAt < 400) { setTimeout(() => { if (editingId) input.focus(); }, 0); return; }
+    stopEditing();
+  });
 
   function select(id) {
     selectedId = id;
@@ -429,7 +484,7 @@ export function createDimensionOverlay(host, handlers = {}) {
   // Esc on a selected dimension deletes it. Capture + stopPropagation so the
   // app's own Esc handling (cancel the Dimension tool...) does not also fire.
   const onWindowKeyDown = (e) => {
-    if (e.key !== 'Escape' || !selectedId || editingId) return;
+    if ((e.key !== 'Escape' && e.key !== 'Delete' && e.key !== 'Backspace') || !selectedId || editingId) return;
     const item = items.find((i) => i.spec.id === selectedId);
     if (!item) { selectedId = null; return; }
     e.preventDefault();
@@ -575,12 +630,12 @@ export function createDimensionOverlay(host, handlers = {}) {
     const nextMode = opts.mode ?? model.mode;
     if (nextMode !== model.mode) dismissed.clear(); // changing the Quotes mode brings everything back
     model = { raw: rawPanels, resolved: resolvedPanels, conflicted: conflictedIds, mode: nextMode, pendingPair: opts.pendingPair ?? null };
-    const imposed = computeDimensionSpecs(rawPanels, resolvedPanels);
+    const imposed = [...computeDimensionSpecs(rawPanels, resolvedPanels), ...computeBoxDimensionSpecs(rawPanels, resolvedPanels)];
     const shown = [];
     if (model.mode !== 'off') shown.push(...imposed);
     if (model.mode === 'all') shown.push(...computeCandidateSpecs(rawPanels, resolvedPanels, imposed, candidateOffsets).filter((c) => !dismissed.has(c.id)));
     if (model.pendingPair) {
-      const spec = candidateSpecForPair(resolvedPanels, model.pendingPair.a, model.pendingPair.b, candidateOffsets);
+      const spec = candidateSpecForPair(resolvedPanels, model.pendingPair.a, model.pendingPair.b, candidateOffsets, rawPanels);
       if (spec) {
         // A pair can only be dimensioned once: if it already has an imposed
         // dimension, show THAT one (even when the mode hides imposed ones),

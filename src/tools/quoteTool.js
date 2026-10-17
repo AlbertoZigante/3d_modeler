@@ -33,9 +33,26 @@ let quotePending = null;
 // and is easy to miss): string | null.
 let quoteMessage = null;
 
+let lastSaid = { text: null, at: 0 };
 function say(text, autoHide = true) {
   quoteMessage = text;
+  // The same message twice in a row (a double-fired click, a repeated pick of
+  // an already dimensioned pair) is shown once, not stacked.
+  const now = Date.now();
+  if (lastSaid.text === text && now - lastSaid.at < 2500) return;
+  lastSaid = { text, at: now };
   showToast(text, autoHide);
+}
+
+// Some pointer paths report one physical click twice; ignore an identical
+// pick arriving right after the previous one.
+let lastPick = { key: null, at: 0 };
+function isEchoPick(nodeId, faceName) {
+  const now = Date.now();
+  const key = `${nodeId}:${faceName}`;
+  const echo = lastPick.key === key && now - lastPick.at < 250;
+  lastPick = { key, at: now };
+  return echo;
 }
 
 export function setQuoteToolContext(context) {
@@ -85,6 +102,7 @@ function resetPicks() {
 }
 
 function handleFacePick(nodeId, faceName) {
+  if (isEchoPick(nodeId, faceName)) return;
   try {
     pickFace(nodeId, faceName);
   } catch (err) {
@@ -131,7 +149,7 @@ function pickFace(nodeId, faceName) {
     quotePick1 = null;
     quotePending = { pair: { a: facing.a, b: facing.b }, plan: null, duplicate: true };
     ctx.setFaceHighlight(null, null);
-    say(plan.message, false);
+    say(plan.message);
     ctx.renderAll();
     return;
   }

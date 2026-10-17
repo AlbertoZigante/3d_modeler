@@ -219,13 +219,13 @@ section('resolveFacingFaces — clicks on outer surfaces (same direction)', () =
   assert(!perp.ok && perp.reason === 'not-parallel', 'perpendicular faces are refused');
 });
 
-section('box dimensions — two walls of one box resize its interior', () => {
+section('box dimensions — two walls of one box set its OUTSIDE size', () => {
   const { nodes, groupId } = addBox([]);
   const w = (n) => wall(nodes, n);
   const pick = (id, faceName) => ({ nodeId: id, faceName });
   const interior = (panels, a, b, axis) => {
     const r = new Map(resolveConstraints(panels).map((x) => [x.id, x]));
-    return Math.abs(r.get(a.id).position[axis] - r.get(b.id).position[axis]) - (r.get(a.id).thickness + r.get(b.id).thickness) / 2;
+    return Math.abs(r.get(a.id).position[axis] - r.get(b.id).position[axis]) + (r.get(a.id).thickness + r.get(b.id).thickness) / 2; // outer-to-outer
   };
   // click the outer surfaces of Left and Right (width), Top and Bottom (height), Back and Front (depth)
   const cases = [['left', 'right', 'x', 'width', 700], ['bottom', 'top', 'y', 'height', 500], ['back', 'front', 'z', 'depth', 300]];
@@ -242,13 +242,13 @@ section('box dimensions — two walls of one box resize its interior', () => {
     }
     assert(plan && plan.label === label, `${n1}/${n2}: box dimension recognised as ${label}`);
     const before = interior(nodes, A, B, axis);
-    assertEqual(Math.round(plan.measuredMm), Math.round(before), `${label}: measured interior matches geometry`);
+    assertEqual(Math.round(plan.measuredMm), Math.round(before), `${label}: measured outer size matches geometry`);
     const offset = boxDimensionOffset(nodes, plan, target);
     const moved = nodes.map((p) => (p.id === plan.moveId ? { ...p, offset } : p));
     const rl = relayoutBox(moved, groupId);
     assert(rl.ok, `${label}: relayoutBox accepts ${target} mm`);
     const applied = moved.map((p) => { const patch = rl.patches.find((x) => x.id === p.id); return patch ? { ...p, width: patch.width, height: patch.height, offset: patch.offset } : p; });
-    assertEqual(Math.round(interior(applied, A, B, axis)), target, `${label}: interior becomes exactly ${target} mm`);
+    assertEqual(Math.round(interior(applied, A, B, axis)), target, `${label}: outer size becomes exactly ${target} mm`);
     assert(previewBoxDimension(nodes, plan, target).ok, `${label}: preview ok`);
   });
   const w1 = w('left'), w2 = w('right');

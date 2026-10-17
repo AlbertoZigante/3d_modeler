@@ -38,6 +38,9 @@ import {
   MATERIAL_CATALOG,
   loadMaterialCatalog,
   getDisplayName,
+  computeWorldHalfExtents,
+  FLOOR_MM,
+  FIELD_TO_AXIS,
 } from './modeller/modules.js';
 import { resolveConstraints } from './modeller/snap.js';
 import { createModellerScene } from './modeller/scene.js';
@@ -107,7 +110,7 @@ import {
   startQuoteMode, cancelQuoteMode, isQuoteActive, getQuotePending, getQuoteMessage, setQuoteToolContext,
 } from './tools/quoteTool.js';
 import {
-  updateQuote, removeQuote, setQuoteOffset, addQuote, planDimension, previewBoxDimension, boxDimensionOffset,
+  updateQuote, removeQuote, setQuoteOffset, addQuote, newConflicts, planDimension, previewBoxDimension, boxDimensionOffset,
 } from './engine/quotes.js';
 import {
   history, createStateCommand, MovePanelCommand, MoveGroupCommand, ResizePanelCommand, ChangeMaterialCommand,
@@ -329,9 +332,54 @@ document.getElementById('export-bom-pdf-btn')?.addEventListener('click', () => {
 });
 
 // ---- Scene (view layer). Consumes RESOLVED panels only. ----
-// Top-bar "Quotes" button state: 'user' (imposed dimensions), 'all' (also a grey
-// measured dimension for every neighbouring pair) or 'off' (hidden, still applied).
+// Top-bar "Quotes" button state: 'all' (grey = measured main distances not
+// imposed, black = imposed by the user, red = conflicts) or 'off' (hidden,
+// imposed ones stay applied).
 let dimensionMode = 'user';
+// Quoted panels flashed red because a refused quote clashes with them.
+let quoteAlertIds = new Set();
+let quoteAlertTimer = null;
+function flashQuoteAlert(ids) {
+  quoteAlertIds = new Set(ids);
+  clearTimeout(quoteAlertTimer);
+  quoteAlertTimer = setTimeout(() => { quoteAlertIds = new Set(); renderAll(); }, 6000);
+}
+function clearQuoteAlert() {
+  clearTimeout(quoteAlertTimer);
+  quoteAlertIds = new Set();
+}
+
+// ---- QUOTE GUARD -------------------------------------------------
+// Quotes outrank moving/scaling: a quoted panel follows the panel it is
+// quoted to (the resolver keeps the distance), but any move/resize that would
+// break a quote — or that tries to move a panel along an axis a quote fixes —
+// is refused, the quotes involved flash red and a flag explains why.
+function hasActiveQuotes(list) {
+  return list.some((p) => (p.constraints || []).some((c) => c.type === 'distance' && !c.overridden));
+}
+/** New quote conflicts caused by going from `prev` to `panels`, or null. */
+function quoteClash(prev) {
+  if (!hasActiveQuotes(panels)) return null;
+  const clash = newConflicts(prev, panels);
+  return clash.conflicts.length ? clash : null;
+}
+function refuseForQuote(clash, what) {
+  flashQuoteAlert(clash.conflictIds);
+  showToast(`${what} — blocked by a quote (shown in red): ${clash.conflicts[0]}`);
+}
+/** The active quote that fixes `node` along `axis`, if any. */
+function quoteHoldingAxis(node, axis) {
+  return (node.constraints || []).find((c) => c.type === 'distance' && !c.overridden && FIELD_TO_AXIS[c.field] === axis) || null;
+}
+function refuseQuotedAxis(node, axis, c) {
+  const anchor = panels.find((p) => p.id === c.from?.node);
+  flashQuoteAlert([node.id]);
+  showToast(`${node.name || node.id} can't move along ${axis.toUpperCase()} — a quote fixes it ${c.value} mm from ${anchor?.name || 'another panel'}. Edit or remove the quote first.`);
+}
+function resolvedMeshPos(id) {
+  const r = resolveConstraints(panels).find((x) => x.id === id);
+  return { x: r.position.x * MM_TO_UNIT, y: r.position.y * MM_TO_UNIT, z: r.position.z * MM_TO_UNIT };
+}
 
 const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight, setPanelHighlightSet, setDimensions, setDimensionHandlers, setDimensionsInteractive } = createModellerScene(canvas, main, {
   axesCanvas,
@@ -358,17 +406,26 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
     // -----------------------------------------------------------
     if (node.isBoxWall) {
       const priorOffset = node.offset;
+      const beforePanels = panels;
       updateNode(nodeId, { offset: transform.offset, rotation: transform.rotation });
 
       const result = relayoutBox(panels, node.groupId);
+      const priorPos = {
+        x: (node.basePosition.x + priorOffset.x) * MM_TO_UNIT,
+        y: (node.basePosition.y + priorOffset.y) * MM_TO_UNIT,
+        z: (node.basePosition.z + priorOffset.z) * MM_TO_UNIT,
+      };
       if (!applyRelayoutResult(result)) {
         updateNode(nodeId, { offset: priorOffset });
         renderAll();
-        return {
-          x: (node.basePosition.x + priorOffset.x) * MM_TO_UNIT,
-          y: (node.basePosition.y + priorOffset.y) * MM_TO_UNIT,
-          z: (node.basePosition.z + priorOffset.z) * MM_TO_UNIT,
-        };
+        return priorPos;
+      }
+      const clash = quoteClash(beforePanels);
+      if (clash) {
+        panels = beforePanels;
+        refuseForQuote(clash, `Can't move ${node.name || 'this wall'}`);
+        renderAll();
+        return priorPos;
       }
 
       renderAll(); // the other 5 walls all just changed — full reconcile, not just this node
@@ -392,7 +449,23 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
       }
     }
 
+    for (const axis of ['x', 'y', 'z']) {
+      const held = quoteHoldingAxis(node, axis);
+      if (held && Math.abs(clampedOffset[axis] - node.offset[axis]) > 0.01) {
+        refuseQuotedAxis(node, axis, held);
+        renderAll();
+        return resolvedMeshPos(nodeId);
+      }
+    }
+    const beforeMove = panels;
     updateNode(nodeId, { offset: clampedOffset, rotation: transform.rotation });
+    const moveClash = quoteClash(beforeMove);
+    if (moveClash) {
+      panels = beforeMove;
+      refuseForQuote(moveClash, `Can't move ${node.name || 'this panel'}`);
+      renderAll();
+      return resolvedMeshPos(nodeId);
+    }
 
     // A shelf (or any other panel) can be one of a door's 4 boundary
     // panels (see features/door.js#createDoorNode's boundaryIds) — if
@@ -543,6 +616,13 @@ function applyDimensionChange(nodeId, dims, offsetDeltaMm) {
   }
   const before = panels;
   updateNode(nodeId, { width: dims.width, height: dims.height, thickness: dims.thickness, offset: proposedOffset });
+  const resizeClash = quoteClash(before);
+  if (resizeClash) {
+    panels = before;
+    refuseForQuote(resizeClash, `Can't resize ${current.name || 'this panel'}`);
+    renderAll();
+    return false;
+  }
 
   // Same reasoning as onTransformChange's door catch-up above — a
   // resize (this handler backs the resize-handle drag, mostly shelves;
@@ -697,6 +777,29 @@ function handleDrawerConfirmed(placement) {
 // the returned patches on success. Used at every box-wall
 // move/resize/material call site below so that behavior — and
 // wording — stays identical across all four.
+// The lowest point of every box must stay on the floor (FLOOR_MM) — or, when the
+// box has a plinth / legs, THEY are the lowest part and stand on the floor.
+// Quotes and box-wall dimensions can move a wall (e.g. the Bottom) and leave
+// the box floating or sunk: shift the whole group back so it rests on the floor.
+function groundBoxes() {
+  const groupIds = new Set(panels.filter((p) => p.isBoxWall && p.groupId).map((p) => p.groupId));
+  groupIds.forEach((groupId) => {
+    // Flags (isBoxWall / isPlinthPanel / isLeg) live on the RAW nodes only —
+    // the resolved copies don't carry them.
+    const rawById = new Map(panels.filter((p) => p.groupId === groupId).map((p) => [p.id, p]));
+    const resolved = resolveConstraints(panels).filter((r) => rawById.has(r.id));
+    const support = resolved.filter((r) => rawById.get(r.id).isPlinthPanel || rawById.get(r.id).isLeg);
+    const base = support.length ? support : resolved.filter((r) => rawById.get(r.id).isBoxWall && /bottom/i.test(r.name || ''));
+    if (!base.length) return;
+    const lowest = Math.min(...base.map((r) => r.position.y - computeWorldHalfExtents(r).y));
+    const dy = lowest - FLOOR_MM;
+    if (Math.abs(dy) < 0.01) return;
+    panels = panels.map((p) => (p.groupId === groupId && p.basePosition
+      ? { ...p, basePosition: { ...p.basePosition, y: p.basePosition.y - dy } }
+      : p));
+  });
+}
+
 function applyRelayoutResult(result) {
   if (!result.ok) {
     if (result.hitAxis) {
@@ -707,7 +810,15 @@ function applyRelayoutResult(result) {
       showPanelSizeLimitError(result.reason.split(':')[1]);
     } else if (result.reason?.startsWith('min-gap:')) {
       const [a, b] = result.reason.slice('min-gap:'.length).split('/');
-      showToast(`Can't fit — ${a} and ${b} would be closer than ${MIN_WALL_GAP_MM}mm`);
+      const quoted = panels.filter((p) => [a, b].includes(p.name)
+        && ((p.constraints || []).some((c) => c.type === 'distance' && !c.overridden)
+          || panels.some((o) => (o.constraints || []).some((c) => c.type === 'distance' && !c.overridden && c.from?.node === p.id))));
+      if (quoted.length) {
+        flashQuoteAlert(quoted.map((p) => p.id));
+        showToast(`Can't fit — ${a} and ${b} would be closer than ${MIN_WALL_GAP_MM}mm. A quote keeps ${quoted.map((p) => p.name).join(' / ')} at its distance (shown in red), so the move is blocked.`);
+      } else {
+        showToast(`Can't fit — ${a} and ${b} would be closer than ${MIN_WALL_GAP_MM}mm`);
+      }
     }
     return false;
   }
@@ -1052,7 +1163,7 @@ function checkJointWarnings(resolvedPanels) {
   setDimensions(
     panels,
     resolvedPanels,
-    new Set(violations.filter((v) => v.type === 'quoteConflict').flatMap((v) => v.drivenIds || [])),
+    new Set([...violations.filter((v) => v.type === 'quoteConflict').flatMap((v) => v.drivenIds || []), ...quoteAlertIds]),
     { mode: dimensionMode, pendingPair: getQuotePending()?.pair || null },
   );
   const newViolations = violations.filter((v) => !knownViolationKeys.has(v.key));
@@ -1081,7 +1192,22 @@ function checkJointWarnings(resolvedPanels) {
   showToast(parts.join('  •  '));
 }
 
+// An exception in any part of the render (panel list, inspector...) must not
+// leave the viewport and the quote lines stale until the next click: report it
+// and still refresh the quotes.
 function renderAll() {
+  try {
+    renderAllInner();
+  } catch (err) {
+    console.error('renderAll failed:', err);
+    showToast(`Internal error while redrawing: ${err?.message || err}`);
+    try {
+      setDimensions(panels, resolveConstraints(panels), new Set(quoteAlertIds), { mode: dimensionMode, pendingPair: getQuotePending()?.pair || null });
+    } catch (err2) { console.error(err2); }
+  }
+}
+
+function renderAllInner() {
   const selectedId = getSelectedId();
   const selectedGroupId = getSelectedGroupId();
   const selectedBoxWallId = selectedId && panels.find((p) => p.id === selectedId)?.isBoxWall ? selectedId : null;
@@ -1201,7 +1327,7 @@ function renderAll() {
     onAddHorizontal: addHorizontalPanel,
     onAddParallel: addParallelPanel,
     onAddBox: handleAddBox,
-    onAddDimension: () => (isQuoteActive() ? cancelQuoteMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), startQuoteMode())),
+    onAddDimension: () => (isQuoteActive() ? cancelQuoteMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), showQuotes(), startQuoteMode())),
     quoteToolActive: isQuoteActive(),
     quoteMessage: getQuoteMessage(),
     onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), startCollinearMode())),
@@ -1571,6 +1697,13 @@ function updateSelectedTransformField(group, axis, value) {
       renderAll();
       return;
     }
+    const wallClash = quoteClash(before);
+    if (wallClash) {
+      panels = before;
+      refuseForQuote(wallClash, `Can't move ${node.name || 'this wall'}`);
+      renderAll();
+      return;
+    }
 
     const after = panels;
     recordHistoryCommand(MovePanelCommand, before, after);
@@ -1588,7 +1721,18 @@ function updateSelectedTransformField(group, axis, value) {
     }
   }
   const before = panels;
+  if (group === 'offset') {
+    const held = quoteHoldingAxis(node, axis);
+    if (held) { refuseQuotedAxis(node, axis, held); renderAll(); return; }
+  }
   updateNode(selectedId, { [group]: { ...node[group], [axis]: value } });
+  const fieldClash = quoteClash(before);
+  if (fieldClash) {
+    panels = before;
+    refuseForQuote(fieldClash, `Can't change ${node.name || 'this panel'}`);
+    renderAll();
+    return;
+  }
   const after = panels;
   recordHistoryCommand(MovePanelCommand, before, after);
   renderAll();
@@ -2077,7 +2221,16 @@ function changeQuoteValue(constraintId, value, drivenId = getSelectedId()) {
   const before = panels;
   const result = updateQuote(panels, drivenId, constraintId, value);
   if (!result.ok) { showToast(result.message); renderAll(); return false; }
+  const clash = newConflicts(before, result.panels);
+  if (clash.conflicts.length) {
+    flashQuoteAlert(clash.conflictIds);
+    showToast(`Value refused — it conflicts with other quotes (shown in red): ${clash.conflicts[0]}`);
+    renderAll();
+    return false;
+  }
+  clearQuoteAlert();
   panels = result.panels;
+  groundBoxes();
   const violation = resolveConstraints(panels).find((r) => r.id === drivenId);
   if (violation) {
     const dims = { width: violation.width, height: violation.height, thickness: violation.thickness };
@@ -2119,7 +2272,7 @@ function changeQuoteOffset(drivenId, constraintId, offsetMm) {
 // re-fit the rest (doors, drawers, plinth, legs follow inside
 // applyRelayoutResult), ONE history step. Same validate-then-commit path as
 // dragging a wall or typing its offset.
-function applyBoxDimension(wallId, offset) {
+function applyBoxDimension(wallId, offset, remember = null) {
   const wall = panels.find((p) => p.id === wallId);
   if (!wall) return false;
   const before = panels;
@@ -2129,6 +2282,22 @@ function applyBoxDimension(wallId, offset) {
     panels = before;
     renderAll();
     return false;
+  }
+  const boxClash = quoteClash(before);
+  if (boxClash) {
+    panels = before;
+    refuseForQuote(boxClash, "Can't resize the box that way");
+    renderAll();
+    return false;
+  }
+  groundBoxes();
+  if (remember) {
+    // Keep the dimension on screen: the wall that stayed put remembers it.
+    const holder = panels.find((p) => p.id === remember.holderId);
+    if (holder) {
+      const kept = holder.boxDims?.[remember.axis];
+      updateNode(holder.id, { boxDims: { ...(holder.boxDims || {}), [remember.axis]: { otherId: remember.otherId, offsetMm: kept?.offsetMm ?? remember.offsetMm ?? 0 } } });
+    }
   }
   recordHistoryCommand(MovePanelCommand, before, panels);
   renderAll();
@@ -2141,19 +2310,32 @@ function commitDimension(plan, value, offsetMm = 0) {
   if (plan.mode === 'box') {
     const preview = previewBoxDimension(panels, plan.plan, value);
     if (!preview.ok) { showToast(preview.blocking); return false; }
-    const done = applyBoxDimension(plan.plan.moveId, boxDimensionOffset(panels, plan.plan, value));
+    const done = applyBoxDimension(plan.plan.moveId, boxDimensionOffset(panels, plan.plan, value), {
+      holderId: plan.plan.anchorId, otherId: plan.plan.moveId, axis: plan.plan.axis, offsetMm,
+    });
     if (done && plan.notice) showToast(plan.notice); // e.g. the panel was fixed, so a box wall moved instead
     return done;
   }
   const before = panels;
   const added = addQuote(panels, { drivenId: plan.drivenId, myFace: plan.myFace, from: plan.from, value });
   if (!added.ok) { showToast(added.message); return false; }
+  // A quote that contradicts others is NOT applied: the quotes in its way
+  // are shown in red instead.
+  const clash = newConflicts(panels, added.panels);
+  if (clash.conflicts.length) {
+    flashQuoteAlert(clash.conflictIds);
+    showToast(`Quote refused — it conflicts with other quotes (shown in red): ${clash.conflicts[0]}`);
+    renderAll();
+    return false;
+  }
+  clearQuoteAlert();
   let next = added.panels;
   if (offsetMm) {
     const moved = setQuoteOffset(next, plan.drivenId, added.constraint.id, offsetMm);
     if (moved.ok) next = moved.panels;
   }
   updateNode(plan.drivenId, { constraints: next.find((p) => p.id === plan.drivenId).constraints });
+  groundBoxes();
   recordHistoryCommand(AddConstraintCommand, before, panels);
   renderAll();
   return true;
@@ -2175,31 +2357,63 @@ function onDimensionEdit(spec, value) {
   if (!plan.ok) { showToast(plan.message); return false; }
   const ok = commitDimension(plan, value, spec.offsetMm);
   if (ok && isQuoteActive()) cancelQuoteMode();
+  // Belt and braces: redraw once more after the input/focus events that follow
+  // the Enter key have settled, so the new quote and the moved panel show now.
+  if (ok) requestAnimationFrame(() => renderAll());
   return ok;
 }
+function setBoxDimEntry(spec, patch) {
+  const holder = panels.find((p) => p.id === spec.holderId);
+  if (!holder?.boxDims) return false;
+  const before = panels;
+  const next = { ...holder.boxDims };
+  if (patch === null) delete next[spec.axis]; else next[spec.axis] = { ...next[spec.axis], ...patch };
+  updateNode(holder.id, { boxDims: next });
+  recordHistoryCommand(patch === null ? RemoveConstraintCommand : MoveDimensionCommand, before, panels);
+  renderAll();
+  return true;
+}
 function onDimensionRemove(spec) {
+  if (spec.kind === 'boxdim') { setBoxDimEntry(spec, null); return; } // hides the dimension only — the box keeps its size
   if (spec.kind === 'imposed') removeQuoteById(spec.drivenId, spec.constraintId);
+  requestAnimationFrame(() => renderAll());
 }
 function onDimensionMove(spec, offsetMm) {
+  if (spec.kind === 'boxdim') { setBoxDimEntry(spec, { offsetMm }); return; }
   if (spec.kind === 'imposed') changeQuoteOffset(spec.drivenId, spec.constraintId, offsetMm);
 }
-setDimensionHandlers({ onEditValue: onDimensionEdit, onRemove: onDimensionRemove, onMove: onDimensionMove });
+// An exception inside a quote edit must neither leave the screen stale (the
+// quote may already be stored) nor stay silent: redraw, show the message.
+function safely(fn, fallback) {
+  return (...args) => {
+    try {
+      return fn(...args);
+    } catch (err) {
+      console.error('quote action failed:', err);
+      showToast(`Internal error: ${err?.message || err}`);
+      try { renderAll(); } catch (e2) { console.error(e2); }
+      return fallback;
+    }
+  };
+}
+setDimensionHandlers({ onEditValue: safely(onDimensionEdit, false), onRemove: safely(onDimensionRemove), onMove: safely(onDimensionMove) });
 setDimensionsInteractive(true);
 
-// Top-bar "Quotes" button cycles: user (imposed only) -> all (+ a grey
-// measured dimension for every neighbouring pair, to impose faster) -> off
-// (hidden; imposed ones stay applied, they are constraints).
+// Top-bar "Quotes" button toggles: on = every main distance (grey = measured,
+// not imposed · black = imposed by you · red = in conflict) -> off (hidden;
+// imposed ones stay applied, they are constraints).
 const toggleQuotesBtn = document.getElementById('toggle-quotes-btn');
 const quotesLabelEl = document.getElementById('quotes-mode-label');
 const QUOTE_MODES = {
-  user: { next: 'all', label: 'Quotes', title: 'Showing your dimensions — click to also show every measurable distance (grey) so you can impose them faster' },
-  all: { next: 'off', label: 'Quotes: all', title: 'Showing all distances: grey = measured only, black = imposed by you. Click to hide dimensions' },
-  off: { next: 'user', label: 'Quotes: off', title: 'Dimensions hidden (imposed ones stay applied) — click to show them' },
+  user: { next: 'off', label: 'Quotes', title: 'Your quotes: black = imposed by you · red = conflict. Click to hide' },
+  off: { next: 'user', label: 'Quotes: off', title: 'Quotes hidden (imposed ones stay applied) — click to show them' },
 };
+function showQuotes() {
+  if (dimensionMode === 'off') { dimensionMode = 'user'; syncQuotesButton(); }
+}
 function syncQuotesButton() {
   const m = QUOTE_MODES[dimensionMode];
   toggleQuotesBtn?.classList.toggle('on', dimensionMode !== 'off');
-  toggleQuotesBtn?.classList.toggle('all', dimensionMode === 'all');
   toggleQuotesBtn?.setAttribute('title', m.title);
   if (quotesLabelEl) quotesLabelEl.textContent = m.label;
 }
@@ -2208,7 +2422,6 @@ toggleQuotesBtn?.addEventListener('click', () => {
   syncQuotesButton();
   renderAll();
 });
-syncQuotesButton();
 
 // identifier is either a FIELD NAME (soft "Unlink" — mark the active
 // constraint on that field overridden, keep its definition) or a

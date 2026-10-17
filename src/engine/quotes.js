@@ -30,7 +30,7 @@ import { resolveConstraints } from '../modeller/snap.js';
 import { detectJoints } from './joints.js';
 import { findQuoteConflicts } from './quoteConflicts.js';
 import { relayoutBox } from '../features/box.js';
-import { getAlignedAxis, getPanelOwnership, nextConstraintId, FIELD_TO_AXIS, FACE_TO_DIM_FIELD, LOCAL_FACES } from '../modeller/modules.js';
+import { getAlignedAxis, getPanelOwnership, nextConstraintId, FIELD_TO_AXIS, FACE_TO_DIM_FIELD, LOCAL_FACES, computeWorldHalfExtents } from '../modeller/modules.js';
 
 const AXIS_TO_POSITION_FIELD = { x: 'positionX', y: 'positionY', z: 'positionZ' };
 
@@ -260,15 +260,25 @@ export function removeQuote(panels, drivenId, constraintId) {
  */
 export function previewQuote(panels, spec) {
   const added = addQuote(panels, spec);
-  if (!added.ok) return { ok: false, blocking: added.message, conflicts: [] };
+  if (!added.ok) return { ok: false, blocking: added.message, conflicts: [], conflictIds: [] };
+  return { ...newConflicts(panels, added.panels), ok: true };
+}
 
+/**
+ * Conflicts that `next` has and `prev` did not (same audit as the red lines
+ * in the viewport). `conflictIds` = ids of the quoted panels involved, used
+ * to flash the quotes in the way in red.
+ */
+export function newConflicts(prev, next) {
   const audit = (list) => {
     const resolved = resolveConstraints(list);
     return findQuoteConflicts(list, resolved, { collisions: detectJoints(resolved).collisions });
   };
-  const known = new Set(audit(panels).map((v) => v.key));
-  const fresh = audit(added.panels).filter((v) => !known.has(v.key));
-  return { ok: true, conflicts: fresh.map((v) => v.message) };
+  const known = new Set(audit(prev).map((v) => v.key));
+  const fresh = audit(next).filter((v) => !known.has(v.key));
+  const ids = new Set();
+  fresh.forEach((v) => [...(v.drivenIds || []), ...(v.panelIds || [])].forEach((id) => ids.add(id)));
+  return { conflicts: fresh.map((v) => v.message), conflictIds: [...ids] };
 }
 
 // ---------------------------------------------------------------
@@ -310,7 +320,11 @@ export function planBoxDimension(panels, a, b) {
   const moveIsB = rb.position[axis] >= ra.position[axis];
   const mover = moveIsB ? nb : na;
   const stay = moveIsB ? na : nb;
-  const measuredMm = (resolvedFacePoint(rb, b.faceName, axis) - resolvedFacePoint(ra, a.faceName, axis)) * alA.sign;
+  // OUTSIDE-to-OUTSIDE: the box's overall size (the inner space is what is left
+  // between the walls' inner faces, which is where shelves go).
+  const half = (r) => computeWorldHalfExtents(r)[axis];
+  const [lowR, upR] = rb.position[axis] >= ra.position[axis] ? [ra, rb] : [rb, ra];
+  const measuredMm = (upR.position[axis] + half(upR)) - (lowR.position[axis] - half(lowR));
   return {
     ok: true, kind: 'box', groupId: na.groupId, axis, label: BOX_AXIS_LABEL[axis],
     moveId: mover.id, anchorId: stay.id, measuredMm, moveSign: 1,
