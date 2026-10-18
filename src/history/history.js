@@ -278,6 +278,18 @@ export class UnlinkConstraintCommand extends ModelCommand {
   }
 }
 
+export class MoveDimensionCommand extends ModelCommand {
+  constructor(options) {
+    super({ ...options, label: 'Move dimension' });
+  }
+}
+
+export class EditQuoteCommand extends ModelCommand {
+  constructor(options) {
+    super({ ...options, label: 'Edit distance' });
+  }
+}
+
 export class HideBoxWallCommand extends ModelCommand {
   constructor(options) {
     super({ ...options, label: 'Hide box wall' });

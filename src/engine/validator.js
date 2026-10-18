@@ -32,6 +32,7 @@
 
 import { detectJoints } from './joints.js';
 import { findClearanceViolations } from './clearance.js';
+import { findQuoteConflicts } from './quoteConflicts.js';
 import { findPanelSizeViolation, findDesignLimitViolation, checkMinGap, collectAxisSlabs } from '../shared/geometry.js';
 import { MIN_PANEL_DIM_MM } from '../modeller/modules.js';
 
@@ -39,7 +40,7 @@ import { MIN_PANEL_DIM_MM } from '../modeller/modules.js';
  * @typedef {Object} Violation
  * @property {'collision'|'undersizedPanel'|'oversizedPanel'|'exceedsDesignLimit'|'minGap'|
  *   'fastenerAccess'|'hingeBoring'|'doorSwing'|'drawerTravel'|'handleClearance'|
- *   'clearanceConflict'|'parallelPanelGap'|'fixingProximity'|'boringDepth'} type -
+ *   'clearanceConflict'|'parallelPanelGap'|'fixingProximity'|'boringDepth'|'quoteConflict'} type -
  *   the last 8 come from engine/clearance.js#findClearanceViolations — see that
  *   file's own header for what each one checks and why it's a separate concern
  *   from the collision/size/design-limit/min-gap checks in THIS file.
@@ -192,11 +193,20 @@ export function validateDesign(panels, resolvedPanels, precomputed = {}) {
 
   const collisions = precomputed.collisions ?? detectJoints(resolvedPanels).collisions;
 
+  // User-quote conflicts (engine/quoteConflicts.js). A quote conflict
+  // that already explains a generic collision / design-limit violation
+  // replaces it, so one underlying problem isn't listed twice.
+  const quoteViolations = findQuoteConflicts(panels, resolvedPanels, { collisions });
+  const explained = new Set(quoteViolations.flatMap((v) => v.explains || []));
+
   return {
     violations: [
-      ...collisionViolations(collisions, resolvedById),
-      ...panelSizeViolations(visibleResolvedPanels),
-      ...designLimitViolations(visibleResolvedPanels),
+      ...quoteViolations,
+      ...[
+        ...collisionViolations(collisions, resolvedById),
+        ...panelSizeViolations(visibleResolvedPanels),
+        ...designLimitViolations(visibleResolvedPanels),
+      ].filter((v) => !explained.has(v.key)),
       ...minGapViolations(panels),
       // Joinery/tool-assembly/moving-part clearance — see
       // engine/clearance.js's own file header. Cheap enough (per-item

@@ -101,12 +101,24 @@ export function renderProperties(
           ${MATERIAL_CATALOG.map((m) => `<option value="${escapeHtml(m.name)}" ${m.name === groupMaterial ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
         </select>
       </div>
+      ${drawerStack ? drawerHeightsSectionHTML(drawerStack) : ''}
       ${restoreFaceListHTML(hiddenList, restoreError)}
       <div class="empty-state">Click a member panel — in the list, or in the 3D/2D view — to select and edit it individually.</div>
       <button class="remove-btn" id="ungroup-btn">Ungroup (keep all ${groupMemberCount} panels)</button>
       <button class="remove-btn" id="delete-group-btn">Delete whole group (${groupMemberCount} panels)</button>
     `;
     wireRestoreFaceButtons(container, onRestoreFace);
+    container.querySelectorAll('[data-drawer-layout]').forEach((btn) => {
+      btn.addEventListener('click', () => onDrawerLayoutModeChange?.(btn.dataset.drawerLayout));
+    });
+    container.querySelectorAll('.drawer-height-field').forEach((input) => {
+      const commit = () => {
+        const v = parseFloat(input.value);
+        if (Number.isFinite(v)) onDrawerFrontHeightChange?.(Number(input.dataset.index), v);
+      };
+      input.addEventListener('change', commit);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
+    });
     container.querySelector('#group-material-field').addEventListener('change', (e) => onGroupMaterialChange(e.target.value));
     container.querySelector('#ungroup-btn').addEventListener('click', onUngroup);
     container.querySelector('#delete-group-btn').addEventListener('click', onRemove);

@@ -300,6 +300,40 @@ export async function loadMaterialCatalog(url = `${import.meta.env.BASE_URL}data
   return MATERIAL_CATALOG;
 }
 
+// ---- OWNERSHIP ----
+// Who is allowed to decide where/how big a panel is.
+//   'user'   — an ordinary panel (e.g. a shelf): the person may place
+//              it, including by imposing a distance (a "quote", see
+//              engine/quotes.js).
+//   'system' — geometry derived by a feature (plinth + ribs, door,
+//              drawer front/box, leg, box wall). The feature
+//              regenerates it from its own parameters, so nothing a
+//              person types or imposes may move or resize it. It can
+//              still be a quote's ANCHOR (a fixed datum to measure from).
+// An explicit node.ownership wins; otherwise it is derived from the
+// existing feature flags, so designs created before this field existed
+// behave identically without a migration.
+const SYSTEM_FLAGS = [
+  ['isPlinthPanel', 'plinth'],
+  ['isDoor', 'door'],
+  ['isDrawerFront', 'drawer-front'],
+  ['isDrawerBoxPanel', 'drawer-box'],
+  ['isLeg', 'leg'],
+  ['isBoxWall', 'box-wall'],
+];
+
+export function getPanelOwnership(node) {
+  if (node?.ownership === 'system' || node?.ownership === 'user') {
+    return { ownership: node.ownership, reason: node.ownershipReason || null };
+  }
+  const hit = SYSTEM_FLAGS.find(([flag]) => node?.[flag]);
+  return hit ? { ownership: 'system', reason: hit[1] } : { ownership: 'user', reason: null };
+}
+
+export function isSystemManaged(node) {
+  return getPanelOwnership(node).ownership === 'system';
+}
+
 export function createPanelNode(overrides = {}) {
   const rotation = overrides.rotation || { x: 0, y: 90, z: 0 };
   const node = {
@@ -329,6 +363,12 @@ export function createPanelNode(overrides = {}) {
 
   node.thicknessAxis =
     getAlignedAxis(node.rotation, 'front')?.axis || 'z';
+
+  // Stamped AFTER overrides are merged, from the same flags every
+  // feature already sets — see getPanelOwnership below.
+  const own = getPanelOwnership(node);
+  node.ownership = own.ownership;
+  if (own.reason) node.ownershipReason = own.reason;
 
   // Assigned from node.name AFTER overrides are merged in (box walls
   // and shelves set name directly via overrides) — see the file-

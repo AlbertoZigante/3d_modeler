@@ -23,6 +23,7 @@ import { computeHandlePlacement } from '../shared/handle.js';
 import { createOrbitControls } from './orbitControls.js';
 import { createGizmos } from './gizmos.js';
 import { create2DControls } from './view2d.js';
+import { createDimensionOverlay } from './dimensions.js';
 import { createViewCube } from './viewCube.js';
 
 const CONST_Face_Panel_Color_Highlight = 0xff8a1e; // orange, same as the collinear tool's highlight color
@@ -568,6 +569,18 @@ export function createModellerScene(
     reconcile(lastResolvedPanels, lastSelectedId, lastSelectedGroupId, lastMultiSelectedIds, lastBoxWallIds); // re-apply immediately, don't wait for the next external render
   }
 
+  // Quote annotations (see dimensions.js). The overlay itself is created
+  // after the viewport element is known (below); these thin wrappers are
+  // only called once the scene is up. Handlers are filled in by
+  // modeller-main.js (edit value / remove / move a dimension).
+  const dimensionHandlers = {};
+  let dimensionOverlay = null;
+  function setDimensions(rawPanels, resolvedPanels, conflictedIds, opts) {
+    dimensionOverlay?.update(rawPanels, resolvedPanels, conflictedIds, opts);
+  }
+  function setDimensionHandlers(h) { Object.assign(dimensionHandlers, h); }
+  function setDimensionsInteractive(v) { dimensionOverlay?.setInteractive(v); }
+
   function reconcile(resolvedPanels, selectedId, selectedGroupId, multiSelectedIds, boxWallIds, selectedBoxWallId) {
     lastResolvedPanels = resolvedPanels;
     lastSelectedId = selectedId;
@@ -816,6 +829,12 @@ export function createModellerScene(
   // since dragging a sidebar's width changes this element's size
   // without ever firing a window resize event.
   const viewportEl = canvas.parentElement || main;
+  // Screen-space dimension layer (constant-size text, click to edit, drag to move).
+  dimensionOverlay = createDimensionOverlay(viewportEl, {
+    onEditValue: (...a) => dimensionHandlers.onEditValue?.(...a),
+    onRemove: (...a) => dimensionHandlers.onRemove?.(...a),
+    onMove: (...a) => dimensionHandlers.onMove?.(...a),
+  });
   function onResize() {
     const w = viewportEl.clientWidth;
     const h = viewportEl.clientHeight;
@@ -862,6 +881,7 @@ export function createModellerScene(
   function animate() {
     animationFrameId = requestAnimationFrame(animate);
     renderView(renderer, activeCamera, viewMode);
+    dimensionOverlay?.refresh(activeCamera, viewportEl.clientWidth, viewportEl.clientHeight); // re-project the dimensions through the camera as it is now
     if (viewCube) {viewCube.render(activeCamera);}
     if (pipRenderer) { // Picture-in-picture shows the opposite view
       const pipMode = viewMode === '2d' ? '3d' : '2d';
@@ -899,8 +919,9 @@ export function createModellerScene(
       mesh.material.dispose();
     }
     highlightSetMeshes.clear();
+    dimensionOverlay?.dispose();
     renderer.dispose();
   }
 
-  return { reconcile, dispose, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight, setPanelHighlightSet };
+  return { reconcile, dispose, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight, setPanelHighlightSet, setDimensions, setDimensionHandlers, setDimensionsInteractive };
 }
