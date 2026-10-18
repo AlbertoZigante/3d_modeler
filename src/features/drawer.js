@@ -39,6 +39,15 @@ import { resolveConstraints } from '../modeller/snap.js';
 import { findBoxSibling } from './box.js';
 import { applyPanelPatch } from './door.js';
 
+/**
+ * A drawer stack (its fronts and their boxes) is its OWN group — `groupId` is
+ * the stack's id, so it selects, moves and lists independently of the cabinet.
+ * `boxGroupId` is the LINK back to the cabinet group whose walls/shelves/Back
+ * define the drawer sizes. Designs saved before this split have no
+ * `boxGroupId` (drawers shared the cabinet's `groupId`): fall back to it.
+ */
+export const boxGroupOf = (p) => p?.boxGroupId ?? p?.groupId;
+
 export const DEFAULT_DRAWER_EDGE_FIT = { left: 'in', right: 'in', bottom: 'in', top: 'in' };
 export const DEFAULT_DRAWER_COUNT = 2;
 export const MAX_DRAWER_COUNT = 10; // no structural reason beyond this — just a guard against a fat-fingered huge count producing degenerate slivers (see the panel-too-short check below, which would catch it anyway, but failing fast on the count itself gives a clearer reason)
@@ -71,18 +80,26 @@ export function computeDrawerFrontsPlacement(panels, boundaryResult, edgeFit, dr
   if (!front.ok) return front;
 
   const totalHeight = front.bMax - front.bMin;
-  const heightEach = totalHeight / count;
-  if (heightEach < MIN_PANEL_DIM_MM) return { ok: false, reason: 'panel-too-short' };
+  // Equal subdivision by default; with `drawerSpec.heights` (one per front,
+  // bottom-to-top) each front keeps ITS OWN share of the available height —
+  // scaled when the cabinet is resized, so the proportions the person chose
+  // survive and the stack always fills the opening exactly.
+  const custom = Array.isArray(drawerSpec.heights) && drawerSpec.heights.length === count
+    && drawerSpec.heights.every((h) => Number.isFinite(h) && h > 0);
+  const weightSum = custom ? drawerSpec.heights.reduce((a, b) => a + b, 0) : 0;
+  const heights = custom
+    ? drawerSpec.heights.map((h) => (h / weightSum) * totalHeight)
+    : Array.from({ length: count }, () => totalHeight / count);
+  if (heights.some((h) => h < MIN_PANEL_DIM_MM)) return { ok: false, reason: 'panel-too-short' };
 
-  // Equal subdivision, bottom-to-top — fronts[0] sits at bMin (the
-  // bottom-most drawer), fronts[count-1] at bMax. See this module's
-  // own header comment for why each is a plain literal height today
-  // rather than a constraint some future per-drawer resize would need.
-  const fronts = Array.from({ length: count }, (_, i) => ({
-    bMin: front.bMin + i * heightEach,
-    bMax: front.bMin + (i + 1) * heightEach,
-    heightMm: heightEach,
-  }));
+  // Bottom-to-top — fronts[0] sits at bMin (the bottom-most drawer),
+  // fronts[count-1] at bMax.
+  let cursor = front.bMin;
+  const fronts = heights.map((h, i) => {
+    const bMin = cursor;
+    cursor = i === count - 1 ? front.bMax : cursor + h; // last one closes exactly on bMax (no float drift)
+    return { bMin, bMax: cursor, heightMm: cursor - bMin };
+  });
 
   return {
     ok: true,
@@ -151,7 +168,8 @@ export function createDrawerFrontNodes(panels, placement, drawerBoxSpec = {}) {
       thickness: placement.thicknessMm,
       material: placement.material,
       rotation,
-      groupId: placement.groupId,
+      groupId: stackId,               // independent group: one per drawer stack
+      boxGroupId: placement.groupId,  // link to the cabinet that defines its size
       isBoxPanel: true,
       // Same reasoning as a door's lockedMoveAxes (see
       // features/door.js#createDoorNode's own comment) — a drawer
@@ -192,6 +210,10 @@ export function createDrawerFrontNodes(panels, placement, drawerBoxSpec = {}) {
     node.drawerIndex = i;
     node.drawerCount = placement.fronts.length;
     node.drawerBoxSpec = boxSpec;
+    // Height layout of the whole stack: 'equal', or 'custom' (each front has its
+    // own height). `drawerHeights` mirrors the current heights, bottom-to-top.
+    node.drawerLayoutMode = 'equal';
+    node.drawerHeights = placement.fronts.map((fr) => fr.heightMm);
 
     return node;
   });
@@ -275,6 +297,9 @@ export function computeDrawerRecompute(panels, anyFrontInStack) {
     material: anyFrontInStack.material,
     thicknessMm: anyFrontInStack.thickness,
     count: anyFrontInStack.drawerCount,
+    heights: anyFrontInStack.drawerLayoutMode === 'custom'
+      ? [...siblings].sort((a, b) => a.drawerIndex - b.drawerIndex).map((p) => (p.drawerHeights?.[p.drawerIndex]))
+      : null,
   });
 }
 
@@ -302,7 +327,7 @@ export function computeDrawerRecompute(panels, anyFrontInStack) {
 export function applyDrawerAdjustmentsForGroup(panels, groupId) {
   let next = panels;
   const seenStackIds = new Set();
-  const stackFronts = next.filter((p) => p.groupId === groupId && p.isDrawerFront);
+  const stackFronts = next.filter((p) => boxGroupOf(p) === groupId && p.isDrawerFront);
 
   for (const front of stackFronts) {
     if (seenStackIds.has(front.drawerStackId)) continue; // already processed this whole stack via an earlier sibling
@@ -336,6 +361,7 @@ export function applyDrawerAdjustmentsForGroup(panels, groupId) {
         ...p,
         [widthField]: placement.aMax - placement.aMin,
         [heightField]: f.bMax - f.bMin,
+        drawerHeights: placement.fronts.map((fr) => fr.heightMm),
         offset: {
           x: absoluteCenter.x - p.basePosition.x,
           y: absoluteCenter.y - p.basePosition.y,
@@ -368,6 +394,59 @@ export function applyDrawerAdjustmentsForGroup(panels, groupId) {
   }
 
   return next;
+}
+
+/**
+ * Changes how the heights of one drawer stack's fronts are decided.
+ *   { mode: 'equal' }                       -> all fronts the same height
+ *   { mode: 'custom' }                      -> keep today's heights, now editable
+ *   { mode: 'custom', index, valueMm }      -> front `index` (0 = bottom) gets
+ *        valueMm; the neighbour above (or below, for the top front) absorbs the
+ *        difference, so the stack still fills the opening exactly.
+ * Pure: returns { ok, panels } or { ok:false, message }.
+ */
+export function applyDrawerLayout(panels, stackId, change) {
+  const fronts = panels.filter((p) => p.isDrawerFront && p.drawerStackId === stackId)
+    .sort((a, b) => a.drawerIndex - b.drawerIndex);
+  if (!fronts.length) return { ok: false, message: 'No drawer stack found.' };
+  const boxGroup = boxGroupOf(fronts[0]);
+  const n = fronts.length;
+  let mode = change.mode === 'equal' ? 'equal' : 'custom';
+  let heights = fronts.map((f) => f.drawerHeights?.[f.drawerIndex]);
+  if (heights.some((h) => !Number.isFinite(h))) {
+    return { ok: false, message: 'This drawer stack has no readable heights yet.' };
+  }
+
+  if (mode === 'custom' && Number.isFinite(change.valueMm)) {
+    if (n < 2) return { ok: false, message: 'A single drawer fills the whole opening — add more drawers to set different heights.' };
+    const i = change.index;
+    if (!(i >= 0 && i < n)) return { ok: false, message: 'Unknown drawer front.' };
+    const j = i + 1 < n ? i + 1 : i - 1; // the neighbour that gives/takes the difference
+    const delta = heights[i] - change.valueMm;
+    const nextI = change.valueMm;
+    const nextJ = heights[j] + delta;
+    if (nextI < MIN_PANEL_DIM_MM || nextJ < MIN_PANEL_DIM_MM) {
+      return { ok: false, message: `Not possible: every front must stay at least ${MIN_PANEL_DIM_MM} mm high (the neighbouring front would become ${Math.round(nextJ)} mm).` };
+    }
+    heights = heights.slice();
+    heights[i] = nextI;
+    heights[j] = nextJ;
+  }
+
+  let next = panels.map((p) => (p.isDrawerFront && p.drawerStackId === stackId
+    ? { ...p, drawerLayoutMode: mode, drawerHeights: heights }
+    : p));
+  next = applyDrawerAdjustmentsForGroup(next, boxGroup);
+  // The recompute leaves a stack untouched when it cannot be built (e.g. too short):
+  // detect that and refuse instead of storing a layout that was not applied.
+  const check = next.filter((p) => p.isDrawerFront && p.drawerStackId === stackId).sort((a, b) => a.drawerIndex - b.drawerIndex);
+  if (mode === 'custom' && Number.isFinite(change.valueMm)) {
+    const got = check[change.index]?.drawerHeights?.[change.index];
+    if (!Number.isFinite(got) || Math.abs(got - change.valueMm) > 0.5) {
+      return { ok: false, message: 'Those heights do not fit the opening.' };
+    }
+  }
+  return { ok: true, panels: next };
 }
 
 export const DEFAULT_DRAWER_BOX_WIDTH_MARGIN_MM = 21; // Blum TANDEM/LEGRABOX spec: inside drawer width = opening width - 42mm, i.e. 21mm clearance per side (see engine/hardware.js's RUNNER_CATALOG + REF 4) — kept in sync with that number on purpose, since a mismatch here would mean the drawer is built without enough room for the runner engine/hardware.js recommends for it
@@ -476,7 +555,7 @@ export function computeDrawerBoxPlacement(panels, frontNode, boxSpec) {
   const axisA = frontNode.axisA;
   const axisB = frontNode.axisB;
 
-  const backNode = findBoxSibling(panels, frontNode.groupId, 'Back');
+  const backNode = findBoxSibling(panels, boxGroupOf(frontNode), 'Back');
   if (!backNode) return { ok: false, reason: 'no-back-wall' };
 
   const boundaryNodes = Object.values(frontNode.boundaryIds || {}).map((id) => panels.find((p) => p.id === id));
@@ -591,7 +670,8 @@ export function computeDrawerBoxPlacement(panels, frontNode, boxSpec) {
   return {
     ok: true,
     frontId: frontNode.id,
-    groupId: frontNode.groupId,
+    groupId: boxGroupOf(frontNode),   // the cabinet (sizes + shared basePosition)
+    drawerGroupId: frontNode.groupId, // the drawer's own group
     normalAxis: N,
     axisA,
     axisB,
@@ -644,7 +724,8 @@ export function createDrawerBoxNodes(panels, placement) {
       thickness: placement.thicknessMm,
       material: placement.material,
       rotation: spec.rotation,
-      groupId: placement.groupId,
+      groupId: placement.drawerGroupId ?? placement.groupId,
+      boxGroupId: placement.groupId,
       isBoxPanel: true,
       // Mirrors isDrawerFront — the box's proportions/position are
       // DERIVED (from the front's own boundary panels + Back wall +

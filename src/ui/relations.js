@@ -8,7 +8,7 @@
  * (Collinear / shelves) rather than this panel.
  */
 
-import { getDisplayName } from '../modeller/modules.js';
+import { getDisplayName, getPanelOwnership } from '../modeller/modules.js';
 
 export function renderRelations(
   container,
@@ -16,6 +16,7 @@ export function renderRelations(
     selectedPanel,
     allPanels,
     onUnlinkConstraint,
+    onQuoteChange,
   } = {}
 ) {
   // ------------------------------------------------------------
@@ -44,10 +45,31 @@ export function renderRelations(
     ? selectedPanel.constraints
     : [];
 
+  const ownership = getPanelOwnership(selectedPanel);
+  const systemBadge = ownership.ownership === 'system'
+    ? `<div class="empty-state" title="Generated and positioned by the system — it can't be moved or resized by a dimension">
+         🔒 Managed by the system${ownership.reason ? ` (${escapeHtml(ownership.reason)})` : ''} — dimensions can't move it.
+       </div>`
+    : '';
+
   container.innerHTML = `
     <div class="section-title">Relations</div>
+    ${systemBadge}
     ${renderConstraintList(constraints, allPanels)}
   `;
+
+  container.querySelectorAll('.quote-value-input').forEach((input) => {
+    const commit = () => {
+      const value = parseFloat(input.value);
+      if (Number.isFinite(value) && typeof onQuoteChange === 'function') {
+        onQuoteChange(input.dataset.constraintId, value);
+      }
+    };
+    input.addEventListener('change', commit);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    });
+  });
 
   container
     .querySelectorAll('.constraint-remove-btn')
@@ -106,6 +128,28 @@ function renderConstraintList(constraints, allPanels) {
             ${escapeHtml(nameOf(c.to?.node))}
             ·${escapeHtml(c.to?.face ?? '')}
           `;
+        } else if (type === 'equalSpacing') {
+          description = `
+            equally spaced with ${Math.max((c.members || []).length - 1, 0)} other${(c.members || []).length === 2 ? '' : 's'}
+            between ${escapeHtml(nameOf(c.from?.node))} ↔ ${escapeHtml(nameOf(c.to?.node))}
+          `;
+        } else if (type === 'distance') {
+          description = `
+            ${escapeHtml(nameOf(c.from?.node))}
+            ·${escapeHtml(c.from?.face ?? '')}
+            ⟷
+            (${escapeHtml(c.myFace ?? '')})
+            <input
+              type="number"
+              class="quote-value-input"
+              data-constraint-id="${relationId}"
+              value="${escapeHtml(String(c.value ?? 0))}"
+              min="0"
+              step="1"
+              style="width:64px"
+              ${c.overridden ? 'disabled' : ''}
+            /> mm
+          `;
         } else {
           description = `
             attached
@@ -122,7 +166,7 @@ function renderConstraintList(constraints, allPanels) {
             data-constraint-id="${relationId}"
           >
             <div class="constraint-desc">
-              <strong>${field}</strong>
+              <strong>${type === 'distance' ? 'distance' : field}</strong>
               ${c.overridden ? '(unlinked)' : ''}
               —
               ${description}

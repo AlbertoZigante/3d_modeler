@@ -658,7 +658,14 @@ export function create2DControls(
     return raycaster.intersectObjects(objects, false);
   }
 
+  // True only while a press that STARTED on the canvas is in progress. The
+  // pointerup listener lives on window, so without this a click on the
+  // dimension overlay (label/line), a toolbar button or the side panel
+  // would also be taken as a face pick by the Dimension tool.
+  let pressStartedOnCanvas = false;
+
   function handlePointerDown(e) {
+    pressStartedOnCanvas = true;
     gestureState.moved = false;
     gestureState.downX = e.clientX;
     gestureState.downY = e.clientY;
@@ -863,8 +870,10 @@ export function create2DControls(
   }
 
   function handlePointerUp(e) {
+    const startedOnCanvas = pressStartedOnCanvas;
+    pressStartedOnCanvas = false;
     if (isFacePickMode?.()) {
-      if (!gestureState.moved) {
+      if (startedOnCanvas && !gestureState.moved) {
         const worldPoint = screenToWorld(e);
         const hits = hitTest(e, meshList());
 

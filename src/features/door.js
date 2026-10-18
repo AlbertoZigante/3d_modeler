@@ -216,7 +216,25 @@ export function computeDoorOpenTransform(door) {
   position[horizontalAxis] = hingeCoord; // the hinge edge itself never moves
   position[door.normalAxis] = door.position[door.normalAxis] + doorSign * halfWidth; // swings outward, away from the box, by its own half-width
 
-  return { rotation: ROTATION_FOR_NORMAL_AXIS[horizontalAxis], position };
+  // Opening = rotating the CLOSED door about the vertical line through its
+  // hinge, by +90° or -90° about world Y, whichever carries the free edge
+  // (the one opposite the hinge, where the handle sits) from its closed
+  // direction onto doorSign * normalAxis (outward). Which of the two it is
+  // depends on the hinge side, so one fixed rotation for both hinges swung
+  // a left-hinged door mirrored: the handle ended up at the hinge end and on
+  // the wrong face. Rotating the door's own closed orientation keeps the
+  // handle (a child of the door mesh) exactly where it was on the door.
+  const closed = ROTATION_FOR_NORMAL_AXIS[door.normalAxis];
+  const free = { x: 0, z: 0 };
+  free[horizontalAxis] = door.hinge === 'right' ? -1 : 1; // from the hinge toward the free edge, closed
+  const out = { x: 0, z: 0 };
+  out[door.normalAxis] = doorSign;
+  const rotatedBy90 = { x: free.z, z: -free.x }; // world-Y +90° applied to `free`: (x, z) -> (z, -x)
+  const angle = rotatedBy90.x === out.x && rotatedBy90.z === out.z ? 90 : -90;
+  const y = ((((closed.y || 0) + angle) + 540) % 360) - 180;
+  const rotation = { x: closed.x || 0, y, z: closed.z || 0 };
+
+  return { rotation, position };
 }
 
 // Whether `node`'s given dimField is governed by an ACTIVE spansBetween

@@ -38,6 +38,9 @@ import {
   MATERIAL_CATALOG,
   loadMaterialCatalog,
   getDisplayName,
+  computeWorldHalfExtents,
+  FLOOR_MM,
+  FIELD_TO_AXIS,
 } from './modeller/modules.js';
 import { resolveConstraints } from './modeller/snap.js';
 import { createModellerScene } from './modeller/scene.js';
@@ -74,9 +77,12 @@ import {
 } from './shared/geometry.js';
 import { addBox, relayoutBox } from './features/box.js';
 import { isShelf } from './features/shelf.js';
+import { addPlinthAndRaiseBox, applyPlinthAdjustment, normalizePlinthEdgeFit, MIN_PLINTH_HEIGHT_MM } from './features/plinth.js';
+import { addLegsAndRaiseBox, applyLegAdjustment } from './features/leg.js';
+import { startLegMode, cancelLegMode, isLegPickActive, setLegToolContext } from './tools/leg.js';
+import { startPlinthMode, cancelPlinthMode, isPlinthPickActive, setPlinthToolContext } from './tools/plinth.js';
 import { createDoorNode, computeDoorOpenTransform, applyDoorAdjustmentsForGroup, applyPanelPatch, computeDoorPlacement, DEFAULT_DOOR_EDGE_FIT, DEFAULT_DOOR_HINGE } from './features/door.js';
-import { createDrawerFrontNodes, createDrawerBoxNodes, computeDrawerBoxPlacement, applyDrawerAdjustmentsForGroup, computeDrawerFrontsPlacement, DEFAULT_DRAWER_EDGE_FIT, DEFAULT_DRAWER_COUNT, MAX_DRAWER_COUNT } from './features/drawer.js';
-import { addPlinthAndRaiseBox, applyPlinthAdjustment, normalizePlinthEdgeFit, DEFAULT_PLINTH_INSET_MM } from './features/plinth.js';
+import { createDrawerFrontNodes, createDrawerBoxNodes, computeDrawerBoxPlacement, computeDrawerOpenTransform, applyDrawerAdjustmentsForGroup, applyDrawerLayout, boxGroupOf, computeDrawerFrontsPlacement, DEFAULT_DRAWER_EDGE_FIT, DEFAULT_DRAWER_COUNT, MAX_DRAWER_COUNT, DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM } from './features/drawer.js';
 import { startShelfMode, cancelShelfMode, getShelfMode, setShelfToolContext } from './tools/shelfTool.js';
 import { setBoundaryRectToolContext } from './tools/boundaryRectTool.js';
 import {
@@ -92,12 +98,6 @@ import {
   setDrawerToolContext,
 } from './tools/drawerTool.js';
 import {
-  startPlinthMode,
-  cancelPlinthMode,
-  isPlinthPickActive,
-  setPlinthToolContext,
-} from './tools/plinthTool.js';
-import {
   startCollinearMode,
   cancelCollinearMode,
   isCollinearActive,
@@ -107,12 +107,23 @@ import {
 } from './tools/collinearTool.js';
 import { setAttachToolContext } from './tools/attachTool.js';
 import {
+  startSpacingMode, cancelSpacingMode, isSpacingActive, getSpacingState, spacingNextStep, setSpacingToolContext,
+} from './tools/spacingTool.js';
+import { planEqualSpacing, removeEqualSpacing } from './engine/spacing.js';
+import {
+  startQuoteMode, cancelQuoteMode, isQuoteActive, getQuotePending, getQuoteMessage, setQuoteToolContext,
+} from './tools/quoteTool.js';
+import {
+  updateQuote, removeQuote, setQuoteOffset, addQuote, newConflicts, planDimension, previewBoxDimension, boxDimensionOffset,
+} from './engine/quotes.js';
+import {
   history, createStateCommand, MovePanelCommand, MoveGroupCommand, ResizePanelCommand, ChangeMaterialCommand,
   ChangeGroupMaterialCommand, RenamePanelCommand, AddPanelCommand, DeletePanelCommand, AddBoxCommand,
   DeleteBoxCommand, GroupPanelsCommand, UngroupPanelsCommand, DeleteShelfCommand,
-  RemoveConstraintCommand, UnlinkConstraintCommand, HideBoxWallCommand, RestoreBoxWallCommand,
+  AddConstraintCommand, RemoveConstraintCommand, UnlinkConstraintCommand, EditQuoteCommand, MoveDimensionCommand, HideBoxWallCommand, RestoreBoxWallCommand,
   ChangeEdgeFitCommand, AddDoorCommand, SetDoorHingeCommand, DeleteDoorCommand,
-  AddDrawerCommand, DeleteDrawerCommand,
+  AddDrawerCommand, DeleteDrawerCommand, SetDrawerBoxMarginCommand,
+  AddLegsCommand, AddPlinthCommand, SetPlinthHeightCommand, SetPlinthEdgeFitCommand,
 } from './history/history.js';
 initResizableLayout();
 
@@ -325,7 +336,77 @@ document.getElementById('export-bom-pdf-btn')?.addEventListener('click', () => {
 });
 
 // ---- Scene (view layer). Consumes RESOLVED panels only. ----
-const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight, setPanelHighlightSet } = createModellerScene(canvas, main, {
+// Top-bar "Quotes" button state: 'all' (grey = measured main distances not
+// imposed, black = imposed by the user, red = conflicts) or 'off' (hidden,
+// imposed ones stay applied).
+let dimensionMode = 'user';
+// Quoted panels flashed red because a refused quote clashes with them.
+let quoteAlertIds = new Set();
+let quoteAlertTimer = null;
+function flashQuoteAlert(ids) {
+  quoteAlertIds = new Set(ids);
+  clearTimeout(quoteAlertTimer);
+  quoteAlertTimer = setTimeout(() => { quoteAlertIds = new Set(); renderAll(); }, 6000);
+}
+function clearQuoteAlert() {
+  clearTimeout(quoteAlertTimer);
+  quoteAlertIds = new Set();
+}
+
+// ---- Live dependents while dragging ------------------------------
+// A drag only patches the dragged node (cheap, once per pointer move), so a
+// panel DERIVED from it — a shelf spanning between two shelves, a quote
+// anchored to it — used to stay stale until the drag ended. When anything
+// else depends on the moving panel(s), redraw (at most once per frame).
+let liveRenderQueued = false;
+function hasDependents(ids) {
+  const set = new Set(ids);
+  return panels.some((p) => !set.has(p.id)
+    && (p.constraints || []).some((c) => !c.overridden && (set.has(c.from?.node) || set.has(c.to?.node))));
+}
+function queueLiveRender() {
+  if (liveRenderQueued) return;
+  liveRenderQueued = true;
+  requestAnimationFrame(() => { liveRenderQueued = false; renderAll(); });
+}
+
+// ---- QUOTE GUARD -------------------------------------------------
+// Quotes outrank moving/scaling: a quoted panel follows the panel it is
+// quoted to (the resolver keeps the distance), but any move/resize that would
+// break a quote — or that tries to move a panel along an axis a quote fixes —
+// is refused, the quotes involved flash red and a flag explains why.
+function hasActiveQuotes(list) {
+  return list.some((p) => (p.constraints || []).some((c) => (c.type === 'distance' || c.type === 'equalSpacing') && !c.overridden));
+}
+/** New quote conflicts caused by going from `prev` to `panels`, or null. */
+function quoteClash(prev) {
+  if (!hasActiveQuotes(panels)) return null;
+  const clash = newConflicts(prev, panels);
+  return clash.conflicts.length ? clash : null;
+}
+function refuseForQuote(clash, what) {
+  flashQuoteAlert(clash.conflictIds);
+  showToast(`${what} — blocked by a quote (shown in red): ${clash.conflicts[0]}`);
+}
+/** The active quote that fixes `node` along `axis`, if any. */
+function quoteHoldingAxis(node, axis) {
+  return (node.constraints || []).find((c) => (c.type === 'distance' || c.type === 'equalSpacing') && !c.overridden && FIELD_TO_AXIS[c.field] === axis) || null;
+}
+function refuseQuotedAxis(node, axis, c) {
+  const anchor = panels.find((p) => p.id === c.from?.node);
+  flashQuoteAlert([node.id]);
+  if (c.type === 'equalSpacing') {
+    showToast(`${node.name || node.id} can't move along ${axis.toUpperCase()} — it is kept equally spaced with the other panels of its set. Remove the spacing first.`);
+    return;
+  }
+  showToast(`${node.name || node.id} can't move along ${axis.toUpperCase()} — a quote fixes it ${c.value} mm from ${anchor?.name || 'another panel'}. Edit or remove the quote first.`);
+}
+function resolvedMeshPos(id) {
+  const r = resolveConstraints(panels).find((x) => x.id === id);
+  return { x: r.position.x * MM_TO_UNIT, y: r.position.y * MM_TO_UNIT, z: r.position.z * MM_TO_UNIT };
+}
+
+const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighlight, setPanelHighlightSet, setDimensions, setDimensionHandlers, setDimensionsInteractive } = createModellerScene(canvas, main, {
   axesCanvas,
   pipCanvas,
   onPipModeClick: (mode) => switchView(mode),
@@ -350,17 +431,26 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
     // -----------------------------------------------------------
     if (node.isBoxWall) {
       const priorOffset = node.offset;
+      const beforePanels = panels;
       updateNode(nodeId, { offset: transform.offset, rotation: transform.rotation });
 
       const result = relayoutBox(panels, node.groupId);
+      const priorPos = {
+        x: (node.basePosition.x + priorOffset.x) * MM_TO_UNIT,
+        y: (node.basePosition.y + priorOffset.y) * MM_TO_UNIT,
+        z: (node.basePosition.z + priorOffset.z) * MM_TO_UNIT,
+      };
       if (!applyRelayoutResult(result)) {
         updateNode(nodeId, { offset: priorOffset });
         renderAll();
-        return {
-          x: (node.basePosition.x + priorOffset.x) * MM_TO_UNIT,
-          y: (node.basePosition.y + priorOffset.y) * MM_TO_UNIT,
-          z: (node.basePosition.z + priorOffset.z) * MM_TO_UNIT,
-        };
+        return priorPos;
+      }
+      const clash = quoteClash(beforePanels);
+      if (clash) {
+        panels = beforePanels;
+        refuseForQuote(clash, `Can't move ${node.name || 'this wall'}`);
+        renderAll();
+        return priorPos;
       }
 
       renderAll(); // the other 5 walls all just changed — full reconcile, not just this node
@@ -384,7 +474,23 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
       }
     }
 
+    for (const axis of ['x', 'y', 'z']) {
+      const held = quoteHoldingAxis(node, axis);
+      if (held && Math.abs(clampedOffset[axis] - node.offset[axis]) > 0.01) {
+        refuseQuotedAxis(node, axis, held);
+        renderAll();
+        return resolvedMeshPos(nodeId);
+      }
+    }
+    const beforeMove = panels;
     updateNode(nodeId, { offset: clampedOffset, rotation: transform.rotation });
+    const moveClash = quoteClash(beforeMove);
+    if (moveClash) {
+      panels = beforeMove;
+      refuseForQuote(moveClash, `Can't move ${node.name || 'this panel'}`);
+      renderAll();
+      return resolvedMeshPos(nodeId);
+    }
 
     // A shelf (or any other panel) can be one of a door's 4 boundary
     // panels (see features/door.js#createDoorNode's boundaryIds) — if
@@ -404,8 +510,9 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
 
     if (doorsChanged) {
       renderAll(); // more than just this node changed — full reconcile, not just the inspector
-    } else if (nodeId === getSelectedId()) {
-      renderInspectorOnly();
+    } else {
+      if (nodeId === getSelectedId()) renderInspectorOnly();
+      if (hasDependents([nodeId])) queueLiveRender(); // shelves/quotes derived from this panel follow it live
     }
     if (hitAxis) {
       showDesignLimitError(hitAxis);
@@ -454,6 +561,8 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
       };
     });
 
+    if (hasDependents(nodeIds)) queueLiveRender();
+
     if (hitAxis) {
       showDesignLimitError(hitAxis);
       return clampedDeltaMm; // tells gizmos.js/view2d.js to snap the live meshes back to this clamped value
@@ -485,6 +594,8 @@ window.addEventListener('pointerup', () => {
     groupIds.forEach((groupId) => {
       const before2 = panels;
       panels = applyDoorAdjustmentsForGroup(panels, groupId);
+      // drawers are a separate group now: they follow the cabinet they are linked to
+      panels = applyDrawerAdjustmentsForGroup(panels, groupId);
       if (panels !== before2) doorsChanged = true;
     });
     if (doorsChanged) renderAll();
@@ -535,6 +646,13 @@ function applyDimensionChange(nodeId, dims, offsetDeltaMm) {
   }
   const before = panels;
   updateNode(nodeId, { width: dims.width, height: dims.height, thickness: dims.thickness, offset: proposedOffset });
+  const resizeClash = quoteClash(before);
+  if (resizeClash) {
+    panels = before;
+    refuseForQuote(resizeClash, `Can't resize ${current.name || 'this panel'}`);
+    renderAll();
+    return false;
+  }
 
   // Same reasoning as onTransformChange's door catch-up above — a
   // resize (this handler backs the resize-handle drag, mostly shelves;
@@ -548,6 +666,23 @@ function applyDimensionChange(nodeId, dims, offsetDeltaMm) {
   recordHistoryCommand(ResizePanelCommand, before, after);
   renderAll();
   return true;
+}
+
+// Equal spacing: spread the picked panels evenly between two boundaries as a
+// live relation. Refused (and nothing changes) if it would break a quote.
+function applyEqualSpacing(memberIds, boundaryIds) {
+  const before = panels;
+  const plan = planEqualSpacing(panels, memberIds, boundaryIds);
+  if (!plan.ok) return { ok: false, message: plan.message };
+  const clash = newConflicts(before, plan.panels);
+  if (clash.conflicts.length) {
+    flashQuoteAlert(clash.conflictIds);
+    return { ok: false, message: `Not possible — it conflicts with a quote (shown in red): ${clash.conflicts[0]}` };
+  }
+  panels = plan.panels;
+  recordHistoryCommand(AddConstraintCommand, before, panels);
+  renderAll();
+  return { ok: true, message: `${plan.count} panel${plan.count === 1 ? '' : 's'} spaced equally — ${Math.round(plan.gapMm * 10) / 10} mm between each` };
 }
 
 // -------------------------------------------------------------
@@ -566,6 +701,7 @@ const toolContext = {
   recordHistoryCommand,
   renderAll: () => renderAll(),
   clearMultiSelected: () => multiSelectedIds.clear(),
+  setMultiSelected: (ids) => { multiSelectedIds.clear(); ids.forEach((id) => multiSelectedIds.add(id)); },
   setFaceHighlight,
   setFacePickMode,
   setPanelHighlight,
@@ -574,7 +710,17 @@ const toolContext = {
 setShelfToolContext(toolContext);
 setCollinearToolContext(toolContext);
 setAttachToolContext(toolContext);
+setQuoteToolContext(toolContext);
+setSpacingToolContext({ ...toolContext, onSpacingPicked: (memberIds, boundaryIds) => applyEqualSpacing(memberIds, boundaryIds) });
 setBoundaryRectToolContext(toolContext);
+setPlinthToolContext({
+  ...toolContext,
+  onBoxPicked: (groupId) => handleAddPlinth(groupId),
+});
+setLegToolContext({
+  ...toolContext,
+  onBoxPicked: (groupId) => handleAddLegs(groupId),
+});
 setDoorToolContext({
   renderAll: () => renderAll(),
   onBoundaryPicked: (boundaryResult) => {
@@ -607,33 +753,6 @@ setDrawerToolContext({
       return;
     }
     handleDrawerConfirmed(placement);
-  },
-});
-setPlinthToolContext({
-  ...toolContext,
-  onBoxPicked: (groupId) => {
-    const catalogEntry = MATERIAL_CATALOG[0];
-    const result = addPlinthAndRaiseBox(panels, groupId, {
-      material: catalogEntry?.name,
-      thicknessMm: catalogEntry?.thicknessMm ?? 18,
-    });
-    if (!result.ok) {
-      const message = result.reason === 'already-has-plinth'
-        ? 'This box already has a plinth'
-        : result.reason === 'has-legs'
-          ? "Can't add a plinth to a box that already has legs"
-          : "Couldn't place a plinth under that box";
-      showToast(message);
-      renderAll();
-      return;
-    }
-    const before = panels;
-    panels = result.panels;
-    const after = panels;
-    recordHistoryCommand(AddBoxCommand, before, after); // closest existing command — adds new structural panels under an existing box, same shape as building one
-    const firstPlinthPanel = panels.find((p) => p.isPlinthPanel && p.groupId === result.groupId);
-    setSelectedId(firstPlinthPanel?.id ?? null);
-    renderAll();
   },
 });
 
@@ -707,6 +826,29 @@ function handleDrawerConfirmed(placement) {
 // the returned patches on success. Used at every box-wall
 // move/resize/material call site below so that behavior — and
 // wording — stays identical across all four.
+// The lowest point of every box must stay on the floor (FLOOR_MM) — or, when the
+// box has a plinth / legs, THEY are the lowest part and stand on the floor.
+// Quotes and box-wall dimensions can move a wall (e.g. the Bottom) and leave
+// the box floating or sunk: shift the whole group back so it rests on the floor.
+function groundBoxes() {
+  const groupIds = new Set(panels.filter((p) => p.isBoxWall && p.groupId).map((p) => p.groupId));
+  groupIds.forEach((groupId) => {
+    // Flags (isBoxWall / isPlinthPanel / isLeg) live on the RAW nodes only —
+    // the resolved copies don't carry them.
+    const rawById = new Map(panels.filter((p) => p.groupId === groupId).map((p) => [p.id, p]));
+    const resolved = resolveConstraints(panels).filter((r) => rawById.has(r.id));
+    const support = resolved.filter((r) => rawById.get(r.id).isPlinthPanel || rawById.get(r.id).isLeg);
+    const base = support.length ? support : resolved.filter((r) => rawById.get(r.id).isBoxWall && /bottom/i.test(r.name || ''));
+    if (!base.length) return;
+    const lowest = Math.min(...base.map((r) => r.position.y - computeWorldHalfExtents(r).y));
+    const dy = lowest - FLOOR_MM;
+    if (Math.abs(dy) < 0.01) return;
+    panels = panels.map((p) => (p.groupId === groupId && p.basePosition
+      ? { ...p, basePosition: { ...p.basePosition, y: p.basePosition.y - dy } }
+      : p));
+  });
+}
+
 function applyRelayoutResult(result) {
   if (!result.ok) {
     if (result.hitAxis) {
@@ -717,7 +859,15 @@ function applyRelayoutResult(result) {
       showPanelSizeLimitError(result.reason.split(':')[1]);
     } else if (result.reason?.startsWith('min-gap:')) {
       const [a, b] = result.reason.slice('min-gap:'.length).split('/');
-      showToast(`Can't fit — ${a} and ${b} would be closer than ${MIN_WALL_GAP_MM}mm`);
+      const quoted = panels.filter((p) => [a, b].includes(p.name)
+        && ((p.constraints || []).some((c) => c.type === 'distance' && !c.overridden)
+          || panels.some((o) => (o.constraints || []).some((c) => c.type === 'distance' && !c.overridden && c.from?.node === p.id))));
+      if (quoted.length) {
+        flashQuoteAlert(quoted.map((p) => p.id));
+        showToast(`Can't fit — ${a} and ${b} would be closer than ${MIN_WALL_GAP_MM}mm. A quote keeps ${quoted.map((p) => p.name).join(' / ')} at its distance (shown in red), so the move is blocked.`);
+      } else {
+        showToast(`Can't fit — ${a} and ${b} would be closer than ${MIN_WALL_GAP_MM}mm`);
+      }
     }
     return false;
   }
@@ -736,16 +886,18 @@ function applyRelayoutResult(result) {
     // features/drawer.js#applyDrawerAdjustmentsForGroup's own doc
     // comment.
     panels = applyDrawerAdjustmentsForGroup(panels, groupId);
-    // Same again for a plinth (features/plinth.js#applyPlinthAdjustment)
-    // — it's sized off the owning box's Bottom panel, so any box
-    // resize/edge-fit change leaves it stale until re-derived here.
-    // No heightMm/edgeFit passed: it re-reads its own current ones off
-    // an existing plinth panel (delta 0, so the box isn't re-raised),
-    // and it's a no-op (same array back) for a group with no plinth.
+    // Plinth follows the Bottom panel's footprint (and its own edge fit).
     panels = applyPlinthAdjustment(panels, groupId);
+    panels = applyLegAdjustment(panels, groupId); // legs follow the Bottom's corners
   }
   return true;
 }
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && isQuoteActive()) cancelQuoteMode();
+  if (e.key === 'Escape' && isSpacingActive()) cancelSpacingMode();
+  if (e.key === 'Enter' && isSpacingActive() && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '')) { e.preventDefault(); spacingNextStep(); }
+});
 
 // Escape cancels an in-progress collinear or shelf pick — same as it
 // already does for nothing else in this app (no other modal/
@@ -760,6 +912,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && isDoorPickActive()) cancelDoorMode();
   if (e.key === 'Escape' && isDrawerPickActive()) cancelDrawerMode();
   if (e.key === 'Escape' && isPlinthPickActive()) cancelPlinthMode();
+  if (e.key === 'Escape' && isLegPickActive()) cancelLegMode();
 
   if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
     e.preventDefault();
@@ -813,20 +966,28 @@ view2dBtn.addEventListener('click', () => switchView('2d'));
 let currentViewIs3d = true;
 
 const TOOL_HINTS = {
+  spacing: 'Equal spacing: 1) click the panels to space, press Enter · 2) click the two boundary panels (e.g. Left and Right) · Esc: cancel',
+  quote: 'Dimension: click one panel, then another, type the distance (mm) and press Apply. Two walls of one box (Left/Right, Top/Bottom, Back/Front) resize the box interior · Esc: cancel',
   collinear: 'Collinear: click a face/edge on one panel, then a parallel face/edge on another panel to align them · Esc: cancel',
   shelfHorizontal: 'Horizontal shelf: pick one boundary of the box, then the opposite boundary, to span a shelf between them · Esc: cancel',
   shelfVertical: 'Vertical shelf: pick one boundary of the box, then the opposite boundary, to span a shelf between them · Esc: cancel',
   doorPick: 'Add door: pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or a shelf) to place the door — it\'s added immediately, in/in/in/in · Esc: cancel',
+  legPick: 'Add legs: click a box — 4 legs are placed under its Bottom panel and the box is raised by the leg height · Esc: cancel',
+  plinthPick: 'Add plinth: click a box — a plinth is built under it and the box is raised by the plinth height · Esc: cancel',
   drawerPick: 'Add drawer: pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or a shelf) to place the drawers — added immediately, in/in/in/in · Esc: cancel',
 };
 
 function updateToolHint() {
   let hint = null;
-  if (isCollinearActive()) hint = TOOL_HINTS.collinear;
+  if (isSpacingActive()) hint = TOOL_HINTS.spacing;
+  else if (isQuoteActive()) hint = TOOL_HINTS.quote;
+  else if (isCollinearActive()) hint = TOOL_HINTS.collinear;
   else if (getShelfMode() === 'horizontal') hint = TOOL_HINTS.shelfHorizontal;
   else if (getShelfMode() === 'vertical') hint = TOOL_HINTS.shelfVertical;
   else if (isDoorPickActive()) hint = TOOL_HINTS.doorPick;
   else if (isDrawerPickActive()) hint = TOOL_HINTS.drawerPick;
+  else if (isPlinthPickActive()) hint = TOOL_HINTS.plinthPick;
+  else if (isLegPickActive()) hint = TOOL_HINTS.legPick;
 
   if (hint) {
     hintBarTool.textContent = hint;
@@ -1050,6 +1211,14 @@ function checkJointWarnings(resolvedPanels) {
   // resolved graph since the min-gap sweep needs each panel's own
   // pre-resolve `.offset` field (see collectAxisSlabs).
   const { violations } = validateDesign(panels, resolvedPanels, { collisions });
+  // Quote annotations are drawn here (not next to reconcile) so a
+  // conflicting quote can be coloured red in the same pass.
+  setDimensions(
+    panels,
+    resolvedPanels,
+    new Set([...violations.filter((v) => v.type === 'quoteConflict').flatMap((v) => v.drivenIds || []), ...quoteAlertIds]),
+    { mode: dimensionMode, pendingPair: getQuotePending()?.pair || null },
+  );
   const newViolations = violations.filter((v) => !knownViolationKeys.has(v.key));
   knownViolationKeys = new Set(violations.map((v) => v.key));
 
@@ -1076,7 +1245,22 @@ function checkJointWarnings(resolvedPanels) {
   showToast(parts.join('  •  '));
 }
 
+// An exception in any part of the render (panel list, inspector...) must not
+// leave the viewport and the quote lines stale until the next click: report it
+// and still refresh the quotes.
 function renderAll() {
+  try {
+    renderAllInner();
+  } catch (err) {
+    console.error('renderAll failed:', err);
+    showToast(`Internal error while redrawing: ${err?.message || err}`);
+    try {
+      setDimensions(panels, resolveConstraints(panels), new Set(quoteAlertIds), { mode: dimensionMode, pendingPair: getQuotePending()?.pair || null });
+    } catch (err2) { console.error(err2); }
+  }
+}
+
+function renderAllInner() {
   const selectedId = getSelectedId();
   const selectedGroupId = getSelectedGroupId();
   const selectedBoxWallId = selectedId && panels.find((p) => p.id === selectedId)?.isBoxWall ? selectedId : null;
@@ -1118,12 +1302,13 @@ function renderAll() {
   const drawerBoxPanelFieldsById = new Map(
     panels.filter((p) => p.isDrawerBoxPanel).map((p) => [p.id, { isDrawerBoxPanel: true }])
   );
-  // Same re-attachment, plinth counterpart (features/plinth.js —
-  // 4 lateral panels + ribs): without it gizmos.js's isPlinthPanel(mesh)
-  // is always false, because resolveConstraints' output (which scene.js
-  // reads) never carries this flag through on its own.
+  // Same re-attachment for plinth panels (walls + ribs) so scene.js/
+  // gizmos.js see isPlinthPanel and hide every resize/move handle.
   const plinthPanelFieldsById = new Map(
     panels.filter((p) => p.isPlinthPanel).map((p) => [p.id, { isPlinthPanel: true }])
+  );
+  const legFieldsById = new Map(
+    panels.filter((p) => p.isLeg).map((p) => [p.id, { isLeg: true, displayColor: p.displayColor }])
   );
   const resolvedWithCodes = resolved.map((r) => ({
     ...r,
@@ -1132,6 +1317,7 @@ function renderAll() {
     ...drawerFrontFieldsById.get(r.id),
     ...drawerBoxPanelFieldsById.get(r.id),
     ...plinthPanelFieldsById.get(r.id),
+    ...legFieldsById.get(r.id),
   }));
 
   const visiblePanels = resolvedWithCodes.filter((p) => !p.hidden);
@@ -1151,10 +1337,33 @@ function renderAll() {
   // at the door's real CLOSED position/rotation — doorOpen is a purely
   // visual toggle (see toggleSelectedDoorOpen), not a design change,
   // and must never affect what gets measured or cut.
+  // Same visual-only idea as the door case just above, but a drawer is
+  // FIVE panels (front + its own left/right/bottom/back box) that all
+  // have to shift together by the SAME offset, not one panel rotating
+  // about its own hinge — so this is built as an id -> offset map from
+  // the RAW graph first (drawerOpen only ever lives on the front;
+  // isDrawerFront/isDrawerBoxPanel/drawerBoxFrontId are read from
+  // `panels`, never trusted off a resolved node — see this file's own
+  // drawerFrontFieldsById/drawerBoxPanelFieldsById maps just above on
+  // why), then applied by id below rather than re-deriving per panel.
+  const openDrawerShiftByPanelId = new Map();
+  panels.filter((p) => p.isDrawerFront && p.drawerOpen).forEach((frontRaw) => {
+    const transform = computeDrawerOpenTransform(frontRaw, panels, resolved);
+    if (!transform) return;
+    openDrawerShiftByPanelId.set(frontRaw.id, transform.offsetMm);
+    panels
+      .filter((p) => p.isDrawerBoxPanel && p.drawerBoxFrontId === frontRaw.id)
+      .forEach((boxPanel) => openDrawerShiftByPanelId.set(boxPanel.id, transform.offsetMm));
+  });
+
   const sceneVisiblePanels = visiblePanels.map((p) => {
-    if (!p.isDoor || !p.doorOpen) return p;
-    const open = computeDoorOpenTransform(p);
-    return open ? { ...p, position: open.position, rotation: open.rotation } : p;
+    if (p.isDoor && p.doorOpen) {
+      const open = computeDoorOpenTransform(p);
+      return open ? { ...p, position: open.position, rotation: open.rotation } : p;
+    }
+    const shift = openDrawerShiftByPanelId.get(p.id);
+    if (!shift) return p;
+    return { ...p, position: { x: p.position.x + shift.x, y: p.position.y + shift.y, z: p.position.z + shift.z } };
   });
 
   reconcile(sceneVisiblePanels, selectedId, selectedGroupId, multiSelectedIds, boxWallIds, selectedBoxWallId);
@@ -1171,18 +1380,27 @@ function renderAll() {
     onAddHorizontal: addHorizontalPanel,
     onAddParallel: addParallelPanel,
     onAddBox: handleAddBox,
-    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), startCollinearMode())),
+    onAddDimension: () => (isQuoteActive() ? cancelQuoteMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelSpacingMode(), showQuotes(), startQuoteMode())),
+    quoteToolActive: isQuoteActive(),
+    quoteMessage: getQuoteMessage(),
+    onAddSpacing: () => (isSpacingActive() ? cancelSpacingMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), cancelSpacingMode(), startSpacingMode())),
+    onSpacingNext: () => spacingNextStep(),
+    spacingToolActive: isSpacingActive(),
+    spacingState: isSpacingActive() ? getSpacingState() : null,
+    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), cancelSpacingMode(), startCollinearMode())),
     collinearActive: isCollinearActive(),
     collinearGapMm: getCollinearGapMm(),
     onCollinearGapChange: setCollinearGapMm, // deliberately no renderAll() here — see toolbar.js's own comment on why
-    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), startShelfMode('horizontal'))),
-    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), startShelfMode('vertical'))),
+    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), cancelSpacingMode(), startShelfMode('horizontal'))),
+    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), cancelSpacingMode(), startShelfMode('vertical'))),
     shelfMode: getShelfMode(),
-    onAddDoor: () => (isDoorPickActive() ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDrawerMode(), cancelPlinthMode(), startDoorMode())),
+    onAddDoor: () => (isDoorPickActive() ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), cancelSpacingMode(), startDoorMode())),
     doorToolActive: isDoorPickActive(),
-    onAddDrawer: () => (isDrawerPickActive() ? cancelDrawerMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelPlinthMode(), startDrawerMode())),
+    onAddDrawer: () => (isDrawerPickActive() ? cancelDrawerMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), cancelSpacingMode(), startDrawerMode())),
     drawerToolActive: isDrawerPickActive(),
-    onAddPlinth: () => (isPlinthPickActive() ? cancelPlinthMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), startPlinthMode())),
+    onAddPlinth: () => (isPlinthPickActive() ? cancelPlinthMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelLegMode(), cancelQuoteMode(), cancelSpacingMode(), startPlinthMode())),
+    onAddLegs: () => (isLegPickActive() ? cancelLegMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelQuoteMode(), cancelSpacingMode(), startLegMode())),
+    legToolActive: isLegPickActive(),
     plinthToolActive: isPlinthPickActive(),
   });
 
@@ -1237,14 +1455,42 @@ function renderInspectorOnly() {
   // restore via restoreFace's door check). isBoxWall is the exact
   // same authoritative flag renderAll() already trusts over anything
   // resolveConstraints might produce — see that call site's comment.
-  const hiddenGroupMembers = groupMembers.filter((p) => p.hidden && p.isBoxWall);
+  // A drawer is its own group; the walls it can need restored belong to the cabinet it is linked to.
+  const hiddenGroupMembers = (selectedPanel?.isDrawerFront ? panels.filter((p) => p.groupId === boxGroupOf(selectedPanel)) : groupMembers).filter((p) => p.hidden && p.isBoxWall);
   const groupMemberCount = visibleGroupMembers.length;
+  // The unified DRAWER view (group, front or box panel selected — all the
+  // same right-hand view). null when the selection is not part of a drawer.
+  const anchorFront = drawerAnchor();
+  const stackFronts = anchorFront ? drawerStackFronts(anchorFront) : [];
+  const stackMembers = anchorFront ? panels.filter((p) => p.groupId === anchorFront.groupId) : [];
+  const drawerView = anchorFront
+    ? {
+      front: anchorFront,
+      count: stackFronts.length,
+      memberCount: stackMembers.length,
+      hasBox: panels.some((p) => p.isDrawerBoxPanel && p.drawerBoxFrontId === anchorFront.id),
+      open: !!anchorFront.drawerOpen,
+      material: stackMembers.every((p) => p.material === stackMembers[0].material) ? stackMembers[0].material : null,
+      mode: anchorFront.drawerLayoutMode || 'equal',
+      fronts: stackFronts.map((f) => ({ index: f.drawerIndex, heightMm: resolved.find((r) => r.id === f.id)?.height ?? f.drawerHeights?.[f.drawerIndex] ?? 0 })),
+    }
+    : null;
 
   // null means "Mixed materials".
   const groupMaterial =
     groupMembers.length > 0 && groupMembers.every((p) => p.material === groupMembers[0].material)
       ? groupMembers[0].material
       : null;
+
+  // A drawer front always carries drawerBoxSpec (createDrawerFrontNodes
+  // stores it unconditionally), even when its box failed to build
+  // (computeDrawerBoxPlacement returned ok:false — too little room, or
+  // too little real clearance). drawerBoxSpec truthiness alone can't
+  // tell margin fields / the Open button whether there's an actual box
+  // to adjust or open, so this checks for the box's own panels
+  // directly, same way applyDrawerAdjustmentsForGroup itself finds
+  // them.
+  const drawerHasBox = !!(selectedPanel?.isDrawerFront && panels.some((p) => p.isDrawerBoxPanel && p.drawerBoxFrontId === selectedPanel.id));
 
   if (inspectorEl) {
     renderProperties(inspectorEl, {
@@ -1254,6 +1500,7 @@ function renderInspectorOnly() {
       groupMemberCount,
       groupMaterial,
       hiddenGroupMembers,
+      drawerHasBox,
       restoreError: restoreBlockedMessage,
       onFieldChange: updateSelectedField,
       onTransformFieldChange: updateSelectedTransformField,
@@ -1269,9 +1516,14 @@ function renderInspectorOnly() {
       onDoorHingeChange: updateSelectedDoorHinge,
       onDrawerFrontEdgeFitChange: updateSelectedDrawerFrontEdgeFit,
       onDrawerFrontCountChange: updateSelectedDrawerFrontCount,
-      onPlinthEdgeFitChange: updateSelectedPlinthEdgeFit,
+      onToggleDrawerOpen: toggleSelectedDrawerOpen,
+      onDrawerBoxMarginChange: updateSelectedDrawerBoxMargin,
       onPlinthHeightChange: updateSelectedPlinthHeight,
-      onPlinthInsetChange: updateSelectedPlinthInset,
+      onPlinthEdgeChange: updateSelectedPlinthEdge,
+      drawerView,
+      onDeleteDrawerGroup: deleteDrawerGroup,
+      onDrawerLayoutModeChange: (mode) => updateDrawerStackLayout({ mode }),
+      onDrawerFrontHeightChange: (index, valueMm) => updateDrawerStackLayout({ mode: 'custom', index, valueMm }),
     });
   }
 
@@ -1280,6 +1532,7 @@ function renderInspectorOnly() {
       selectedPanel,
       allPanels: panels,
       onUnlinkConstraint: unlinkOrRemoveConstraint,
+      onQuoteChange: changeQuoteValue,
     });
   }
 }
@@ -1439,8 +1692,32 @@ function updateSelectedField(field, value) {
   renderAll();
 }
 
+// ---- ONE drawer view ------------------------------------------------
+// Selecting a drawer GROUP, a drawer FRONT or a drawer BOX panel all show the
+// same right-hand view (all settings of the stack together). This finds the
+// front those controls act on: the selected front, the front a selected box
+// panel belongs to, or — for a group selection — the bottom front of the stack.
+function drawerAnchor() {
+  const selectedId = getSelectedId();
+  const node = panels.find((p) => p.id === selectedId);
+  if (node?.isDrawerFront) return node;
+  if (node?.isDrawerBoxPanel) return panels.find((p) => p.id === node.drawerBoxFrontId) || null;
+  if (!node) {
+    const gid = getSelectedGroupId();
+    if (!gid) return null;
+    // only a group made purely of drawer parts (a legacy design with drawers inside the cabinet group keeps the cabinet view)
+    const members = panels.filter((p) => p.groupId === gid);
+    if (!members.length || !members.every((p) => p.isDrawerFront || p.isDrawerBoxPanel)) return null;
+    return members.filter((p) => p.isDrawerFront).sort((a, b) => a.drawerIndex - b.drawerIndex)[0] || null;
+  }
+  return null;
+}
+function drawerStackFronts(anchor) {
+  return panels.filter((p) => p.isDrawerFront && p.drawerStackId === anchor.drawerStackId).sort((a, b) => a.drawerIndex - b.drawerIndex);
+}
+
 function updateGroupMaterial(materialName) {
-  const groupId = getSelectedGroupId();
+  const groupId = getSelectedGroupId() || drawerAnchor()?.groupId;
   if (!groupId) return;
   const catalogEntry = MATERIAL_CATALOG.find((m) => m.name === materialName);
   if (!catalogEntry) return; // dropdown only ever offers catalog entries — defensive, shouldn't happen
@@ -1523,6 +1800,13 @@ function updateSelectedTransformField(group, axis, value) {
       renderAll();
       return;
     }
+    const wallClash = quoteClash(before);
+    if (wallClash) {
+      panels = before;
+      refuseForQuote(wallClash, `Can't move ${node.name || 'this wall'}`);
+      renderAll();
+      return;
+    }
 
     const after = panels;
     recordHistoryCommand(MovePanelCommand, before, after);
@@ -1540,7 +1824,18 @@ function updateSelectedTransformField(group, axis, value) {
     }
   }
   const before = panels;
+  if (group === 'offset') {
+    const held = quoteHoldingAxis(node, axis);
+    if (held) { refuseQuotedAxis(node, axis, held); renderAll(); return; }
+  }
   updateNode(selectedId, { [group]: { ...node[group], [axis]: value } });
+  const fieldClash = quoteClash(before);
+  if (fieldClash) {
+    panels = before;
+    refuseForQuote(fieldClash, `Can't change ${node.name || 'this panel'}`);
+    renderAll();
+    return;
+  }
   const after = panels;
   recordHistoryCommand(MovePanelCommand, before, after);
   renderAll();
@@ -1618,6 +1913,16 @@ function cascadeDeleteOrphanedDoors(panelsAfterChange, affectedNode) {
     `${getDisplayName(affectedNode)} was a boundary panel for ${orphaned.length === 1 ? 'a door' : `${orphaned.length} doors`} — removed automatically`
   );
   return panelsAfterChange.filter((p) => !orphaned.some((d) => d.id === p.id));
+}
+
+// "Delete drawers" in the unified drawer view: removes the whole drawer group,
+// whichever of its parts happens to be selected.
+function deleteDrawerGroup() {
+  const anchor = drawerAnchor();
+  if (!anchor) return;
+  setSelectedId(null);
+  setSelectedGroupId(anchor.groupId);
+  removeSelected();
 }
 
 function removeSelected() {
@@ -1767,6 +2072,134 @@ function toggleSelectedDoorOpen() {
   renderAll();
 }
 
+// Same ephemeral, non-history reasoning as toggleSelectedDoorOpen just
+// above — only `drawerOpen` on the front itself is toggled here; the
+// shift applied to all 5 of the drawer's own panels is computed fresh
+// every render (see renderAll()'s own openDrawerShiftByPanelId), never
+// stored.
+function toggleSelectedDrawerOpen() {
+  const node = drawerAnchor();
+  if (!node) return;
+  // one button for the whole stack: open them all, or close them all
+  const open = !node.drawerOpen;
+  panels = panels.map((p) => (p.isDrawerFront && p.drawerStackId === node.drawerStackId ? { ...p, drawerOpen: open } : p));
+  renderAll();
+}
+
+// Unlike drawerOpen above, the box's own top/bottom margins ARE a
+// design decision (they change the box's real built geometry), so this
+// goes through history like any other field edit. Clamped to its own
+// floor HERE, not just inside features/drawer.js#computeDrawerBoxPlacement,
+// so the field shown in the inspector never lies about what the box
+// actually built.
+function updateSelectedDrawerBoxMargin(field, rawValue) {
+  const node = drawerAnchor();
+  if (!node || !node.drawerBoxSpec) return;
+
+  const floor = field === 'topMarginMm' ? DEFAULT_DRAWER_BOX_TOP_MARGIN_MM : DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM;
+  const clamped = Math.max(floor, rawValue);
+  if (node.drawerBoxSpec[field] === clamped) return;
+
+  const before = panels;
+  // margins are a property of the whole drawer group: every front of the stack gets them
+  panels = panels.map((p) => (p.isDrawerFront && p.drawerStackId === node.drawerStackId ? { ...p, drawerBoxSpec: { ...p.drawerBoxSpec, [field]: clamped } } : p));
+  // Re-derives this front's own box (and only this front's — see
+  // applyDrawerAdjustmentsForGroup's own per-stack loop) against the
+  // just-updated spec, same recompute path a boundary-panel resize
+  // already drives.
+  panels = applyDrawerAdjustmentsForGroup(panels, boxGroupOf(node));
+  const after = panels;
+  recordHistoryCommand(SetDrawerBoxMarginCommand, before, after);
+  renderAll();
+}
+
+// Right-toolbar edge fields: one edge's in/out and/or inset mm.
+function updateSelectedPlinthEdge(edge, patch) {
+  const node = panels.find((p) => p.id === getSelectedId());
+  if (!node || !node.isPlinthPanel) return;
+
+  const current = normalizePlinthEdgeFit(node.plinthEdgeFit);
+  const next = { ...current, [edge]: { ...current[edge], ...patch } };
+  const before = panels;
+  const after = applyPlinthAdjustment(panels, node.groupId, undefined, next);
+  if (after === before) {
+    showToast("Not enough room for that plinth edge setting");
+    renderAll(); // reset the field to the stored value
+    return;
+  }
+  panels = after;
+  recordHistoryCommand(SetPlinthEdgeFitCommand, before, after);
+  renderAll();
+}
+
+// Legs tool callback — same flow as the plinth: tool start deselected
+// everything, then the person picked a box. Builds 4 legs on the
+// Bottom's corners and raises the box by the leg height (ONE history step).
+function handleAddLegs(groupId) {
+  const result = addLegsAndRaiseBox(panels, groupId);
+  if (!result.ok) {
+    showToast(result.reason === 'already-has-legs'
+      ? 'That box already has legs'
+      : result.reason === 'has-plinth'
+        ? 'That box has a plinth — legs and plinth cannot be combined'
+        : result.reason === 'no-bottom-panel'
+          ? 'That box has no Bottom panel to put legs under'
+          : 'The Bottom panel is too small for legs');
+    renderAll();
+    return;
+  }
+  const before = panels;
+  panels = result.panels;
+  recordHistoryCommand(AddLegsCommand, before, panels);
+  setSelectedGroupId(groupId);
+  setSelectedId(null);
+  renderAll();
+}
+
+// Plinth tool callback — the person clicked Plinth (everything got
+// deselected, see tools/plinth.js) and then picked a box. Builds the
+// plinth under it and raises the box by the plinth's height, as ONE
+// history step.
+function handleAddPlinth(groupId) {
+  const result = addPlinthAndRaiseBox(panels, groupId, {});
+  if (!result.ok) {
+    showToast(result.reason === 'already-has-plinth'
+      ? 'That box already has a plinth — select it to change its height'
+      : result.reason === 'has-legs'
+        ? 'That box has legs — legs and plinth cannot be combined'
+      : result.reason === 'no-bottom-panel'
+        ? 'That box has no Bottom panel to build a plinth under'
+        : 'Not enough room under that box for a plinth');
+    renderAll();
+    return;
+  }
+  const before = panels;
+  panels = result.panels;
+  recordHistoryCommand(AddPlinthCommand, before, panels);
+  // Select one plinth panel so its edge/height fields show in the
+  // right toolbar (same as a freshly added door/drawer).
+  setSelectedGroupId(groupId);
+  setSelectedId(panels.find((p) => p.groupId === groupId && p.plinthRole === 'left')?.id ?? null);
+  renderAll();
+}
+
+// ui/properties.js's Plinth height field — goes through history; the
+// box is raised/lowered by the height change so the plinth's bottom
+// stays where it was (see features/plinth.js#applyPlinthAdjustment).
+function updateSelectedPlinthHeight(rawValue) {
+  const selectedId = getSelectedId();
+  const node = panels.find((p) => p.id === selectedId);
+  if (!node || !node.isPlinthPanel) return;
+
+  const clamped = Math.max(MIN_PLINTH_HEIGHT_MM, rawValue);
+  const before = panels;
+  const after = applyPlinthAdjustment(panels, node.groupId, clamped);
+  if (after === before) return;
+  panels = after;
+  recordHistoryCommand(SetPlinthHeightCommand, before, after);
+  renderAll();
+}
+
 // Unlike doorOpen above, which side a door hinges on IS a design
 // decision (affects assembly/hardware later), so this goes through
 // history like any other field edit.
@@ -1795,9 +2228,8 @@ function updateSelectedDoorHinge(hinge) {
 // then recomputes once — no relayoutBox involved, since the boundary
 // itself hasn't changed, only the stack's own fit.
 function updateSelectedDrawerFrontEdgeFit(edge, value) {
-  const selectedId = getSelectedId();
-  const node = panels.find((p) => p.id === selectedId);
-  if (!node || !node.isDrawerFront || node.edgeFit?.[edge] === value) return;
+  const node = drawerAnchor();
+  if (!node || node.edgeFit?.[edge] === value) return;
 
   const newEdgeFit = { ...node.edgeFit, [edge]: value };
   const before = panels;
@@ -1806,9 +2238,23 @@ function updateSelectedDrawerFrontEdgeFit(edge, value) {
       ? { ...p, edgeFit: newEdgeFit }
       : p
   );
-  panels = applyDrawerAdjustmentsForGroup(panels, node.groupId);
+  panels = applyDrawerAdjustmentsForGroup(panels, boxGroupOf(node));
   const after = panels;
   recordHistoryCommand(ChangeEdgeFitCommand, before, after);
+  renderAll();
+}
+
+// Equal heights / custom heights for the selected drawer group. Equal-or-custom
+// toggles keep the current heights; a typed height moves only the boundary with
+// its neighbour (features/drawer.js#applyDrawerLayout).
+function updateDrawerStackLayout(change) {
+  const front = drawerAnchor();
+  if (!front) return;
+  const before = panels;
+  const result = applyDrawerLayout(panels, front.drawerStackId, change);
+  if (!result.ok) { showToast(result.message); renderAll(); return; }
+  panels = result.panels;
+  recordHistoryCommand(SetDrawerBoxMarginCommand, before, panels);
   renderAll();
 }
 
@@ -1824,9 +2270,8 @@ function updateSelectedDrawerFrontEdgeFit(edge, value) {
 // edgeFit/material/thickness/drawerBoxSpec — same shape
 // handleDrawerConfirmed uses to build a stack the first time.
 function updateSelectedDrawerFrontCount(count) {
-  const selectedId = getSelectedId();
-  const node = panels.find((p) => p.id === selectedId);
-  if (!node || !node.isDrawerFront) return;
+  const node = drawerAnchor();
+  if (!node) return;
 
   const newCount = Math.round(Number(count));
   if (!Number.isFinite(newCount) || newCount < 1 || newCount > MAX_DRAWER_COUNT || newCount === node.drawerCount) return;
@@ -1883,70 +2328,6 @@ function updateSelectedDrawerFrontCount(count) {
   renderAll();
 }
 
-// A plinth's height and per-edge fit/inset both go through the same
-// features/plinth.js#applyPlinthAdjustment — unlike a drawer's count
-// (above), it patches the EXISTING perimeter panels in place (keeping
-// their ids) and only adds/drops rib panels as needed, so there's no
-// tear-down-and-rebuild here. `node` can be any panel in the plinth
-// (perimeter or rib) — height/edgeFit are shared by the whole plinth,
-// same reasoning as a drawer stack's shared edgeFit.
-function updateSelectedPlinthHeight(height) {
-  const selectedId = getSelectedId();
-  const node = panels.find((p) => p.id === selectedId);
-  if (!node || !node.isPlinthPanel) return;
-
-  const newHeight = Number(height);
-  if (!Number.isFinite(newHeight) || newHeight <= 0 || newHeight === node.height) return;
-
-  const before = panels;
-  panels = applyPlinthAdjustment(panels, node.groupId, newHeight, node.plinthEdgeFit);
-  const after = panels;
-  recordHistoryCommand(ChangeEdgeFitCommand, before, after);
-  renderAll();
-}
-
-function updateSelectedPlinthEdgeFit(edge, fit) {
-  const selectedId = getSelectedId();
-  const node = panels.find((p) => p.id === selectedId);
-  if (!node || !node.isPlinthPanel) return;
-
-  const current = node.plinthEdgeFit || {};
-  if (current[edge]?.fit === fit) return;
-
-  const newEdgeFit = normalizePlinthEdgeFit({
-    ...current,
-    [edge]: { ...current[edge], fit, insetMm: current[edge]?.insetMm ?? DEFAULT_PLINTH_INSET_MM },
-  });
-
-  const before = panels;
-  panels = applyPlinthAdjustment(panels, node.groupId, node.height, newEdgeFit);
-  const after = panels;
-  recordHistoryCommand(ChangeEdgeFitCommand, before, after);
-  renderAll();
-}
-
-function updateSelectedPlinthInset(edge, cm) {
-  const selectedId = getSelectedId();
-  const node = panels.find((p) => p.id === selectedId);
-  if (!node || !node.isPlinthPanel) return;
-
-  const mm = Number(cm) * 10;
-  if (!Number.isFinite(mm) || mm < 0) return;
-  const current = node.plinthEdgeFit || {};
-  if (current[edge]?.insetMm === mm) return;
-
-  const newEdgeFit = normalizePlinthEdgeFit({
-    ...current,
-    [edge]: { ...current[edge], insetMm: mm },
-  });
-
-  const before = panels;
-  panels = applyPlinthAdjustment(panels, node.groupId, node.height, newEdgeFit);
-  const after = panels;
-  recordHistoryCommand(ChangeEdgeFitCommand, before, after);
-  renderAll();
-}
-
 // -------------------------------------------------------------
 // Relation (constraint) CRUD — manual spansBetween/attachedTo
 // creation now happens via the collinear tool and the shelf tool,
@@ -1959,6 +2340,214 @@ function updateSelectedPlinthInset(edge, cm) {
 // isBoxWall.
 // -------------------------------------------------------------
 
+// Edits the mm of an existing quote from the Relations panel. Rejected
+// values (negative, resolver warning) leave the design untouched.
+function changeQuoteValue(constraintId, value, drivenId = getSelectedId()) {
+  const before = panels;
+  const result = updateQuote(panels, drivenId, constraintId, value);
+  if (!result.ok) { showToast(result.message); renderAll(); return false; }
+  const clash = newConflicts(before, result.panels);
+  if (clash.conflicts.length) {
+    flashQuoteAlert(clash.conflictIds);
+    showToast(`Value refused — it conflicts with other quotes (shown in red): ${clash.conflicts[0]}`);
+    renderAll();
+    return false;
+  }
+  clearQuoteAlert();
+  panels = result.panels;
+  groundBoxes();
+  const violation = resolveConstraints(panels).find((r) => r.id === drivenId);
+  if (violation) {
+    const dims = { width: violation.width, height: violation.height, thickness: violation.thickness };
+    const hitAxis = findDesignLimitViolation(violation.rotation, violation.position, dims);
+    if (hitAxis) {
+      panels = before; // out of the allowed design volume — refuse
+      showDesignLimitError(hitAxis);
+      renderAll();
+      return false;
+    }
+  }
+  recordHistoryCommand(EditQuoteCommand, before, panels);
+  renderAll();
+  return true;
+}
+
+// Dimension annotations in the viewport (modeller/dimensions.js): click a
+// label to retype its value, press its x to remove it, drag it to slide
+// the dimension line out of the way (cosmetic, undoable).
+function removeQuoteById(drivenId, constraintId) {
+  const before = panels;
+  const result = removeQuote(panels, drivenId, constraintId);
+  if (!result.ok) { showToast(result.message); return; }
+  panels = result.panels;
+  recordHistoryCommand(RemoveConstraintCommand, before, panels);
+  renderAll();
+}
+
+function changeQuoteOffset(drivenId, constraintId, offsetMm) {
+  const before = panels;
+  const result = setQuoteOffset(panels, drivenId, constraintId, offsetMm);
+  if (!result.ok) return;
+  panels = result.panels;
+  recordHistoryCommand(MoveDimensionCommand, before, panels);
+  renderAll();
+}
+
+// Two walls of one box: move the positive-side wall and let relayoutBox()
+// re-fit the rest (doors, drawers, plinth, legs follow inside
+// applyRelayoutResult), ONE history step. Same validate-then-commit path as
+// dragging a wall or typing its offset.
+function applyBoxDimension(wallId, offset, remember = null) {
+  const wall = panels.find((p) => p.id === wallId);
+  if (!wall) return false;
+  const before = panels;
+  updateNode(wallId, { offset });
+  const result = relayoutBox(panels, wall.groupId);
+  if (!applyRelayoutResult(result)) {
+    panels = before;
+    renderAll();
+    return false;
+  }
+  const boxClash = quoteClash(before);
+  if (boxClash) {
+    panels = before;
+    refuseForQuote(boxClash, "Can't resize the box that way");
+    renderAll();
+    return false;
+  }
+  groundBoxes();
+  if (remember) {
+    // Keep the dimension on screen: the wall that stayed put remembers it.
+    const holder = panels.find((p) => p.id === remember.holderId);
+    if (holder) {
+      const kept = holder.boxDims?.[remember.axis];
+      updateNode(holder.id, { boxDims: { ...(holder.boxDims || {}), [remember.axis]: { otherId: remember.otherId, offsetMm: kept?.offsetMm ?? remember.offsetMm ?? 0 } } });
+    }
+  }
+  recordHistoryCommand(MovePanelCommand, before, panels);
+  renderAll();
+  return true;
+}
+
+// Imposes a planned dimension (engine/quotes.js#planDimension) at `value` mm:
+// a `distance` constraint (with the line's dragged position), or a box resize.
+function commitDimension(plan, value, offsetMm = 0) {
+  if (plan.mode === 'box') {
+    const preview = previewBoxDimension(panels, plan.plan, value);
+    if (!preview.ok) { showToast(preview.blocking); return false; }
+    const done = applyBoxDimension(plan.plan.moveId, boxDimensionOffset(panels, plan.plan, value), {
+      holderId: plan.plan.anchorId, otherId: plan.plan.moveId, axis: plan.plan.axis, offsetMm,
+    });
+    if (done && plan.notice) showToast(plan.notice); // e.g. the panel was fixed, so a box wall moved instead
+    return done;
+  }
+  const before = panels;
+  const added = addQuote(panels, { drivenId: plan.drivenId, myFace: plan.myFace, from: plan.from, value });
+  if (!added.ok) { showToast(added.message); return false; }
+  // A quote that contradicts others is NOT applied: the quotes in its way
+  // are shown in red instead.
+  const clash = newConflicts(panels, added.panels);
+  if (clash.conflicts.length) {
+    flashQuoteAlert(clash.conflictIds);
+    showToast(`Quote refused — it conflicts with other quotes (shown in red): ${clash.conflicts[0]}`);
+    renderAll();
+    return false;
+  }
+  clearQuoteAlert();
+  let next = added.panels;
+  if (offsetMm) {
+    const moved = setQuoteOffset(next, plan.drivenId, added.constraint.id, offsetMm);
+    if (moved.ok) next = moved.panels;
+  }
+  updateNode(plan.drivenId, { constraints: next.find((p) => p.id === plan.drivenId).constraints });
+  groundBoxes();
+  recordHistoryCommand(AddConstraintCommand, before, panels);
+  renderAll();
+  return true;
+}
+
+// Viewport dimensions (modeller/dimensions.js). spec.kind is "imposed" (a
+// stored quote: retype / remove / move it) or "candidate" (a grey measured
+// value: typing a number imposes it).
+function onDimensionEdit(spec, value) {
+  if (spec.kind === 'imposed') return changeQuoteValue(spec.constraintId, value, spec.drivenId);
+  // A grey (measured) dimension only starts acting on the geometry when the
+  // person gives it a DIFFERENT value. Confirming the value it already shows
+  // changes nothing and imposes nothing.
+  if (Math.abs(value - spec.valueMm) < 0.05) {
+    showToast('Value unchanged — nothing imposed. Type a different value to apply a dimension.');
+    return true;
+  }
+  const plan = planDimension(panels, spec.faceA, spec.faceB);
+  if (!plan.ok) { showToast(plan.message); return false; }
+  const ok = commitDimension(plan, value, spec.offsetMm);
+  if (ok && isQuoteActive()) cancelQuoteMode();
+  // Belt and braces: redraw once more after the input/focus events that follow
+  // the Enter key have settled, so the new quote and the moved panel show now.
+  if (ok) requestAnimationFrame(() => renderAll());
+  return ok;
+}
+function setBoxDimEntry(spec, patch) {
+  const holder = panels.find((p) => p.id === spec.holderId);
+  if (!holder?.boxDims) return false;
+  const before = panels;
+  const next = { ...holder.boxDims };
+  if (patch === null) delete next[spec.axis]; else next[spec.axis] = { ...next[spec.axis], ...patch };
+  updateNode(holder.id, { boxDims: next });
+  recordHistoryCommand(patch === null ? RemoveConstraintCommand : MoveDimensionCommand, before, panels);
+  renderAll();
+  return true;
+}
+function onDimensionRemove(spec) {
+  if (spec.kind === 'boxdim') { setBoxDimEntry(spec, null); return; } // hides the dimension only — the box keeps its size
+  if (spec.kind === 'imposed') removeQuoteById(spec.drivenId, spec.constraintId);
+  requestAnimationFrame(() => renderAll());
+}
+function onDimensionMove(spec, offsetMm) {
+  if (spec.kind === 'boxdim') { setBoxDimEntry(spec, { offsetMm }); return; }
+  if (spec.kind === 'imposed') changeQuoteOffset(spec.drivenId, spec.constraintId, offsetMm);
+}
+// An exception inside a quote edit must neither leave the screen stale (the
+// quote may already be stored) nor stay silent: redraw, show the message.
+function safely(fn, fallback) {
+  return (...args) => {
+    try {
+      return fn(...args);
+    } catch (err) {
+      console.error('quote action failed:', err);
+      showToast(`Internal error: ${err?.message || err}`);
+      try { renderAll(); } catch (e2) { console.error(e2); }
+      return fallback;
+    }
+  };
+}
+setDimensionHandlers({ onEditValue: safely(onDimensionEdit, false), onRemove: safely(onDimensionRemove), onMove: safely(onDimensionMove) });
+setDimensionsInteractive(true);
+
+// Top-bar "Quotes" button toggles: on = every main distance (grey = measured,
+// not imposed · black = imposed by you · red = in conflict) -> off (hidden;
+// imposed ones stay applied, they are constraints).
+const toggleQuotesBtn = document.getElementById('toggle-quotes-btn');
+const quotesLabelEl = document.getElementById('quotes-mode-label');
+const QUOTE_MODES = {
+  user: { next: 'off', label: 'Quotes', title: 'Your quotes: black = imposed by you · red = conflict. Click to hide' },
+  off: { next: 'user', label: 'Quotes: off', title: 'Quotes hidden (imposed ones stay applied) — click to show them' },
+};
+function showQuotes() {
+  if (dimensionMode === 'off') { dimensionMode = 'user'; syncQuotesButton(); }
+}
+function syncQuotesButton() {
+  const m = QUOTE_MODES[dimensionMode];
+  toggleQuotesBtn?.classList.toggle('on', dimensionMode !== 'off');
+  toggleQuotesBtn?.setAttribute('title', m.title);
+  if (quotesLabelEl) quotesLabelEl.textContent = m.label;
+}
+toggleQuotesBtn?.addEventListener('click', () => {
+  dimensionMode = QUOTE_MODES[dimensionMode].next;
+  syncQuotesButton();
+  renderAll();
+});
+
 // identifier is either a FIELD NAME (soft "Unlink" — mark the active
 // constraint on that field overridden, keep its definition) or a
 // CONSTRAINT ID with { remove: true } (hard delete regardless of
@@ -1970,6 +2559,26 @@ function unlinkOrRemoveConstraint(identifier, opts = {}) {
 
   if (opts.remove) {
     const before = panels;
+    const target = (node.constraints || []).find((c) => c.id === identifier);
+    if (target?.type === 'equalSpacing') {
+      // the whole set is released together; the shelves keep their current places
+      const result = removeEqualSpacing(panels, target.spacingId);
+      if (!result.ok) { showToast(result.message); return; }
+      panels = result.panels;
+      recordHistoryCommand(RemoveConstraintCommand, before, panels);
+      renderAll();
+      return;
+    }
+    if (target?.type === 'distance') {
+      // A quote is removed through the engine so the panel keeps its
+      // current position instead of jumping back to its base offset.
+      const result = removeQuote(panels, selectedId, identifier);
+      if (!result.ok) { showToast(result.message); return; }
+      panels = result.panels;
+      recordHistoryCommand(RemoveConstraintCommand, before, panels);
+      renderAll();
+      return;
+    }
     const nextConstraints = (node.constraints || []).filter((c) => c.id !== identifier);
     updateNode(selectedId, { constraints: nextConstraints });
     const after = panels;

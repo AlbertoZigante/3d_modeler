@@ -75,7 +75,15 @@ export function computeHandlePlacement(node) {
   // shared/frontFit.js#edgeSides). If the handle renders on the SAME
   // side as the hinge instead of opposite, flip sideSign's two
   // branches below.
-  const sideSign = node.hinge === 'right' ? -1 : 1; // hinge 'right' (opening swings from the right) -> handle on the LEFT; hinge 'left' (default) -> handle on the RIGHT
+  // The free (handle) side in WORLD terms is the one opposite the hinge along
+  // the door's horizontal axis: hinge 'right' = the larger coordinate, so the
+  // handle goes to the smaller one. LOCAL +X only runs toward the larger
+  // coordinate for a door facing Z (rotation 0°); a door facing X is turned
+  // 90° about Y, which points local +X toward the SMALLER one — so there the
+  // local sign flips (otherwise the handle sat at the hinge edge).
+  const freeWorldSign = node.hinge === 'right' ? -1 : 1;
+  const localXAlongWorld = node.normalAxis === 'x' ? -1 : 1;
+  const sideSign = freeWorldSign * localXAlongWorld;
   // Clamped to [0, width/2 - crossSection/2] — a pathologically narrow
   // door (narrower than 2x the margin) would otherwise push the
   // handle's offset negative, flipping it onto the WRONG side instead

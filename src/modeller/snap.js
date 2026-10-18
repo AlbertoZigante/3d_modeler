@@ -305,6 +305,82 @@ function applyAttachedTo(node, constraint, resolvedById, byId, r) {
   r.lockedFields[constraint.field] = true;
 }
 
+/**
+ * `distance` — a user-imposed QUOTE: the clear gap (mm, >= 0) between
+ * one face of an anchor panel and the facing face of THIS panel.
+ *
+ *   { id, type: 'distance', kind: 'quote', field: 'positionX'|'positionY'|'positionZ',
+ *     myFace, from: { node, face }, value, overridden }
+ *
+ * It lives on the DRIVEN node (same convention as attachedTo) and sets
+ * POSITION only — it never reads or writes width/height/thickness, so a
+ * quote can never resize a panel. The driven panel sits on the side the
+ * anchor face points to (that face's outward normal), `value` away from
+ * it; `myFace` must therefore face back toward the anchor.
+ */
+function applyDistance(node, constraint, resolvedById, byId, r) {
+  const axisKey = FIELD_TO_AXIS[constraint.field];
+  if (!axisKey || !constraint.field.startsWith('position')) {
+    throw new Error('a distance quote can only drive a position field, never a size');
+  }
+  if (!constraint.myFace || !LOCAL_FACES[constraint.myFace]) {
+    throw new Error('missing or unknown "myFace" for distance quote');
+  }
+  if (!(typeof constraint.value === 'number' && constraint.value >= 0)) {
+    throw new Error('a distance quote needs a value of 0 mm or more');
+  }
+  const anchorResolved = resolvedById.get(constraint.from?.node);
+  if (!anchorResolved) throw new Error(`references missing panel "${constraint.from?.node}"`);
+  const anchorAligned = getAlignedAxis(anchorResolved.rotation, constraint.from.face);
+  const myAligned = getAlignedAxis(r.rotation, constraint.myFace);
+  if (!anchorAligned || anchorAligned.axis !== axisKey || !myAligned || myAligned.axis !== axisKey) {
+    throw new Error(
+      `both faces must be aligned with the ${axisKey.toUpperCase()} axis — angled/non-axis-aligned quotes aren't supported yet`
+    );
+  }
+  if (myAligned.sign !== -anchorAligned.sign) {
+    throw new Error('the two faces must face each other along the quoted axis');
+  }
+  const anchorMm = resolveFacePointMm(constraint.from, axisKey, resolvedById, byId);
+  const myFaceMm = anchorMm + anchorAligned.sign * constraint.value;
+  const dimField = FACE_TO_DIM_FIELD[constraint.myFace];
+  r.position[axisKey] = myFaceMm - myAligned.sign * (r[dimField] / 2);
+  r.lockedFields[constraint.field] = true;
+}
+
+/**
+ * EQUAL SPACING — one constraint per member shelf, all sharing `spacingId`:
+ *   { type:'equalSpacing', field:'positionX|Y|Z', from:{node,face}, to:{node,face},
+ *     members:[ids in order along the axis], spacingId }
+ * `from`/`to` are the two boundary FACES facing each other. The members are
+ * spread so that every gap (boundary-to-shelf, shelf-to-shelf, shelf-to-boundary)
+ * is the same: gap = (span - sum of member thicknesses) / (count + 1). It is a
+ * live relation: resize the box (or move a boundary) and the shelves re-space.
+ * Members that were deleted since are simply left out of the count.
+ */
+function applyEqualSpacing(node, constraint, resolvedById, byId, r) {
+  const axisKey = FIELD_TO_AXIS[constraint.field];
+  if (!axisKey || !constraint.field.startsWith('position')) {
+    throw new Error('equal spacing can only drive a position field');
+  }
+  const pA = resolveFacePointMm(constraint.from, axisKey, resolvedById, byId);
+  const pB = resolveFacePointMm(constraint.to, axisKey, resolvedById, byId);
+  const dir = pB >= pA ? 1 : -1;
+  const span = Math.abs(pB - pA);
+  const members = (constraint.members || []).filter((id) => byId.has(id));
+  const index = members.indexOf(node.id);
+  if (index < 0) throw new Error('is not part of its own equal-spacing set');
+  const thick = members.map((id) => resolvedById.get(id).thickness);
+  const total = thick.reduce((a, b) => a + b, 0);
+  const gap = (span - total) / (members.length + 1);
+  if (gap < 0) {
+    r.warnings.push(`equal spacing: the ${members.length} shelves (${Math.round(total)} mm) don't fit in ${Math.round(span)} mm`);
+  }
+  const before = thick.slice(0, index).reduce((a, b) => a + b, 0);
+  r.position[axisKey] = pA + dir * (gap * (index + 1) + before + thick[index] / 2);
+  r.lockedFields[constraint.field] = true;
+}
+
 export function resolveConstraints(panels) {
   const byId = new Map(panels.map((p) => [p.id, p]));
   const resolvedById = new Map();
@@ -336,8 +412,10 @@ export function resolveConstraints(panels) {
     // attachedTo on the same node both matter, in exactly this
     // dependency direction — caught by simulating it against this
     // resolver directly, not by inspection.
+    // `distance` (a user quote) only ever sets POSITION, so like
+    // attachedTo it must run after every spansBetween.
     const orderedConstraints = [...(node.constraints || [])].sort(
-      (a, b) => (a.type === 'attachedTo' ? 1 : 0) - (b.type === 'attachedTo' ? 1 : 0)
+      (a, b) => (a.type !== 'spansBetween' ? 1 : 0) - (b.type !== 'spansBetween' ? 1 : 0)
     );
     orderedConstraints.forEach((constraint) => {
       if (constraint.overridden) return;
@@ -346,6 +424,10 @@ export function resolveConstraints(panels) {
           applySpansBetween(node, constraint, resolvedById, byId, r);
         } else if (constraint.type === 'attachedTo') {
           applyAttachedTo(node, constraint, resolvedById, byId, r);
+        } else if (constraint.type === 'distance') {
+          applyDistance(node, constraint, resolvedById, byId, r);
+        } else if (constraint.type === 'equalSpacing') {
+          applyEqualSpacing(node, constraint, resolvedById, byId, r);
         } else {
           r.warnings.push(`unknown constraint type "${constraint.type}"`);
         }

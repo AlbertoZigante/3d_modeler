@@ -189,11 +189,30 @@ const COMPONENT_ICONS = {
       <rect x="4" y="17" width="16" height="4" />
     </svg>
   `,
+  // Dashed cabinet body resting on four short solid feet.
+  legs: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="3" width="16" height="12" stroke-dasharray="1.6 2.2" opacity="0.6" />
+      <rect x="5" y="16" width="3" height="5" />
+      <rect x="16" y="16" width="3" height="5" />
+    </svg>
+  `,
   // Standard CAD dimension annotation — two extension lines (the
   // edges being measured) joined by a line with arrowheads pointing
   // out to each one. Reads as "the distance/size between these two
   // things is called out here", distinct from every other icon above
   // (none of which are about measurement).
+  // Three bars evenly spread between two end bars — "equal spacing".
+  spacing: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="4" x2="3" y2="20" />
+      <line x1="21" y1="4" x2="21" y2="20" />
+      <line x1="9" y1="7" x2="9" y2="17" />
+      <line x1="12" y1="7" x2="12" y2="17" />
+      <line x1="15" y1="7" x2="15" y2="17" />
+      <path d="M3 12 H9 M15 12 H21" stroke-dasharray="1.5 2" />
+    </svg>
+  `,
   dimension: `
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
       <line x1="4" y1="5" x2="4" y2="19" />
@@ -242,6 +261,14 @@ function ensureComponentIconStyles() {
       background: #e0904a;
       border-color: #c97b38;
       color: #fff;
+    }
+    .component-icon-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .component-icon-btn:disabled:hover {
+      background: var(--toolbar-btn-bg, #fff);
+      border-color: var(--toolbar-border, #d8d0c4);
     }
     .component-icon-btn svg {
       width: 22px;
@@ -295,6 +322,18 @@ function ensureComponentIconStyles() {
       border: 1px solid #d8d0c4;
     }
 
+    .quote-actions { display: flex; gap: 8px; }
+    .quote-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .quote-preview-warn {
+      font-size: 12.5px; line-height: 1.4; color: #8a4b00; background: #fff4e0;
+      border: 1px solid #f0c987; border-radius: 5px; padding: 7px 8px;
+    }
+    .quote-preview-ok { font-size: 12.5px; color: #1f6b3a; }
+    .quote-btn {
+      flex: 1; padding: 7px 8px; font-size: 12.5px; font-weight: 600;
+      border-radius: 5px; border: 1px solid #c9c0b0; background: #f3ede0; cursor: pointer;
+    }
+    .quote-btn.primary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
     .properties-gap-row {
       display: flex;
       align-items: center;
@@ -364,6 +403,15 @@ export function renderPanelList(
     collinearGapMm,
     onCollinearGapChange,
 
+    onAddDimension,
+    quoteToolActive,
+    quoteMessage,
+
+    onAddSpacing,
+    onSpacingNext,
+    spacingToolActive,
+    spacingState,
+
     onShelfHorizontal,
     onShelfVertical,
     shelfMode,
@@ -376,6 +424,8 @@ export function renderPanelList(
 
     onAddPlinth,
     plinthToolActive,
+    onAddLegs,
+    legToolActive,
 
   }
 ) {
@@ -409,7 +459,7 @@ export function renderPanelList(
    * collapses back to the three sections above it.
    */
   const anyToolActive =
-    !!(collinearActive || shelfMode || doorToolActive || drawerToolActive || plinthToolActive);
+    !!(collinearActive || quoteToolActive || spacingToolActive || shelfMode || doorToolActive || drawerToolActive || plinthToolActive || legToolActive);
 
   const propertiesSectionMarkup = `
     <div
@@ -440,10 +490,13 @@ export function renderPanelList(
           ${renderPropertiesContent({
             collinearActive,
             collinearGapMm,
+            quoteToolActive,
+            quoteMessage,
+            spacingToolActive,
+            spacingState,
             shelfMode,
             doorToolActive,
             drawerToolActive,
-            plinthToolActive,
           })}
         </div>
 
@@ -612,10 +665,20 @@ export function renderPanelList(
               type="button"
               class="component-icon-btn ${plinthToolActive ? 'active' : ''}"
               id="add-plinth-btn"
-              title="${plinthToolActive ? 'Cancel Add Plinth (Esc)' : 'Add Plinth — click any panel of a box to build a plinth under it and raise the box onto it'}"
+              title="${plinthToolActive ? 'Cancel Add Plinth (Esc)' : 'Add Plinth — click, then pick a box: a 4-panel kick base is built under it and the box is raised by the plinth height'}"
             >
               ${COMPONENT_ICONS.plinth}
-              <span class="icon-label">${plinthToolActive ? 'Cancel' : 'Add Plinth'}</span>
+              <span class="icon-label">${plinthToolActive ? 'Cancel' : 'Plinth'}</span>
+            </button>
+
+            <button
+              type="button"
+              class="component-icon-btn ${legToolActive ? 'active' : ''}"
+              id="add-legs-btn"
+              title="${legToolActive ? 'Cancel Add Legs (Esc)' : 'Add Legs — click, then pick a box: 4 black legs (3x3 cm, 7 cm high, 1 cm from the Bottom edge) are placed under it and the box is raised by 7 cm'}"
+            >
+              ${COMPONENT_ICONS.legs}
+              <span class="icon-label">${legToolActive ? 'Cancel' : 'Legs'}</span>
             </button>
 
           </div>
@@ -666,12 +729,22 @@ export function renderPanelList(
 
             <button
               type="button"
-              class="component-icon-btn"
+              class="component-icon-btn ${quoteToolActive ? 'active' : ''}"
               id="add-dimension-btn"
-              title="Dimension — set a distance between two elements, or a panel's size — not wired yet"
+              title="${quoteToolActive ? 'Cancel Dimension (Esc)' : 'Dimension — impose a distance between two panels (sizes can\'t be set)'}"
             >
               ${COMPONENT_ICONS.dimension}
-              <span class="icon-label">Dimension</span>
+              <span class="icon-label">${quoteToolActive ? 'Cancel' : 'Dimension'}</span>
+            </button>
+
+            <button
+              type="button"
+              class="component-icon-btn ${spacingToolActive ? 'active' : ''}"
+              id="add-spacing-btn"
+              title="${spacingToolActive ? 'Cancel Equal spacing (Esc)' : 'Equal spacing — spread panels evenly between two boundaries'}"
+            >
+              ${COMPONENT_ICONS.spacing}
+              <span class="icon-label">${spacingToolActive ? 'Cancel' : 'Spacing'}</span>
             </button>
 
           </div>
@@ -892,6 +965,33 @@ export function renderPanelList(
     );
 
 
+  /* ==========================================================
+     ADD PLINTH (pick mode — deselects everything, then the next
+     clicked box gets the plinth and is raised by its height)
+     ========================================================== */
+
+  container
+    .querySelector(
+      '#add-plinth-btn'
+    )
+    ?.addEventListener(
+      'click',
+      (event) => {
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        onAddPlinth?.();
+      }
+    );
+
+
+  container.querySelector('#add-legs-btn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onAddLegs?.();
+  });
+
   container
     .querySelector(
       '#shelf-h-btn'
@@ -982,25 +1082,23 @@ export function renderPanelList(
       }
     );
 
-  /* ==========================================================
-     ADD PLINTH (pick any panel of a box, place 4 lateral panels + ribs)
-     ========================================================== */
 
-  container
-    .querySelector(
-      '#add-plinth-btn'
-    )
-    ?.addEventListener(
-      'click',
-      (event) => {
+  container.querySelector('#add-spacing-btn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onAddSpacing?.();
+  });
+  container.querySelector('#spacing-next-btn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onSpacingNext?.();
+  });
 
-        event.preventDefault();
-        event.stopPropagation();
-
-        onAddPlinth?.();
-      }
-    );
-
+  container.querySelector('#add-dimension-btn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onAddDimension?.();
+  });
 
   const gapInput =
     container.querySelector(
@@ -1048,11 +1146,44 @@ export function renderPanelList(
 function renderPropertiesContent({
   collinearActive,
   collinearGapMm,
+  quoteToolActive,
+  quoteMessage,
+  spacingToolActive,
+  spacingState,
   shelfMode,
   doorToolActive,
   drawerToolActive,
-  plinthToolActive,
 }) {
+
+  if (spacingToolActive && spacingState) {
+    const st = spacingState;
+    return `
+      <div class="properties-section-content">
+        <div class="properties-hint">
+          <b>Step ${st.step} of 2</b> &mdash; ${st.step === 1
+    ? 'click every panel to space evenly (click again to un-pick), then press Enter or Next.'
+    : 'click the two boundary panels (e.g. the Left and Right box panels). The panels are spread so every gap is equal, and stay equal when the box is resized.'}
+        </div>
+        <div class="properties-hint">${st.step === 1 ? `${st.memberCount} panel${st.memberCount === 1 ? '' : 's'} picked` : `${st.memberCount} panel${st.memberCount === 1 ? '' : 's'} to space · ${st.boundaryCount} of 2 boundaries picked`}</div>
+        ${st.step === 1 ? `<button type="button" class="add-btn" id="spacing-next-btn" ${st.memberCount ? '' : 'disabled'}>Next: pick the boundaries</button>` : ''}
+        ${st.message ? `<div class="properties-error">${escapeAttribute(st.message)}</div>` : ''}
+      </div>
+    `;
+  }
+
+  if (quoteToolActive) {
+    return `
+      <div class="properties-section-content">
+        <div class="properties-hint">
+          Click one panel, then another. The distance between them appears in the
+          viewport (grey) &mdash; click it, type a value and press Enter to impose it.
+          Two walls of one box resize the box interior. Only distances can be set,
+          never sizes; system-managed parts (plinth, doors, drawers, legs) can't be moved.
+        </div>
+        ${quoteMessage ? `<div class="properties-error">${escapeAttribute(quoteMessage)}</div>` : ''}
+      </div>
+    `;
+  }
 
   if (collinearActive) {
     return `
@@ -1126,16 +1257,6 @@ function renderPropertiesContent({
           Pick 4 boundary panels (Left/Right, Top/Bottom, Back/Front, or shelves) to place drawer front(s) into.
           Two of one boundary type + two of another; whichever axis is left over becomes the front's facing direction.
           2 drawers are placed immediately, in/in/in/in — select one afterward to fine-tune the fit.
-        </div>
-      </div>
-    `;
-  }
-
-  if (plinthToolActive) {
-    return `
-      <div class="properties-section-content">
-        <div class="properties-hint">
-          Click any panel of a box to build a plinth under it and raise the box onto it — placed immediately at the default height, flush on every side. Select one of its panels afterward to fine-tune the height and each edge's fit/inset.
         </div>
       </div>
     `;
