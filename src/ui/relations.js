@@ -128,6 +128,11 @@ function renderConstraintList(constraints, allPanels) {
             ${escapeHtml(nameOf(c.to?.node))}
             ·${escapeHtml(c.to?.face ?? '')}
           `;
+        } else if (type === 'equalSpacing') {
+          description = `
+            equally spaced with ${Math.max((c.members || []).length - 1, 0)} other${(c.members || []).length === 2 ? '' : 's'}
+            between ${escapeHtml(nameOf(c.from?.node))} ↔ ${escapeHtml(nameOf(c.to?.node))}
+          `;
         } else if (type === 'distance') {
           description = `
             ${escapeHtml(nameOf(c.from?.node))}

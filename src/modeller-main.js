@@ -82,7 +82,7 @@ import { addLegsAndRaiseBox, applyLegAdjustment } from './features/leg.js';
 import { startLegMode, cancelLegMode, isLegPickActive, setLegToolContext } from './tools/leg.js';
 import { startPlinthMode, cancelPlinthMode, isPlinthPickActive, setPlinthToolContext } from './tools/plinth.js';
 import { createDoorNode, computeDoorOpenTransform, applyDoorAdjustmentsForGroup, applyPanelPatch, computeDoorPlacement, DEFAULT_DOOR_EDGE_FIT, DEFAULT_DOOR_HINGE } from './features/door.js';
-import { createDrawerFrontNodes, createDrawerBoxNodes, computeDrawerBoxPlacement, computeDrawerOpenTransform, applyDrawerAdjustmentsForGroup, computeDrawerFrontsPlacement, DEFAULT_DRAWER_EDGE_FIT, DEFAULT_DRAWER_COUNT, MAX_DRAWER_COUNT, DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM } from './features/drawer.js';
+import { createDrawerFrontNodes, createDrawerBoxNodes, computeDrawerBoxPlacement, computeDrawerOpenTransform, applyDrawerAdjustmentsForGroup, applyDrawerLayout, boxGroupOf, computeDrawerFrontsPlacement, DEFAULT_DRAWER_EDGE_FIT, DEFAULT_DRAWER_COUNT, MAX_DRAWER_COUNT, DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM } from './features/drawer.js';
 import { startShelfMode, cancelShelfMode, getShelfMode, setShelfToolContext } from './tools/shelfTool.js';
 import { setBoundaryRectToolContext } from './tools/boundaryRectTool.js';
 import {
@@ -107,6 +107,10 @@ import {
 } from './tools/collinearTool.js';
 import { setAttachToolContext } from './tools/attachTool.js';
 import {
+  startSpacingMode, cancelSpacingMode, isSpacingActive, getSpacingState, spacingNextStep, setSpacingToolContext,
+} from './tools/spacingTool.js';
+import { planEqualSpacing, removeEqualSpacing } from './engine/spacing.js';
+import {
   startQuoteMode, cancelQuoteMode, isQuoteActive, getQuotePending, getQuoteMessage, setQuoteToolContext,
 } from './tools/quoteTool.js';
 import {
@@ -116,7 +120,7 @@ import {
   history, createStateCommand, MovePanelCommand, MoveGroupCommand, ResizePanelCommand, ChangeMaterialCommand,
   ChangeGroupMaterialCommand, RenamePanelCommand, AddPanelCommand, DeletePanelCommand, AddBoxCommand,
   DeleteBoxCommand, GroupPanelsCommand, UngroupPanelsCommand, DeleteShelfCommand,
-  RemoveConstraintCommand, UnlinkConstraintCommand, EditQuoteCommand, MoveDimensionCommand, HideBoxWallCommand, RestoreBoxWallCommand,
+  AddConstraintCommand, RemoveConstraintCommand, UnlinkConstraintCommand, EditQuoteCommand, MoveDimensionCommand, HideBoxWallCommand, RestoreBoxWallCommand,
   ChangeEdgeFitCommand, AddDoorCommand, SetDoorHingeCommand, DeleteDoorCommand,
   AddDrawerCommand, DeleteDrawerCommand, SetDrawerBoxMarginCommand,
   AddLegsCommand, AddPlinthCommand, SetPlinthHeightCommand, SetPlinthEdgeFitCommand,
@@ -372,7 +376,7 @@ function queueLiveRender() {
 // break a quote — or that tries to move a panel along an axis a quote fixes —
 // is refused, the quotes involved flash red and a flag explains why.
 function hasActiveQuotes(list) {
-  return list.some((p) => (p.constraints || []).some((c) => c.type === 'distance' && !c.overridden));
+  return list.some((p) => (p.constraints || []).some((c) => (c.type === 'distance' || c.type === 'equalSpacing') && !c.overridden));
 }
 /** New quote conflicts caused by going from `prev` to `panels`, or null. */
 function quoteClash(prev) {
@@ -386,11 +390,15 @@ function refuseForQuote(clash, what) {
 }
 /** The active quote that fixes `node` along `axis`, if any. */
 function quoteHoldingAxis(node, axis) {
-  return (node.constraints || []).find((c) => c.type === 'distance' && !c.overridden && FIELD_TO_AXIS[c.field] === axis) || null;
+  return (node.constraints || []).find((c) => (c.type === 'distance' || c.type === 'equalSpacing') && !c.overridden && FIELD_TO_AXIS[c.field] === axis) || null;
 }
 function refuseQuotedAxis(node, axis, c) {
   const anchor = panels.find((p) => p.id === c.from?.node);
   flashQuoteAlert([node.id]);
+  if (c.type === 'equalSpacing') {
+    showToast(`${node.name || node.id} can't move along ${axis.toUpperCase()} — it is kept equally spaced with the other panels of its set. Remove the spacing first.`);
+    return;
+  }
   showToast(`${node.name || node.id} can't move along ${axis.toUpperCase()} — a quote fixes it ${c.value} mm from ${anchor?.name || 'another panel'}. Edit or remove the quote first.`);
 }
 function resolvedMeshPos(id) {
@@ -586,6 +594,8 @@ window.addEventListener('pointerup', () => {
     groupIds.forEach((groupId) => {
       const before2 = panels;
       panels = applyDoorAdjustmentsForGroup(panels, groupId);
+      // drawers are a separate group now: they follow the cabinet they are linked to
+      panels = applyDrawerAdjustmentsForGroup(panels, groupId);
       if (panels !== before2) doorsChanged = true;
     });
     if (doorsChanged) renderAll();
@@ -658,6 +668,23 @@ function applyDimensionChange(nodeId, dims, offsetDeltaMm) {
   return true;
 }
 
+// Equal spacing: spread the picked panels evenly between two boundaries as a
+// live relation. Refused (and nothing changes) if it would break a quote.
+function applyEqualSpacing(memberIds, boundaryIds) {
+  const before = panels;
+  const plan = planEqualSpacing(panels, memberIds, boundaryIds);
+  if (!plan.ok) return { ok: false, message: plan.message };
+  const clash = newConflicts(before, plan.panels);
+  if (clash.conflicts.length) {
+    flashQuoteAlert(clash.conflictIds);
+    return { ok: false, message: `Not possible — it conflicts with a quote (shown in red): ${clash.conflicts[0]}` };
+  }
+  panels = plan.panels;
+  recordHistoryCommand(AddConstraintCommand, before, panels);
+  renderAll();
+  return { ok: true, message: `${plan.count} panel${plan.count === 1 ? '' : 's'} spaced equally — ${Math.round(plan.gapMm * 10) / 10} mm between each` };
+}
+
 // -------------------------------------------------------------
 // TOOL WIRING — shelfTool.js, collinearTool.js, and attachTool.js are
 // pure interaction-state modules; none of them can reach `panels`,
@@ -674,6 +701,7 @@ const toolContext = {
   recordHistoryCommand,
   renderAll: () => renderAll(),
   clearMultiSelected: () => multiSelectedIds.clear(),
+  setMultiSelected: (ids) => { multiSelectedIds.clear(); ids.forEach((id) => multiSelectedIds.add(id)); },
   setFaceHighlight,
   setFacePickMode,
   setPanelHighlight,
@@ -683,6 +711,7 @@ setShelfToolContext(toolContext);
 setCollinearToolContext(toolContext);
 setAttachToolContext(toolContext);
 setQuoteToolContext(toolContext);
+setSpacingToolContext({ ...toolContext, onSpacingPicked: (memberIds, boundaryIds) => applyEqualSpacing(memberIds, boundaryIds) });
 setBoundaryRectToolContext(toolContext);
 setPlinthToolContext({
   ...toolContext,
@@ -866,6 +895,8 @@ function applyRelayoutResult(result) {
 
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && isQuoteActive()) cancelQuoteMode();
+  if (e.key === 'Escape' && isSpacingActive()) cancelSpacingMode();
+  if (e.key === 'Enter' && isSpacingActive() && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '')) { e.preventDefault(); spacingNextStep(); }
 });
 
 // Escape cancels an in-progress collinear or shelf pick — same as it
@@ -935,6 +966,7 @@ view2dBtn.addEventListener('click', () => switchView('2d'));
 let currentViewIs3d = true;
 
 const TOOL_HINTS = {
+  spacing: 'Equal spacing: 1) click the panels to space, press Enter · 2) click the two boundary panels (e.g. Left and Right) · Esc: cancel',
   quote: 'Dimension: click one panel, then another, type the distance (mm) and press Apply. Two walls of one box (Left/Right, Top/Bottom, Back/Front) resize the box interior · Esc: cancel',
   collinear: 'Collinear: click a face/edge on one panel, then a parallel face/edge on another panel to align them · Esc: cancel',
   shelfHorizontal: 'Horizontal shelf: pick one boundary of the box, then the opposite boundary, to span a shelf between them · Esc: cancel',
@@ -947,7 +979,8 @@ const TOOL_HINTS = {
 
 function updateToolHint() {
   let hint = null;
-  if (isQuoteActive()) hint = TOOL_HINTS.quote;
+  if (isSpacingActive()) hint = TOOL_HINTS.spacing;
+  else if (isQuoteActive()) hint = TOOL_HINTS.quote;
   else if (isCollinearActive()) hint = TOOL_HINTS.collinear;
   else if (getShelfMode() === 'horizontal') hint = TOOL_HINTS.shelfHorizontal;
   else if (getShelfMode() === 'vertical') hint = TOOL_HINTS.shelfVertical;
@@ -1347,22 +1380,26 @@ function renderAllInner() {
     onAddHorizontal: addHorizontalPanel,
     onAddParallel: addParallelPanel,
     onAddBox: handleAddBox,
-    onAddDimension: () => (isQuoteActive() ? cancelQuoteMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), showQuotes(), startQuoteMode())),
+    onAddDimension: () => (isQuoteActive() ? cancelQuoteMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelSpacingMode(), showQuotes(), startQuoteMode())),
     quoteToolActive: isQuoteActive(),
     quoteMessage: getQuoteMessage(),
-    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), startCollinearMode())),
+    onAddSpacing: () => (isSpacingActive() ? cancelSpacingMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), cancelSpacingMode(), startSpacingMode())),
+    onSpacingNext: () => spacingNextStep(),
+    spacingToolActive: isSpacingActive(),
+    spacingState: isSpacingActive() ? getSpacingState() : null,
+    onCollinear: () => (isCollinearActive() ? cancelCollinearMode() : (cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), cancelSpacingMode(), startCollinearMode())),
     collinearActive: isCollinearActive(),
     collinearGapMm: getCollinearGapMm(),
     onCollinearGapChange: setCollinearGapMm, // deliberately no renderAll() here — see toolbar.js's own comment on why
-    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), startShelfMode('horizontal'))),
-    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), startShelfMode('vertical'))),
+    onShelfHorizontal: () => (getShelfMode() === 'horizontal' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), cancelSpacingMode(), startShelfMode('horizontal'))),
+    onShelfVertical: () => (getShelfMode() === 'vertical' ? cancelShelfMode() : (cancelCollinearMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), cancelSpacingMode(), startShelfMode('vertical'))),
     shelfMode: getShelfMode(),
-    onAddDoor: () => (isDoorPickActive() ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), startDoorMode())),
+    onAddDoor: () => (isDoorPickActive() ? cancelDoorMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDrawerMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), cancelSpacingMode(), startDoorMode())),
     doorToolActive: isDoorPickActive(),
-    onAddDrawer: () => (isDrawerPickActive() ? cancelDrawerMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), startDrawerMode())),
+    onAddDrawer: () => (isDrawerPickActive() ? cancelDrawerMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelPlinthMode(), cancelLegMode(), cancelQuoteMode(), cancelSpacingMode(), startDrawerMode())),
     drawerToolActive: isDrawerPickActive(),
-    onAddPlinth: () => (isPlinthPickActive() ? cancelPlinthMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelLegMode(), cancelQuoteMode(), startPlinthMode())),
-    onAddLegs: () => (isLegPickActive() ? cancelLegMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelQuoteMode(), startLegMode())),
+    onAddPlinth: () => (isPlinthPickActive() ? cancelPlinthMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelLegMode(), cancelQuoteMode(), cancelSpacingMode(), startPlinthMode())),
+    onAddLegs: () => (isLegPickActive() ? cancelLegMode() : (cancelCollinearMode(), cancelShelfMode(), cancelDoorMode(), cancelDrawerMode(), cancelPlinthMode(), cancelQuoteMode(), cancelSpacingMode(), startLegMode())),
     legToolActive: isLegPickActive(),
     plinthToolActive: isPlinthPickActive(),
   });
@@ -1418,8 +1455,19 @@ function renderInspectorOnly() {
   // restore via restoreFace's door check). isBoxWall is the exact
   // same authoritative flag renderAll() already trusts over anything
   // resolveConstraints might produce — see that call site's comment.
-  const hiddenGroupMembers = groupMembers.filter((p) => p.hidden && p.isBoxWall);
+  // A drawer is its own group; the walls it can need restored belong to the cabinet it is linked to.
+  const hiddenGroupMembers = (selectedPanel?.isDrawerFront ? panels.filter((p) => p.groupId === boxGroupOf(selectedPanel)) : groupMembers).filter((p) => p.hidden && p.isBoxWall);
   const groupMemberCount = visibleGroupMembers.length;
+  // A selected DRAWER group: its fronts (bottom to top) for the height controls.
+  const drawerFrontsOfGroup = selectedGroupId && !selectedPanel
+    ? groupMembers.filter((p) => p.isDrawerFront).sort((a, b) => a.drawerIndex - b.drawerIndex)
+    : [];
+  const drawerStack = drawerFrontsOfGroup.length
+    ? {
+      mode: drawerFrontsOfGroup[0].drawerLayoutMode || 'equal',
+      fronts: drawerFrontsOfGroup.map((f) => ({ index: f.drawerIndex, heightMm: resolved.find((r) => r.id === f.id)?.height ?? f.drawerHeights?.[f.drawerIndex] ?? 0 })),
+    }
+    : null;
 
   // null means "Mixed materials".
   const groupMaterial =
@@ -1465,6 +1513,9 @@ function renderInspectorOnly() {
       onDrawerBoxMarginChange: updateSelectedDrawerBoxMargin,
       onPlinthHeightChange: updateSelectedPlinthHeight,
       onPlinthEdgeChange: updateSelectedPlinthEdge,
+      drawerStack,
+      onDrawerLayoutModeChange: (mode) => updateDrawerStackLayout({ mode }),
+      onDrawerFrontHeightChange: (index, valueMm) => updateDrawerStackLayout({ mode: 'custom', index, valueMm }),
     });
   }
 
@@ -2014,7 +2065,7 @@ function updateSelectedDrawerBoxMargin(field, rawValue) {
   // applyDrawerAdjustmentsForGroup's own per-stack loop) against the
   // just-updated spec, same recompute path a boundary-panel resize
   // already drives.
-  panels = applyDrawerAdjustmentsForGroup(panels, node.groupId);
+  panels = applyDrawerAdjustmentsForGroup(panels, boxGroupOf(node));
   const after = panels;
   recordHistoryCommand(SetDrawerBoxMarginCommand, before, after);
   renderAll();
@@ -2146,9 +2197,24 @@ function updateSelectedDrawerFrontEdgeFit(edge, value) {
       ? { ...p, edgeFit: newEdgeFit }
       : p
   );
-  panels = applyDrawerAdjustmentsForGroup(panels, node.groupId);
+  panels = applyDrawerAdjustmentsForGroup(panels, boxGroupOf(node));
   const after = panels;
   recordHistoryCommand(ChangeEdgeFitCommand, before, after);
+  renderAll();
+}
+
+// Equal heights / custom heights for the selected drawer group. Equal-or-custom
+// toggles keep the current heights; a typed height moves only the boundary with
+// its neighbour (features/drawer.js#applyDrawerLayout).
+function updateDrawerStackLayout(change) {
+  const gid = getSelectedGroupId();
+  const front = panels.find((p) => p.groupId === gid && p.isDrawerFront);
+  if (!front) return;
+  const before = panels;
+  const result = applyDrawerLayout(panels, front.drawerStackId, change);
+  if (!result.ok) { showToast(result.message); renderAll(); return; }
+  panels = result.panels;
+  recordHistoryCommand(SetDrawerBoxMarginCommand, before, panels);
   renderAll();
 }
 
@@ -2455,6 +2521,15 @@ function unlinkOrRemoveConstraint(identifier, opts = {}) {
   if (opts.remove) {
     const before = panels;
     const target = (node.constraints || []).find((c) => c.id === identifier);
+    if (target?.type === 'equalSpacing') {
+      // the whole set is released together; the shelves keep their current places
+      const result = removeEqualSpacing(panels, target.spacingId);
+      if (!result.ok) { showToast(result.message); return; }
+      panels = result.panels;
+      recordHistoryCommand(RemoveConstraintCommand, before, panels);
+      renderAll();
+      return;
+    }
     if (target?.type === 'distance') {
       // A quote is removed through the engine so the panel keeps its
       // current position instead of jumping back to its base offset.

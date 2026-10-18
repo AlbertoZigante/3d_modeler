@@ -348,6 +348,39 @@ function applyDistance(node, constraint, resolvedById, byId, r) {
   r.lockedFields[constraint.field] = true;
 }
 
+/**
+ * EQUAL SPACING — one constraint per member shelf, all sharing `spacingId`:
+ *   { type:'equalSpacing', field:'positionX|Y|Z', from:{node,face}, to:{node,face},
+ *     members:[ids in order along the axis], spacingId }
+ * `from`/`to` are the two boundary FACES facing each other. The members are
+ * spread so that every gap (boundary-to-shelf, shelf-to-shelf, shelf-to-boundary)
+ * is the same: gap = (span - sum of member thicknesses) / (count + 1). It is a
+ * live relation: resize the box (or move a boundary) and the shelves re-space.
+ * Members that were deleted since are simply left out of the count.
+ */
+function applyEqualSpacing(node, constraint, resolvedById, byId, r) {
+  const axisKey = FIELD_TO_AXIS[constraint.field];
+  if (!axisKey || !constraint.field.startsWith('position')) {
+    throw new Error('equal spacing can only drive a position field');
+  }
+  const pA = resolveFacePointMm(constraint.from, axisKey, resolvedById, byId);
+  const pB = resolveFacePointMm(constraint.to, axisKey, resolvedById, byId);
+  const dir = pB >= pA ? 1 : -1;
+  const span = Math.abs(pB - pA);
+  const members = (constraint.members || []).filter((id) => byId.has(id));
+  const index = members.indexOf(node.id);
+  if (index < 0) throw new Error('is not part of its own equal-spacing set');
+  const thick = members.map((id) => resolvedById.get(id).thickness);
+  const total = thick.reduce((a, b) => a + b, 0);
+  const gap = (span - total) / (members.length + 1);
+  if (gap < 0) {
+    r.warnings.push(`equal spacing: the ${members.length} shelves (${Math.round(total)} mm) don't fit in ${Math.round(span)} mm`);
+  }
+  const before = thick.slice(0, index).reduce((a, b) => a + b, 0);
+  r.position[axisKey] = pA + dir * (gap * (index + 1) + before + thick[index] / 2);
+  r.lockedFields[constraint.field] = true;
+}
+
 export function resolveConstraints(panels) {
   const byId = new Map(panels.map((p) => [p.id, p]));
   const resolvedById = new Map();
@@ -393,6 +426,8 @@ export function resolveConstraints(panels) {
           applyAttachedTo(node, constraint, resolvedById, byId, r);
         } else if (constraint.type === 'distance') {
           applyDistance(node, constraint, resolvedById, byId, r);
+        } else if (constraint.type === 'equalSpacing') {
+          applyEqualSpacing(node, constraint, resolvedById, byId, r);
         } else {
           r.warnings.push(`unknown constraint type "${constraint.type}"`);
         }

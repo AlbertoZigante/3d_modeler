@@ -29,6 +29,8 @@ import {
 import { applyPanelPatch } from '../src/features/door.js';
 import { dimFieldForAxis } from '../src/shared/frontFit.js';
 import { resolveConstraints } from '../src/modeller/snap.js';
+import { applyDrawerAdjustmentsForGroup, boxGroupOf, applyDrawerLayout } from '../src/features/drawer.js';
+import { relayoutBox } from '../src/features/box.js';
 
 await ensureMaterialCatalog();
 
@@ -192,6 +194,59 @@ section('computeDrawerOpenTransform — a front with no box yet returns null, no
   const resolved = resolveConstraints(panels);
   const transform = computeDrawerOpenTransform(front, panels, resolved);
   assertEqual(transform, null, 'no box to read a depth off -> null, rather than guessing or defaulting');
+});
+
+section('drawers are an INDEPENDENT group, linked to the cabinet for their sizes', () => {
+  const { panels, front } = buildBoxWithDrawerFront();
+  const cabinetGroup = panels.find((p) => p.isBoxWall).groupId;
+  assert(front.groupId && front.groupId !== cabinetGroup, 'the drawer front is NOT in the cabinet group');
+  assertEqual(front.boxGroupId, cabinetGroup, 'but it is linked to the cabinet it was sized from');
+  assertEqual(boxGroupOf(front), cabinetGroup, 'boxGroupOf returns the cabinet group');
+
+  const placement = computeDrawerBoxPlacement(panels, front, BOX_SPEC);
+  const boxNodes = createDrawerBoxNodes(panels, placement);
+  assert(boxNodes.every((n) => n.groupId === front.groupId), "the drawer box panels join the drawer's own group");
+  assert(boxNodes.every((n) => n.boxGroupId === cabinetGroup), 'and link to the cabinet too');
+
+  // Widen the cabinet: the drawer (a separate group) must still follow its size.
+  let all = [...panels, ...boxNodes];
+  const right = all.find((p) => p.isBoxWall && p.name === 'Right');
+  all = all.map((p) => (p.id === right.id ? { ...p, offset: { ...p.offset, x: p.offset.x + 100 } } : p));
+  const relaid = relayoutBox(all, cabinetGroup);
+  assert(relaid.ok, 'cabinet relayout succeeds');
+  all = all.map((p) => { const q = relaid.patches.find((x) => x.id === p.id); return q ? { ...p, ...q } : p; });
+  const before = resolveConstraints(all).find((r) => r.id === front.id);
+  all = applyDrawerAdjustmentsForGroup(all, cabinetGroup);
+  const after = resolveConstraints(all).find((r) => r.id === front.id);
+  const rightResolved = resolveConstraints(all).find((r) => r.id === right.id);
+  assert(after.width !== before.width || after.position.x !== before.position.x, 'the drawer front re-fits to the resized cabinet');
+  assert(rightResolved.position.x - after.position.x > 0, 'and stays inside it');
+  assert(all.filter((p) => p.drawerBoxFrontId === front.id).length === 4, 'the drawer box is kept');
+});
+
+section('applyDrawerLayout — equal heights vs a height chosen per front', () => {
+  const { nodes: boxNodes } = addBox([]);
+  const boundaryResult = computeBoundaryRectangle(boxNodes, boundaryPanels(boxNodes));
+  const placement = computeDrawerFrontsPlacement(boxNodes, boundaryResult, DEFAULT_DRAWER_EDGE_FIT, { material: 'Melamine White 18mm', thicknessMm: 18, count: 3 });
+  let panels = [...boxNodes];
+  placement.panelPatches.forEach((patch) => { panels = applyPanelPatch(panels, patch, placement.normalAxis); });
+  panels = [...panels, ...createDrawerFrontNodes(boxNodes, placement, {})];
+  const stackId = panels.find((p) => p.isDrawerFront).drawerStackId;
+  const heights = (list) => list.filter((p) => p.isDrawerFront).sort((a, b) => a.drawerIndex - b.drawerIndex).map((p) => resolveConstraints(list).find((r) => r.id === p.id).height);
+  const total = heights(panels).reduce((a, b) => a + b, 0);
+  assert(heights(panels).every((h) => Math.abs(h - total / 3) < 0.01), 'starts as 3 equal drawers');
+
+  const r = applyDrawerLayout(panels, stackId, { mode: 'custom', index: 0, valueMm: 100 });
+  assert(r.ok, 'setting the bottom front to 100 mm works');
+  const h = heights(r.panels);
+  assert(Math.abs(h[0] - 100) < 0.01, 'the bottom front is exactly 100 mm');
+  assert(Math.abs(h.reduce((a, b) => a + b, 0) - total) < 0.01, 'the stack still fills the opening exactly');
+  assert(Math.abs(h[2] - total / 3) < 0.01, 'the front that was not next to it is untouched');
+
+  const e = applyDrawerLayout(r.panels, stackId, { mode: 'equal' });
+  assert(e.ok && heights(e.panels).every((x) => Math.abs(x - total / 3) < 0.01), 'back to equal heights');
+  assert(!applyDrawerLayout(panels, stackId, { mode: 'custom', index: 0, valueMm: 5 }).ok, 'a front below the minimum is refused');
+  assert(!applyDrawerLayout(panels, stackId, { mode: 'custom', index: 2, valueMm: total }).ok, 'a height that squeezes its neighbour below the minimum is refused');
 });
 
 report();

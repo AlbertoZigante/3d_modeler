@@ -61,6 +61,9 @@ export function renderProperties(
     onDrawerBoxMarginChange,
     onPlinthHeightChange,
     onPlinthEdgeChange,
+    drawerStack,
+    onDrawerLayoutModeChange,
+    onDrawerFrontHeightChange,
   }
 ) {
   if (selectedGroupId && !selectedPanel) {
@@ -84,12 +87,24 @@ export function renderProperties(
           ${MATERIAL_CATALOG.map((m) => `<option value="${escapeHtml(m.name)}" ${m.name === groupMaterial ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
         </select>
       </div>
+      ${drawerStack ? drawerHeightsSectionHTML(drawerStack) : ''}
       ${restoreFaceListHTML(hiddenList, restoreError)}
       <div class="empty-state">Click a member panel — in the list, or in the 3D/2D view — to select and edit it individually.</div>
       <button class="remove-btn" id="ungroup-btn">Ungroup (keep all ${groupMemberCount} panels)</button>
       <button class="remove-btn" id="delete-group-btn">Delete whole group (${groupMemberCount} panels)</button>
     `;
     wireRestoreFaceButtons(container, onRestoreFace);
+    container.querySelectorAll('[data-drawer-layout]').forEach((btn) => {
+      btn.addEventListener('click', () => onDrawerLayoutModeChange?.(btn.dataset.drawerLayout));
+    });
+    container.querySelectorAll('.drawer-height-field').forEach((input) => {
+      const commit = () => {
+        const v = parseFloat(input.value);
+        if (Number.isFinite(v)) onDrawerFrontHeightChange?.(Number(input.dataset.index), v);
+      };
+      input.addEventListener('change', commit);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
+    });
     container.querySelector('#group-material-field').addEventListener('change', (e) => onGroupMaterialChange(e.target.value));
     container.querySelector('#ungroup-btn').addEventListener('click', onUngroup);
     container.querySelector('#delete-group-btn').addEventListener('click', onRemove);
@@ -382,6 +397,31 @@ function doorSectionHTML(door, hiddenGroupMembers, restoreError) {
 // dim-field one wired to onFieldChange below — these live at
 // drawerBoxSpec.<field>, not on the panel directly, so writing
 // through the generic path would silently set the wrong property.
+// Group-level controls for a drawer stack: all fronts the same height, or a
+// height typed for each front. Listed top to bottom, the way they look on the
+// cabinet; `index` 0 is the BOTTOM front.
+function drawerHeightsSectionHTML(stack) {
+  const custom = stack.mode === 'custom';
+  const rows = [...stack.fronts].reverse().map((f, k) => `
+    <div class="field-row">
+      <label>Front ${k + 1}${k === 0 ? ' (top)' : (k === stack.fronts.length - 1 ? ' (bottom)' : '')}</label>
+      <div class="field-input-wrap">
+        <input type="number" class="field-input drawer-height-field" data-index="${f.index}" min="10" step="1" value="${Math.round(f.heightMm * 10) / 10}" ${custom ? '' : 'disabled'} />
+        <span class="unit">mm</span>
+      </div>
+    </div>`).join('');
+  return `
+    <div class="divider"></div>
+    <div class="section-title">Drawer heights</div>
+    <div class="btn-row" style="display:flex;gap:6px;margin-bottom:6px">
+      <button class="add-btn ${!custom ? 'active' : ''}" data-drawer-layout="equal" style="flex:1" title="All fronts the same height">Equal heights</button>
+      <button class="add-btn ${custom ? 'active' : ''}" data-drawer-layout="custom" style="flex:1" title="Set the height of each front">Custom heights</button>
+    </div>
+    ${custom ? '<div class="properties-hint">Changing a front takes the difference from the neighbouring front, so the stack keeps filling the opening.</div>' : ''}
+    ${rows}
+  `;
+}
+
 function drawerSectionHTML(front, hiddenGroupMembers, restoreError, hasBox) {
   const spec = front.drawerBoxSpec || {};
   return `

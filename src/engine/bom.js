@@ -93,9 +93,13 @@ function buildGroupLabels(panels) {
   const labels = new Map();
   let boxCount = 0;
   let groupCount = 0;
+  let drawerCount = 0;
   panels.forEach((node) => {
     if (!node.groupId || labels.has(node.groupId)) return;
-    if (node.isBoxPanel) {
+    if (node.isDrawerFront || node.isDrawerBoxPanel) {
+      drawerCount += 1;
+      labels.set(node.groupId, `Drawer ${drawerCount}`);
+    } else if (node.isBoxPanel) {
       boxCount += 1;
       labels.set(node.groupId, `Box ${boxCount}`);
     } else {

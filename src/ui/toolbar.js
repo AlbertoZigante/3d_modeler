@@ -202,6 +202,17 @@ const COMPONENT_ICONS = {
   // out to each one. Reads as "the distance/size between these two
   // things is called out here", distinct from every other icon above
   // (none of which are about measurement).
+  // Three bars evenly spread between two end bars — "equal spacing".
+  spacing: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="4" x2="3" y2="20" />
+      <line x1="21" y1="4" x2="21" y2="20" />
+      <line x1="9" y1="7" x2="9" y2="17" />
+      <line x1="12" y1="7" x2="12" y2="17" />
+      <line x1="15" y1="7" x2="15" y2="17" />
+      <path d="M3 12 H9 M15 12 H21" stroke-dasharray="1.5 2" />
+    </svg>
+  `,
   dimension: `
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
       <line x1="4" y1="5" x2="4" y2="19" />
@@ -396,6 +407,11 @@ export function renderPanelList(
     quoteToolActive,
     quoteMessage,
 
+    onAddSpacing,
+    onSpacingNext,
+    spacingToolActive,
+    spacingState,
+
     onShelfHorizontal,
     onShelfVertical,
     shelfMode,
@@ -443,7 +459,7 @@ export function renderPanelList(
    * collapses back to the three sections above it.
    */
   const anyToolActive =
-    !!(collinearActive || quoteToolActive || shelfMode || doorToolActive || drawerToolActive || plinthToolActive || legToolActive);
+    !!(collinearActive || quoteToolActive || spacingToolActive || shelfMode || doorToolActive || drawerToolActive || plinthToolActive || legToolActive);
 
   const propertiesSectionMarkup = `
     <div
@@ -476,6 +492,8 @@ export function renderPanelList(
             collinearGapMm,
             quoteToolActive,
             quoteMessage,
+            spacingToolActive,
+            spacingState,
             shelfMode,
             doorToolActive,
             drawerToolActive,
@@ -717,6 +735,16 @@ export function renderPanelList(
             >
               ${COMPONENT_ICONS.dimension}
               <span class="icon-label">${quoteToolActive ? 'Cancel' : 'Dimension'}</span>
+            </button>
+
+            <button
+              type="button"
+              class="component-icon-btn ${spacingToolActive ? 'active' : ''}"
+              id="add-spacing-btn"
+              title="${spacingToolActive ? 'Cancel Equal spacing (Esc)' : 'Equal spacing — spread panels evenly between two boundaries'}"
+            >
+              ${COMPONENT_ICONS.spacing}
+              <span class="icon-label">${spacingToolActive ? 'Cancel' : 'Spacing'}</span>
             </button>
 
           </div>
@@ -1055,6 +1083,17 @@ export function renderPanelList(
     );
 
 
+  container.querySelector('#add-spacing-btn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onAddSpacing?.();
+  });
+  container.querySelector('#spacing-next-btn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onSpacingNext?.();
+  });
+
   container.querySelector('#add-dimension-btn')?.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -1109,10 +1148,28 @@ function renderPropertiesContent({
   collinearGapMm,
   quoteToolActive,
   quoteMessage,
+  spacingToolActive,
+  spacingState,
   shelfMode,
   doorToolActive,
   drawerToolActive,
 }) {
+
+  if (spacingToolActive && spacingState) {
+    const st = spacingState;
+    return `
+      <div class="properties-section-content">
+        <div class="properties-hint">
+          <b>Step ${st.step} of 2</b> &mdash; ${st.step === 1
+    ? 'click every panel to space evenly (click again to un-pick), then press Enter or Next.'
+    : 'click the two boundary panels (e.g. the Left and Right box panels). The panels are spread so every gap is equal, and stay equal when the box is resized.'}
+        </div>
+        <div class="properties-hint">${st.step === 1 ? `${st.memberCount} panel${st.memberCount === 1 ? '' : 's'} picked` : `${st.memberCount} panel${st.memberCount === 1 ? '' : 's'} to space · ${st.boundaryCount} of 2 boundaries picked`}</div>
+        ${st.step === 1 ? `<button type="button" class="add-btn" id="spacing-next-btn" ${st.memberCount ? '' : 'disabled'}>Next: pick the boundaries</button>` : ''}
+        ${st.message ? `<div class="properties-error">${escapeAttribute(st.message)}</div>` : ''}
+      </div>
+    `;
+  }
 
   if (quoteToolActive) {
     return `
