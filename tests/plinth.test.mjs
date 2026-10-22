@@ -96,7 +96,8 @@ section('createPlinthNodes — joins the owning box\'s own group and basePositio
   ['left', 'right', 'back', 'front'].forEach((role) => {
     const node = byRole(plinthNodes, role);
     assert(node, `a ${role} panel exists`);
-    assertEqual(node.groupId, groupId, `${role} panel joins the owning box's own groupId, not a new one of its own`);
+    assert(node.groupId && node.groupId !== groupId, `${role} panel is in a group of its own, separate from the box`);
+    assertEqual(node.boxGroupId, groupId, `${role} panel links back to the box through boxGroupId`);
     assertEqual(node.isPlinthPanel, true, `${role} panel is tagged isPlinthPanel`);
     assertEqual(node.lockedMoveAxes.length, 3, `${role} panel has all 3 move axes locked (derived geometry, not hand-dragged)`);
   });
@@ -125,7 +126,7 @@ section('applyPlinthAdjustment — changes height in place, keeps the same 4 pan
   const { panels, plinthNodes } = buildBoxWithPlinth();
   const idsBefore = plinthNodes.map((n) => n.id).sort();
 
-  const updated = applyPlinthAdjustment(panels, plinthNodes[0].groupId, 150);
+  const updated = applyPlinthAdjustment(panels, plinthNodes[0].boxGroupId, 150);
   const updatedPlinth = updated.filter((p) => p.isPlinthPanel);
   const idsAfter = updatedPlinth.map((n) => n.id).sort();
 

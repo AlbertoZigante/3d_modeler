@@ -1345,7 +1345,7 @@ function appendGroup(
 
   selectButton.innerHTML = `
     <span class="id">
-      Group (${members.length})
+      ${members.some((m) => m.isDoor) ? 'Door' : members.some((m) => m.isPlinthPanel) ? `Plinth (${members.length})` : members.some((m) => m.isLeg) ? `Legs (${members.length})` : members.some((m) => m.isDrawerFront) ? `Drawers (${members.length})` : `Group (${members.length})`}
     </span>
   `;
 
@@ -1455,26 +1455,81 @@ function appendGroup(
     true;
 
 
-  members.forEach(
-    (member) => {
+  const drawerFronts = members
+    .filter((m) => m.isDrawerFront)
+    .sort((a, b) => b.drawerIndex - a.drawerIndex); // top drawer first (= "Drawer 1")
 
-      appendPanelRow(
-        membersContainer,
-        member,
-        {
+  if (drawerFronts.length) {
+    // A drawer group holds one SUB-GROUP per drawer: its front + that
+    // drawer's own box panels. The sub-group header selects the drawer.
+    drawerFronts.forEach((front, k) => {
+      const subMembers = [
+        front,
+        ...members.filter((m) => m.isDrawerBoxPanel && m.drawerBoxFrontId === front.id),
+      ];
+      // each drawer is a dropdown of its own, like a group: [select drawer][▸/▾]
+      const wrapper = document.createElement('div');
+      wrapper.className = 'group-dropdown subgroup-dropdown';
+      wrapper.style.marginLeft = '16px';
+      const selectedInside = subMembers.some((m) => m.id === selectedId);
+      const header = document.createElement('div');
+      header.className = 'group-header-row' + (selectedInside ? ' selected' : '');
+      const selectBtn = document.createElement('button');
+      selectBtn.type = 'button';
+      selectBtn.className = 'list-item group-header-select';
+      selectBtn.innerHTML = `<span class="id">Drawer ${k + 1} (${subMembers.length})</span>`;
+      selectBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onSelectPanel?.(front.id, false);
+      });
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'group-dropdown-toggle';
+      toggle.title = 'Show or hide this drawer\'s panels';
+      const list = document.createElement('div');
+      list.className = 'group-members';
+      const setOpen = (open) => {
+        list.hidden = !open;
+        toggle.textContent = open ? '▾' : '▸';
+        toggle.setAttribute('aria-expanded', String(open));
+        if (open) openSubGroupIds.add(front.id); else openSubGroupIds.delete(front.id);
+      };
+      toggle.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setOpen(list.hidden);
+      });
+      header.appendChild(selectBtn);
+      header.appendChild(toggle);
+      wrapper.appendChild(header);
+      wrapper.appendChild(list);
+      subMembers.forEach((member) => {
+        appendPanelRow(list, member, {
           indented: true,
-
-          isSelected:
-            member.id ===
-            selectedId,
-
+          isSelected: member.id === selectedId,
           isMultiSelected: false,
-
           onSelectPanel,
-        }
-      );
-    }
-  );
+        });
+      });
+      setOpen(openSubGroupIds.has(front.id));
+      membersContainer.appendChild(wrapper);
+    });
+    members
+      .filter((m) => !m.isDrawerFront && !m.isDrawerBoxPanel)
+      .forEach((member) => appendPanelRow(membersContainer, member, {
+        indented: true, isSelected: member.id === selectedId, isMultiSelected: false, onSelectPanel,
+      }));
+  } else {
+    members.forEach((member) => {
+      appendPanelRow(membersContainer, member, {
+        indented: true,
+        isSelected: member.id === selectedId,
+        isMultiSelected: false,
+        onSelectPanel,
+      });
+    });
+  }
 
 
   groupWrapper.appendChild(
@@ -1534,6 +1589,9 @@ function setGroupOpen(
   }
 }
 
+
+// Drawer sub-groups that were opened (by front id) — survives re-renders.
+const openSubGroupIds = new Set();
 
 /* ============================================================
    PANEL ROW

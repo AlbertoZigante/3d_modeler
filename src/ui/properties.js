@@ -28,6 +28,8 @@ import { getDisplayName, MATERIAL_CATALOG } from '../modeller/modules.js';
 import { renderDoorSchema } from './doorSchema.js';
 import { renderDrawerSchema } from './drawerSchema.js';
 import { DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM } from '../features/drawer.js';
+import { renderWallSchema } from './wallSchema.js';
+import { renderPlinthSchema } from './plinthSchema.js';
 import { MIN_PLINTH_HEIGHT_MM, PLINTH_EDGES, normalizePlinthEdgeFit } from '../features/plinth.js';
 
 const DIM_FIELDS = ['width', 'height']; // thickness is derived from material — see below, never a typed field
@@ -65,6 +67,11 @@ export function renderProperties(
     onDeleteDrawerGroup,
     onDrawerLayoutModeChange,
     onDrawerFrontHeightChange,
+    onSelectDrawer,
+    onResetDrawerRow,
+    onDrawerNotice,
+    plinthGroupPanel,
+    legGroup,
   }
 ) {
   if (drawerView) {
@@ -72,10 +79,18 @@ export function renderProperties(
     // front or one drawer-box panel is selected. A drawer's own width / height
     // / thickness are NOT shown: they are derived from the cabinet panels that
     // define the drawers (see features/drawer.js) and cannot be typed.
-    renderDrawerView(container, {
+    let host = container;
+    if (selectedPanel && resolvedPanel) {
+      // one drawer panel selected: the same Node section as any other panel, then the drawer data
+      container.innerHTML = `${nodeSectionHTML(selectedPanel, resolvedPanel)}<div class="divider"></div><div id="drawer-view-host"></div>`;
+      wireNodeSection(container, { selectedPanel, onRename, onFieldChange, onRemove });
+      host = container.querySelector('#drawer-view-host');
+    }
+    renderDrawerView(host, {
       view: drawerView, hiddenGroupMembers, restoreError, onRestoreFace, onGroupMaterialChange,
       onDrawerFrontEdgeFitChange, onDrawerFrontCountChange, onDrawerBoxMarginChange,
       onToggleDrawerOpen, onDrawerLayoutModeChange, onDrawerFrontHeightChange, onDeleteDrawerGroup,
+      onSelectDrawer, onResetDrawerRow, onDrawerNotice,
     });
     return;
   }
@@ -94,24 +109,25 @@ export function renderProperties(
     const hiddenList = hiddenGroupMembers || [];
     container.innerHTML = `
       <div class="section-title">Group selected — ${groupMemberCount} panels</div>
-      <div class="field-row">
+      ${legGroup ? '' : `      <div class="field-row">
         <label>Material (all ${groupMemberCount} panels)</label>
         <select id="group-material-field" class="field-input">
           ${!groupMaterial ? '<option value="" selected disabled>— Mixed materials —</option>' : ''}
           ${MATERIAL_CATALOG.map((m) => `<option value="${escapeHtml(m.name)}" ${m.name === groupMaterial ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
         </select>
-      </div>
-      ${drawerStack ? drawerHeightsSectionHTML(drawerStack) : ''}
+      </div>`}
+      ${plinthGroupPanel ? plinthSectionHTML(plinthGroupPanel) : ''}
       ${restoreFaceListHTML(hiddenList, restoreError)}
       <div class="empty-state">Click a member panel — in the list, or in the 3D/2D view — to select and edit it individually.</div>
-      <button class="remove-btn" id="ungroup-btn">Ungroup (keep all ${groupMemberCount} panels)</button>
-      <button class="remove-btn" id="delete-group-btn">Delete whole group (${groupMemberCount} panels)</button>
+      ${plinthGroupPanel || legGroup ? '' : `<button class="remove-btn" id="ungroup-btn">Ungroup (keep all ${groupMemberCount} panels)</button>`}
+      <button class="remove-btn" id="delete-group-btn">${legGroup ? `Delete legs (${groupMemberCount})` : plinthGroupPanel ? `Delete plinth (${groupMemberCount} panels)` : `Delete whole group (${groupMemberCount} panels)`}</button>
     `;
     wireRestoreFaceButtons(container, onRestoreFace);
+    if (plinthGroupPanel) wirePlinthSection(container, plinthGroupPanel, onPlinthHeightChange, onPlinthEdgeChange);
     container.querySelectorAll('[data-drawer-layout]').forEach((btn) => {
       btn.addEventListener('click', () => onDrawerLayoutModeChange?.(btn.dataset.drawerLayout));
     });
-    container.querySelectorAll('.drawer-height-field').forEach((input) => {
+  container.querySelectorAll('.drawer-height-field').forEach((input) => {
       const commit = () => {
         const v = parseFloat(input.value);
         if (Number.isFinite(v)) onDrawerFrontHeightChange?.(Number(input.dataset.index), v);
@@ -120,7 +136,7 @@ export function renderProperties(
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
     });
     container.querySelector('#group-material-field').addEventListener('change', (e) => onGroupMaterialChange(e.target.value));
-    container.querySelector('#ungroup-btn').addEventListener('click', onUngroup);
+    container.querySelector('#ungroup-btn')?.addEventListener('click', onUngroup);
     container.querySelector('#delete-group-btn').addEventListener('click', onRemove);
     return;
   }
@@ -134,84 +150,18 @@ export function renderProperties(
   const displayName = getDisplayName(selectedPanel);
 
   container.innerHTML = `
-    <div class="node-header-row">
-      <span class="section-title" id="node-name-label">Node: ${escapeHtml(displayName)}${selectedPanel.pieceCode ? ` <span class="node-id-inline">${escapeHtml(selectedPanel.pieceCode)}</span>` : ''}</span>
-      <button class="rename-btn" id="rename-node-btn" title="Rename this panel">✏️</button>
-    </div>
-
-    ${selectedPanel.groupId ? `<div class="group-member-note">Part of a group — Remove here deletes just this panel</div>` : ''}
-
-    ${resolvedPanel.warnings && resolvedPanel.warnings.length > 0 ? `
-      <div class="warning-banner">
-        ${resolvedPanel.warnings.map((w) => `⚠ ${escapeHtml(w)}`).join('<br/>')}
-      </div>` : ''}
-
-    <div class="dims-row dims-row-compact">
-      ${DIM_FIELDS.map((f) => dimFieldHTML(f, selectedPanel, resolvedPanel, locked[f], selectedPanel.isDoor, true)).join('')}
-      <div class="field-row">
-        <label title="Thickness — set by Material, below">T 🔒</label>
-        <div class="field-input-wrap locked">
-          <input type="text" value="${resolvedPanel.thickness.toFixed(1)}" disabled class="field-input" title="Set by Material, below — not directly editable" />
-        </div>
-      </div>
-    </div>
-    <div class="field-row">
-      <label>Material</label>
-      <select id="material-field" class="field-input">
-        ${MATERIAL_CATALOG.map((m) => `<option value="${escapeHtml(m.name)}" ${m.name === selectedPanel.material ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
-      </select>
-    </div>
-    <button class="remove-btn" id="remove-btn">Remove panel</button>
+    ${nodeSectionHTML(selectedPanel, resolvedPanel)}
 
     ${selectedPanel.edgeFit && !selectedPanel.isDoor && !selectedPanel.isDrawerFront ? edgeFitSectionHTML(selectedPanel.edgeFit) : ''}
     ${selectedPanel.isDoor ? doorSectionHTML(selectedPanel, hiddenGroupMembers || [], restoreError) : ''}
     ${selectedPanel.isPlinthPanel ? plinthSectionHTML(selectedPanel) : ''}
   `;
 
-  // ---- rename (pencil icon) ----
-  const renameBtn = container.querySelector('#rename-node-btn');
-  renameBtn.addEventListener('click', () => {
-    const label = container.querySelector('#node-name-label');
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'field-input rename-input';
-    input.value = selectedPanel.name || '';
-    input.placeholder = selectedPanel.id;
-    label.replaceWith(input);
-    input.focus();
-    input.select();
-
-    let committed = false;
-    const commit = () => {
-      if (committed) return;
-      committed = true;
-      onRename(input.value);
-    };
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); commit(); }
-      if (e.key === 'Escape') { committed = true; input.replaceWith(label); }
-    });
-    input.addEventListener('blur', commit);
-  });
-
-  // ---- dimension / material ----
-  container.querySelectorAll('.dim-field').forEach((input) => {
-    input.addEventListener('change', (e) => {
-      const field = e.target.dataset.field;
-      const v = Number(e.target.value);
-      if (Number.isFinite(v) && v > 0) onFieldChange(field, v);
-      else e.target.value = selectedPanel[field];
-    });
-  });
-  container.querySelector('#material-field').addEventListener('change', (e) => {
-    onFieldChange('material', e.target.value);
-  });
+  wireNodeSection(container, { selectedPanel, onRename, onFieldChange, onRemove });
   container.querySelectorAll('.unlink-btn').forEach((btn) => {
     btn.addEventListener('click', () => onUnlinkConstraint(btn.dataset.field));
   });
 
-  // ---- presets ----
-  container.querySelector('#remove-btn').addEventListener('click', onRemove);
 
   // ---- edge fit (only present for a box's Front/Back wall — see the
   // `selectedPanel.edgeFit` check above) ----
@@ -224,13 +174,15 @@ export function renderProperties(
   // actual committed edgeFit, wiping whatever was picked-but-not-yet-
   // applied here). Apply itself now takes no arguments; the value it
   // commits was already tracked the moment each select changed.
-  container.querySelectorAll('.edge-fit-field').forEach((select) => {
-    select.addEventListener('change', () => {
-      onEdgeFitFieldChange(select.dataset.edge, select.value);
+  container.querySelectorAll('.wall-edge-arrow').forEach((g) => {
+    g.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const edge = g.dataset.edge;
+      const current = (selectedPanel.edgeFit || {})[edge] === 'out' ? 'out' : 'in';
+      onEdgeFitFieldChange(edge, current === 'out' ? 'in' : 'out');
+      onEdgeFitChange();
     });
-  });
-  container.querySelector('#apply-edge-fit-btn')?.addEventListener('click', () => {
-    onEdgeFitChange();
   });
 
   // ---- door (edge fit + hinge live, via the shared door schema; open/
@@ -297,15 +249,7 @@ export function renderProperties(
   // ---- plinth (height — only present for an isPlinthPanel selection,
   // see plinthSectionHTML's own comment on why this is its own field
   // rather than the generic dim-field path).
-  container.querySelector('.plinth-height-field')?.addEventListener('change', (event) => {
-    onPlinthHeightChange(Number(event.target.value));
-  });
-  container.querySelectorAll('.plinth-edge-fit').forEach((select) => {
-    select.addEventListener('change', () => onPlinthEdgeChange(select.dataset.edge, { fit: select.value }));
-  });
-  container.querySelectorAll('.plinth-edge-inset').forEach((input) => {
-    input.addEventListener('change', () => onPlinthEdgeChange(input.dataset.edge, { insetMm: Number(input.value) }));
-  });
+  wirePlinthSection(container, selectedPanel, onPlinthHeightChange, onPlinthEdgeChange);
 
   wireRestoreFaceButtons(container, onRestoreFace);
 }
@@ -318,27 +262,12 @@ export function renderProperties(
 // door/front). The 4 selects don't apply live — Apply commits all 4
 // at once as ONE history entry (see modeller-main.js#updateSelectedEdgeFit),
 // so switching a couple of edges mid-thought doesn't spam undo.
-const EDGE_FIT_ROWS = [
-  ['left', 'Left edge (vs Left wall)'],
-  ['right', 'Right edge (vs Right wall)'],
-  ['bottom', 'Bottom edge (vs Bottom wall)'],
-  ['top', 'Top edge (vs Top wall)'],
-];
-
 function edgeFitSectionHTML(edgeFit) {
   return `
     <div class="divider"></div>
-    <div class="section-title">Edge fit</div>
-    ${EDGE_FIT_ROWS.map(([edge, label]) => `
-      <div class="field-row">
-        <label>${label}</label>
-        <select class="field-input edge-fit-field" data-edge="${edge}">
-          <option value="in" ${edgeFit[edge] !== 'out' ? 'selected' : ''}>In (inset)</option>
-          <option value="out" ${edgeFit[edge] === 'out' ? 'selected' : ''}>Out (overlay)</option>
-        </select>
-      </div>
-    `).join('')}
-    <button class="add-btn" id="apply-edge-fit-btn">Apply edge fit</button>
+    <div class="section-title">Junctions</div>
+    <div class="properties-hint">Click an edge's arrow to flip it in (inset) / out (covers the neighboring wall).</div>
+    ${renderWallSchema(edgeFit)}
   `;
 }
 
@@ -439,17 +368,7 @@ function renderDrawerView(container, h) {
     <div class="properties-hint">Click an edge's arrow to flip it in/out.</div>
     ${renderDrawerSchema(front.edgeFit, front.drawerCount)}
 
-    ${v.hasBox ? `
-      <div class="divider"></div>
-      <div class="section-title">Drawer box</div>
-      ${numberFieldHTML('Top margin', 'topMarginMm', spec.topMarginMm ?? DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, 'mm', { min: DEFAULT_DRAWER_BOX_TOP_MARGIN_MM }, 'drawer-margin-field')}
-      ${numberFieldHTML('Bottom margin', 'bottomMarginMm', spec.bottomMarginMm ?? DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM, 'mm', { min: DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM }, 'drawer-margin-field')}
-      <button class="add-btn" id="toggle-drawer-open-btn">${v.open ? 'Close drawers' : 'Open drawers'}</button>
-    ` : `
-      <div class="empty-state">These drawers have no box built yet — nothing to adjust or open.</div>
-    `}
-
-    ${v.count > 1 ? drawerHeightsSectionHTML(v) : ''}
+    ${drawerTableHTML(v)}
     ${restoreFaceListHTML(h.hiddenGroupMembers || [], h.restoreError)}
 
     <div class="divider"></div>
@@ -469,13 +388,31 @@ function renderDrawerView(container, h) {
     });
   });
   container.querySelectorAll('.drawer-margin-field').forEach((input) => {
-    input.addEventListener('change', () => h.onDrawerBoxMarginChange(input.dataset.field, Number(input.value)));
+    input.addEventListener('change', () => {
+      const val = parseFloat(input.value);
+      if (!Number.isFinite(val)) return;
+      h.onDrawerBoxMarginChange(input.dataset.field, val, input.dataset.frontId || undefined);
+    });
   });
-  container.querySelector('#toggle-drawer-open-btn')?.addEventListener('click', () => h.onToggleDrawerOpen());
+  container.querySelectorAll('.drawer-open-btn').forEach((btn) => {
+    btn.addEventListener('click', () => h.onToggleDrawerOpen(btn.dataset.frontId || undefined));
+  });
   container.querySelectorAll('[data-drawer-layout]').forEach((btn) => {
     btn.addEventListener('click', () => h.onDrawerLayoutModeChange?.(btn.dataset.drawerLayout));
   });
-  container.querySelectorAll('.drawer-height-field').forEach((input) => {
+  container.querySelectorAll('.drawer-reset-btn').forEach((btn) => {
+    btn.addEventListener('click', () => h.onResetDrawerRow?.(btn.dataset.frontId || undefined));
+  });
+  container.querySelectorAll('.drawer-row-select').forEach((cell) => {
+    cell.addEventListener('click', () => h.onSelectDrawer?.(cell.dataset.frontId));
+  });
+  // a height that is not free (the one left over, or every height in Apply All): explain
+  container.querySelectorAll('.drawer-height-field[readonly]').forEach((input) => {
+    const notice = () => h.onDrawerNotice?.(input.dataset.reason);
+    input.addEventListener('focus', notice);
+    input.addEventListener('click', notice);
+  });
+  container.querySelectorAll('.drawer-height-field:not([readonly])').forEach((input) => {
     const commit = () => {
       const val = parseFloat(input.value);
       if (Number.isFinite(val)) h.onDrawerFrontHeightChange?.(Number(input.dataset.index), val);
@@ -486,25 +423,75 @@ function renderDrawerView(container, h) {
   container.querySelector('#delete-drawer-group-btn')?.addEventListener('click', () => h.onDeleteDrawerGroup?.());
 }
 
-function drawerHeightsSectionHTML(stack) {
-  const custom = stack.mode === 'custom';
-  const rows = [...stack.fronts].reverse().map((f, k) => `
-    <div class="field-row">
-      <label>Front ${k + 1}${k === 0 ? ' (top)' : (k === stack.fronts.length - 1 ? ' (bottom)' : '')}</label>
-      <div class="field-input-wrap">
-        <input type="number" class="field-input drawer-height-field" data-index="${f.index}" min="10" step="1" value="${Math.round(f.heightMm * 10) / 10}" ${custom ? '' : 'disabled'} />
-        <span class="unit">mm</span>
-      </div>
-    </div>`).join('');
+// Drawer table, two modes (v.mode):
+//  - "Apply All" ('equal'): ONE row — equally spaced drawers, one top/bottom
+//    margin for all of them, one Open/Close for the whole stack.
+//  - "Custom": one row per drawer (1 = top). Any N-1 front heights can be set;
+//    the one left over is greyed out and shows the resulting height (when
+//    only some are set, the unset ones share the rest and are marked "auto").
+function drawerTableHTML(v) {
+  const custom = v.mode === 'custom' && v.count > 1;
+  const rows = [...v.fronts].reverse(); // top -> bottom
+  const boxed = rows.filter((f) => f.hasBox);
+  const commonBox = (key) => (boxed.length && boxed.every((f) => f[key] === boxed[0][key]) ? boxed[0][key] : '');
+  const allOpen = boxed.length > 0 && boxed.every((f) => f.open);
+  const fixedCount = v.fronts.filter((f) => f.fixed).length;
+  const lastFree = v.fronts.length - fixedCount === 1; // the single unfixed front is the automatic one
+  const round1 = (x) => Math.round(x * 10) / 10;
+  const allDirty = boxed.some((f) => f.topMarginMm !== DEFAULT_DRAWER_BOX_TOP_MARGIN_MM || f.bottomMarginMm !== DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM);
+
+  const marginCell = (field, f) => {
+    if (f ? !f.hasBox : boxed.length === 0) return '<span class="dt-na">—</span>';
+    const value = f ? f[field] : commonBox(field);
+    const floor = field === 'topMarginMm' ? DEFAULT_DRAWER_BOX_TOP_MARGIN_MM : DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM;
+    return `<input type="number" class="dt-input drawer-margin-field" data-field="${field}" ${f ? `data-front-id="${f.id}"` : ''} min="${floor}" step="1" value="${value}" placeholder="mixed" />`;
+  };
+  const openCell = (f) => {
+    if (f ? !f.hasBox : boxed.length === 0) return '<span class="dt-na">—</span>';
+    const open = f ? f.open : allOpen;
+    return `<button class="dt-btn drawer-open-btn ${open ? 'is-open' : ''}" ${f ? `data-front-id="${f.id}"` : ''} title="${open ? 'Close' : 'Open'}">${open ? 'Close' : 'Open'}</button>`;
+  };
+
+  const modeBar = v.count > 1 ? `
+    <div class="dt-mode">
+      <button class="dt-seg ${custom ? '' : 'is-active'}" data-drawer-layout="equal" title="Equally spaced drawers, one top/bottom margin for all">Apply All</button>
+      <button class="dt-seg ${custom ? 'is-active' : ''}" data-drawer-layout="custom" title="Set each drawer on its own">Custom</button>
+    </div>` : '';
+
+  const applyAllRow = `
+      <tr class="dt-all">
+        <td class="dt-name">All</td>
+        <td><input type="number" class="dt-input drawer-height-field" data-index="0" value="${round1(rows[0].heightMm)}" readonly data-reason="Apply All: every drawer has the same height. Switch to Custom to set heights one by one." /></td>
+        <td>${marginCell('topMarginMm', null)}</td>
+        <td>${marginCell('bottomMarginMm', null)}</td>
+        <td>${openCell(null)}</td>
+        <td class="dt-reset-col"><button class="dt-reset drawer-reset-btn" ${allDirty ? '' : 'disabled'} title="${allDirty ? 'Reset the top/bottom margin of every drawer to the default' : 'Already at default'}">↺</button></td>
+      </tr>`;
+
+  const customRows = rows.map((f, k) => {
+    const auto = v.count > 1 && !f.fixed && lastFree;       // greyed: just shows the result
+    const shared = v.count > 1 && !f.fixed && fixedCount > 0; // not set by the user
+    const dirty = f.fixed || (f.hasBox && (f.topMarginMm !== DEFAULT_DRAWER_BOX_TOP_MARGIN_MM || f.bottomMarginMm !== DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM));
+    return `
+      <tr class="${f.id === v.selectedFrontId ? 'dt-selected' : ''}" data-front-id="${f.id}">
+        <td class="dt-name drawer-row-select" data-front-id="${f.id}" title="Select drawer ${k + 1}">${k + 1}</td>
+        <td class="${auto ? 'dt-auto-cell' : ''}"><input type="number" class="dt-input drawer-height-field" data-index="${f.index}" min="10" step="1" value="${round1(f.heightMm)}" ${v.count > 1 && !auto ? '' : `readonly data-reason="${v.count > 1 ? 'This height is set by the other drawers: it is what they leave, so the stack always fills the opening. Change another drawer\'s height instead.' : 'A single drawer fills the whole opening. Add more drawers to set different heights.'}"`} />${shared ? '<span class="dt-auto">auto</span>' : ''}</td>
+        <td>${marginCell('topMarginMm', f)}</td>
+        <td>${marginCell('bottomMarginMm', f)}</td>
+        <td>${openCell(f)}</td>
+        <td class="dt-reset-col"><button class="dt-reset drawer-reset-btn" data-front-id="${f.id}" ${dirty ? '' : 'disabled'} title="${dirty ? 'Reset this drawer: default margins, height shared equally with the free drawers' : 'Already at default'}">↺</button></td>
+      </tr>`;
+  }).join('');
+
   return `
     <div class="divider"></div>
-    <div class="section-title">Drawer heights</div>
-    <div class="btn-row" style="display:flex;gap:6px;margin-bottom:6px">
-      <button class="add-btn ${!custom ? 'active' : ''}" data-drawer-layout="equal" style="flex:1" title="All fronts the same height">Equal heights</button>
-      <button class="add-btn ${custom ? 'active' : ''}" data-drawer-layout="custom" style="flex:1" title="Set the height of each front">Custom heights</button>
-    </div>
-    ${custom ? '<div class="properties-hint">Changing a front takes the difference from the neighbouring front, so the stack keeps filling the opening.</div>' : ''}
-    ${rows}
+    <div class="section-title">Drawers <span class="dt-unit">(mm)</span></div>
+    ${modeBar}
+    <table class="drawer-table">
+      <thead><tr><th>Drawer</th><th>Height</th><th>Top margin</th><th>Bottom margin</th><th>Open</th><th class="dt-reset-col"></th></tr></thead>
+      <tbody>${custom || v.count === 1 ? customRows : applyAllRow}</tbody>
+    </table>
+    ${v.fronts.some((f) => !f.hasBox) ? '<div class="properties-hint">— : no box built for that drawer yet.</div>' : ''}
   `;
 }
 
@@ -548,27 +535,100 @@ function drawerSectionHTML(front, hiddenGroupMembers, restoreError, hasBox) {
 // this codebase yet, only for position, so it isn't solved here either
 // — the dedicated field below is the intended way in, same as the
 // drawer box margins, not a true lock against the generic one.)
+function wireNodeSection(container, { selectedPanel, onRename, onFieldChange, onRemove }) {
+  const renameBtn = container.querySelector('#rename-node-btn');
+  renameBtn.addEventListener('click', () => {
+    const label = container.querySelector('#node-name-label');
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'field-input rename-input';
+    input.value = selectedPanel.name || '';
+    input.placeholder = selectedPanel.id;
+    label.replaceWith(input);
+    input.focus();
+    input.select();
+
+    let committed = false;
+    const commit = () => {
+      if (committed) return;
+      committed = true;
+      onRename(input.value);
+    };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      if (e.key === 'Escape') { committed = true; input.replaceWith(label); }
+    });
+    input.addEventListener('blur', commit);
+  });
+
+  container.querySelector('#material-field')?.addEventListener('change', (e) => {
+    onFieldChange('material', e.target.value);
+  });
+  container.querySelector('#remove-btn')?.addEventListener('click', onRemove);
+}
+
+function nodeSectionHTML(selectedPanel, resolvedPanel) {
+  const displayName = getDisplayName(selectedPanel);
+  return `
+    <div class="node-header-row">
+      <span class="section-title" id="node-name-label">Node: ${escapeHtml(displayName)}${selectedPanel.pieceCode ? ` <span class="node-id-inline">${escapeHtml(selectedPanel.pieceCode)}</span>` : ''}</span>
+      <button class="rename-btn" id="rename-node-btn" title="Rename this panel">✏️</button>
+    </div>
+
+    ${selectedPanel.groupId ? `<div class="group-member-note">Part of a group — Remove here deletes just this panel</div>` : ''}
+
+    ${resolvedPanel.warnings && resolvedPanel.warnings.length > 0 ? `
+      <div class="warning-banner">
+        ${resolvedPanel.warnings.map((w) => `⚠ ${escapeHtml(w)}`).join('<br/>')}
+      </div>` : ''}
+
+    <div class="dims-row dims-row-compact">
+      ${[['W', 'Width', resolvedPanel.width, 'Resize it in the 2D/3D view'], ['H', 'Height', resolvedPanel.height, 'Resize it in the 2D/3D view'], ['T', 'Thickness', resolvedPanel.thickness, 'Set by Material, below']].map(([short, full, value, hint]) => `
+      <div class="field-row">
+        <label title="${full}">${short} 🔒</label>
+        <div class="field-input-wrap locked">
+          <input type="text" value="${Number(value).toFixed(1)}" disabled class="field-input" title="${hint} — not directly editable" />
+        </div>
+      </div>`).join('')}
+    </div>
+    <div class="field-row">
+      <label>Material</label>
+      <select id="material-field" class="field-input">
+        ${MATERIAL_CATALOG.map((m) => `<option value="${escapeHtml(m.name)}" ${m.name === selectedPanel.material ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+      </select>
+    </div>
+    <button class="remove-btn" id="remove-btn">Remove panel</button>
+  `;
+}
+
+// Height field + edge arrows/offsets of the plinth section — shared by the
+// single-panel view and the whole-plinth (group) view.
+function wirePlinthSection(container, panel, onPlinthHeightChange, onPlinthEdgeChange) {
+  container.querySelector('.plinth-height-field')?.addEventListener('change', (event) => {
+    onPlinthHeightChange(Number(event.target.value));
+  });
+  container.querySelectorAll('.plinth-edge-arrow').forEach((g) => {
+    g.addEventListener('click', () => {
+      const edge = g.dataset.edge;
+      const current = normalizePlinthEdgeFit(panel.plinthEdgeFit)[edge].fit;
+      onPlinthEdgeChange(edge, { fit: current === 'in' ? 'out' : 'in' });
+    });
+  });
+  container.querySelectorAll('.plinth-edge-inset').forEach((input) => {
+    input.addEventListener('change', () => {
+      onPlinthEdgeChange(input.dataset.edge, { insetMm: Number(input.value) });
+    });
+  });
+}
+
 function plinthSectionHTML(panel) {
   return `
     <div class="divider"></div>
     <div class="section-title">Plinth</div>
     ${numberFieldHTML('Height', 'heightMm', panel.height, 'mm', { min: MIN_PLINTH_HEIGHT_MM }, 'plinth-height-field')}
     <div class="section-title" title="Out = flush with the box's Bottom panel edge. In = set back by the given mm.">Edges</div>
-    ${PLINTH_EDGES.map((edge) => {
-      const e = normalizePlinthEdgeFit(panel.plinthEdgeFit)[edge];
-      return `
-    <div class="field-row">
-      <label>${edge[0].toUpperCase()}${edge.slice(1)}</label>
-      <div class="field-input-wrap">
-        <select class="field-input plinth-edge-fit" data-edge="${edge}">
-          <option value="out" ${e.fit === 'out' ? 'selected' : ''}>Out</option>
-          <option value="in" ${e.fit === 'in' ? 'selected' : ''}>In</option>
-        </select>
-        <input type="number" min="0" step="any" value="${e.insetMm}" data-edge="${edge}" class="field-input plinth-edge-inset" ${e.fit === 'in' ? '' : 'disabled'} />
-        <span class="field-unit">mm</span>
-      </div>
-    </div>`;
-    }).join('')}
+    <div class="properties-hint">Click an edge's arrow to flip it in/out. Set the offset (mm, &gt; 0) next to each 'in' edge.</div>
+    ${renderPlinthSchema(normalizePlinthEdgeFit(panel.plinthEdgeFit))}
   `;
 }
 

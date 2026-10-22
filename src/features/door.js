@@ -25,7 +25,7 @@
  * opening. This file layers door-specific concerns on top: exactly
  * one panel, a hinge side, and open/close swinging.
  */
-import { createPanelNode } from '../modeller/modules.js';
+import { createPanelNode, nextId } from '../modeller/modules.js';
 import { computeBoundaryRectangle } from '../shared/geometry.js';
 import { computeFrontFit, dimFieldForAxis, ROTATION_FOR_NORMAL_AXIS } from '../shared/frontFit.js';
 
@@ -131,7 +131,8 @@ export function createDoorNode(panels, placement) {
     thickness: placement.door.thicknessMm,
     material: placement.door.material,
     rotation,
-    groupId: placement.groupId,
+    groupId: nextId(),              // independent group: one per door
+    boxGroupId: placement.groupId,  // link to the box that defines its size
     isBoxPanel: true,
     // A door's whole size and position are DERIVED from its 4
     // boundary panels + its own edgeFit (see applyDoorAdjustmentsForGroup
@@ -356,7 +357,7 @@ export function computeDoorRecompute(panels, doorNode) {
  */
 export function applyDoorAdjustmentsForGroup(panels, groupId) {
   let next = panels;
-  const doors = next.filter((p) => p.groupId === groupId && p.isDoor);
+  const doors = next.filter((p) => (p.boxGroupId ?? p.groupId) === groupId && p.isDoor); // a door is its own group, linked to its box
 
   for (const door of doors) {
     const placement = computeDoorRecompute(next, door);

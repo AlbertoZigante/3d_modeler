@@ -17,7 +17,7 @@
  * footprint itself is the owning Bottom panel's x/z size, each edge
  * optionally pulled in (see normalizePlinthEdgeFit).
  */
-import { createPanelNode, MIN_PANEL_DIM_MM, computeWorldHalfExtents } from '../modeller/modules.js';
+import { createPanelNode, nextId, MIN_PANEL_DIM_MM, computeWorldHalfExtents } from '../modeller/modules.js';
 import { resolveConstraints } from '../modeller/snap.js';
 import { VERTICAL_ROTATION, PARALLEL_ROTATION } from '../shared/geometry.js';
 import { findBoxSibling } from './box.js';
@@ -62,7 +62,7 @@ export function normalizePlinthEdgeFit(edgeFit) {
   const out = {};
   PLINTH_EDGES.forEach((edge) => {
     const e = edgeFit?.[edge] || {};
-    const insetMm = Number.isFinite(e.insetMm) ? Math.max(0, e.insetMm) : DEFAULT_PLINTH_INSET_MM;
+    const insetMm = Number.isFinite(e.insetMm) && e.insetMm > 0 ? e.insetMm : DEFAULT_PLINTH_INSET_MM; // strictly > 0
     out[edge] = { fit: e.fit === 'in' ? 'in' : 'out', insetMm };
   });
   return out;
@@ -189,12 +189,9 @@ export function computePlinthPlacement(panels, groupId, spec = {}) {
 }
 
 /**
- * Creates the 4 real panel nodes from a successful placement. Joins
- * the OWNING BOX's own existing groupId (not a new one of its own) —
- * same reasoning as features/drawer.js#createDrawerBoxNodes joining
- * its front's groupId: the plinth is part of that box as far as
- * selection/grouping/deletion are concerned, not a separate unit.
- * Reuses the box's own EXISTING basePosition (looked up off any
+ * Creates the real panel nodes from a successful placement. The plinth
+ * is its OWN group (like a drawer stack), linked to its box through
+ * `boxGroupId`. Reuses the box's own EXISTING basePosition (looked up off any
  * current member) rather than {0,0,0}, for the same reason
  * createDrawerBoxNodes does — if the whole box is ever dragged as a
  * group, every member shares one basePosition anchor; a plinth with
@@ -204,7 +201,7 @@ export function computePlinthPlacement(panels, groupId, spec = {}) {
  * @param {ReturnType<typeof computePlinthPlacement>} placement - a successful (ok:true) result
  * @returns {Array} 4 new panel nodes (left, right, back, front)
  */
-export function createPlinthNodes(panels, placement) {
+export function createPlinthNodes(panels, placement, plinthGroupId = nextId()) {
   const basePosition = panels.find((p) => p.groupId === placement.groupId)?.basePosition || { x: 0, y: 0, z: 0 };
   const specs = [
     ...(placement.skipPerimeter ? [] : PERIMETER_ROLES.map((role) => ({ role, ...placement[role] }))),
@@ -216,7 +213,8 @@ export function createPlinthNodes(panels, placement) {
       name: role.startsWith('rib-') ? `Plinth Rib ${role.slice(4)}` : `Plinth ${role[0].toUpperCase()}${role.slice(1)}`,
       material: placement.material,
       rotation: spec.rotation,
-      groupId: placement.groupId,
+      groupId: plinthGroupId,          // independent group: the plinth
+      boxGroupId: placement.groupId,   // link to the box it is built under
       isBoxPanel: true,
       // Derived from the owning box's own Bottom panel (see
       // computePlinthPlacement above) — never something to drag or
@@ -260,7 +258,7 @@ export function createPlinthNodes(panels, placement) {
  * @returns {Array} patched panels
  */
 export function applyPlinthAdjustment(panels, groupId, heightMm, edgeFit) {
-  const existing = panels.filter((p) => p.groupId === groupId && p.isPlinthPanel);
+  const existing = panels.filter((p) => inBox(p, groupId) && p.isPlinthPanel);
   if (existing.length === 0) return panels;
 
   const sample = existing.find((p) => p.plinthRole === 'left') || existing[0];
@@ -281,9 +279,9 @@ export function applyPlinthAdjustment(panels, groupId, heightMm, edgeFit) {
 
   // patch existing (keeps ids), drop ribs that no longer exist
   let next = panels
-    .filter((p) => !(p.groupId === groupId && p.isPlinthPanel && !specByRole.has(p.plinthRole)))
+    .filter((p) => !(inBox(p, groupId) && p.isPlinthPanel && !specByRole.has(p.plinthRole)))
     .map((p) => {
-      if (!(p.groupId === groupId && p.isPlinthPanel)) return p;
+      if (!(inBox(p, groupId) && p.isPlinthPanel)) return p;
       const spec = specByRole.get(p.plinthRole);
       return { ...p, ...spec.dims, plinthEdgeFit: placement.edgeFit, offset: { x: spec.center.x - p.basePosition.x, y: spec.center.y - p.basePosition.y, z: spec.center.z - p.basePosition.z } };
     });
@@ -291,7 +289,7 @@ export function applyPlinthAdjustment(panels, groupId, heightMm, edgeFit) {
   // add ribs that are new (e.g. the plinth grew past a spacing threshold)
   const missing = placement.ribs.filter((r) => !have.has(r.role));
   if (missing.length) {
-    next = [...next, ...createPlinthNodes(panels, { ...placement, ribs: missing, skipPerimeter: true })];
+    next = [...next, ...createPlinthNodes(panels, { ...placement, ribs: missing, skipPerimeter: true }, sample.groupId)];
   }
   return shiftGroupY(next, groupId, delta);
 }
@@ -302,9 +300,15 @@ export function applyPlinthAdjustment(panels, groupId, heightMm, edgeFit) {
  * position = basePosition + offset, so this moves the whole group
  * without touching any offset or constraint.
  */
+// Is `p` part of box `groupId` — either a member of its own group or linked
+// to it (drawers, doors and the plinth are groups of their own, see boxGroupId)?
+const inBox = (p, groupId) => (p.boxGroupId ?? p.groupId) === groupId;
+
 export function shiftGroupY(panels, groupId, dy) {
   if (!dy) return panels;
-  return panels.map((p) => (p.groupId === groupId
+  // everything linked to the box moves with it — drawers, doors and plinth
+  // included, even though they are separate groups
+  return panels.map((p) => (inBox(p, groupId)
     ? { ...p, basePosition: { ...p.basePosition, y: p.basePosition.y + dy } }
     : p));
 }
@@ -318,10 +322,10 @@ export function shiftGroupY(panels, groupId, dy) {
  *   | {ok:false, reason:string}}
  */
 export function addPlinthAndRaiseBox(panels, groupId, spec = {}) {
-  if (panels.some((p) => p.groupId === groupId && p.isPlinthPanel)) {
+  if (panels.some((p) => inBox(p, groupId) && p.isPlinthPanel)) {
     return { ok: false, reason: 'already-has-plinth' };
   }
-  if (panels.some((p) => p.groupId === groupId && p.isLeg)) return { ok: false, reason: 'has-legs' };
+  if (panels.some((p) => inBox(p, groupId) && p.isLeg)) return { ok: false, reason: 'has-legs' };
   const placement = computePlinthPlacement(panels, groupId, spec);
   if (!placement.ok) return placement;
 

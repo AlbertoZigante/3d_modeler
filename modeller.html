@@ -1042,6 +1042,42 @@
        ADD BUTTONS
        ========================================================= */
 
+    /* ---- drawer table: soft, borderless ---- */
+    .drawer-table { width: 100%; border-collapse: separate; border-spacing: 0 3px; table-layout: fixed; font-size: 12px; margin-top: 4px; }
+    .drawer-table th { font-size: 10px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: #a4977f; text-align: center; padding: 2px 2px 4px; line-height: 1.15; }
+    .drawer-table th:first-child, .drawer-table td:first-child { width: 15%; }
+    .drawer-table td { padding: 3px 2px; background: #f8f1e4; text-align: center; vertical-align: middle; }
+    .drawer-table td:first-child { border-radius: 8px 0 0 8px; padding-left: 6px; }
+    .drawer-table td:last-child { border-radius: 0 8px 8px 0; padding-right: 4px; }
+    .drawer-table tr.dt-all td { background: #f0e3cc; font-weight: 600; }
+    .drawer-table .dt-name { color: #3a3126; font-weight: 600; text-align: left; }
+    .drawer-table .dt-na { color: #c3b69c; }
+    .drawer-table .dt-unit { font-weight: 400; color: #a4977f; text-transform: none; }
+    .drawer-table tr.dt-selected td { background: #f7dcc8; }
+    .drawer-table tr.dt-selected .dt-name { color: #b5502f; }
+    .drawer-table .drawer-row-select { cursor: pointer; }
+    .dt-auto { display: block; font-size: 9px; line-height: 1; color: #a4977f; margin-top: -2px; }
+    .dt-input { width: 100%; box-sizing: border-box; padding: 4px 2px; font-size: 12px; text-align: center; color: #3a3126; background: transparent; border: none; border-radius: 6px; outline: none; -moz-appearance: textfield; }
+    .dt-input::-webkit-outer-spin-button, .dt-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .dt-input:hover:not(:disabled) { background: rgba(255,255,255,.7); }
+    .dt-input:focus { background: #fff; box-shadow: 0 0 0 1.5px #d97742 inset; }
+    .dt-input:disabled, .dt-input[readonly] { color: #8a7d68; cursor: default; }
+    .dt-input[readonly]:focus { background: transparent; box-shadow: none; }
+    .drawer-table td.dt-auto-cell { background: #e6e0d4; }
+    .drawer-table td.dt-auto-cell .dt-input { font-style: italic; color: #8a7d68; }
+    .drawer-table th.dt-reset-col, .drawer-table td.dt-reset-col { width: 9%; padding-left: 0; padding-right: 2px; }
+    .dt-reset { width: 22px; height: 22px; padding: 0; font-size: 14px; line-height: 1; color: #8a7d68; background: rgba(255,255,255,.6); border: none; border-radius: 50%; cursor: pointer; }
+    .dt-reset:hover:not(:disabled) { background: #fff; color: #b5502f; }
+    .dt-reset:disabled { opacity: .35; cursor: default; }
+    .dt-mode { display: flex; gap: 2px; padding: 2px; margin: 4px 0 2px; background: #f0e8d8; border-radius: 8px; }
+    .dt-seg { flex: 1; padding: 5px 4px; font-size: 12px; color: #8a7d68; background: transparent; border: none; border-radius: 6px; cursor: pointer; }
+    .dt-seg:hover { color: #3a3126; }
+    .dt-seg.is-active { background: #fff; color: #3a3126; font-weight: 600; box-shadow: 0 1px 2px rgba(60,45,20,.12); }
+    .dt-input::placeholder { color: #c3b69c; font-size: 10px; }
+    .dt-btn { width: 100%; padding: 4px 2px; font-size: 11px; color: #8a7d68; background: rgba(255,255,255,.6); border: none; border-radius: 6px; cursor: pointer; }
+    .dt-btn:hover { background: #fff; color: #3a3126; }
+    .dt-btn.is-open { background: #f7dcc8; color: #b5502f; }
+
     .add-btn {
 
       width: 100%;

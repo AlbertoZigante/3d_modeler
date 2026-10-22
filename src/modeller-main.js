@@ -504,7 +504,7 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
     let doorsChanged = false;
     if (node.groupId) {
       const beforeDoors = panels;
-      panels = applyDoorAdjustmentsForGroup(panels, node.groupId);
+      panels = applyDoorAdjustmentsForGroup(panels, boxGroupOf(node));
       doorsChanged = panels !== beforeDoors;
     }
 
@@ -587,7 +587,7 @@ window.addEventListener('pointerup', () => {
     // this one catch-up pass, once the drag actually finishes.
     const groupIds = new Set(
       Array.from(groupDragStartOffsets.keys())
-        .map((id) => panels.find((p) => p.id === id)?.groupId)
+        .map((id) => boxGroupOf(panels.find((p) => p.id === id)))
         .filter(Boolean)
     );
     let doorsChanged = false;
@@ -659,7 +659,7 @@ function applyDimensionChange(nodeId, dims, offsetDeltaMm) {
   // see gizmos.js) can change a door's boundary just as easily as a
   // move can. No-op when `current`'s group has no doors.
   if (current.groupId) {
-    panels = applyDoorAdjustmentsForGroup(panels, current.groupId);
+    panels = applyDoorAdjustmentsForGroup(panels, boxGroupOf(current));
   }
 
   const after = panels;
@@ -774,6 +774,7 @@ function handleDoorConfirmed(placement) {
 
   const after = panels;
   recordHistoryCommand(AddDoorCommand, before, after);
+  setSelectedGroupId(doorNode.groupId);
   setSelectedId(doorNode.id);
   renderAll();
 }
@@ -835,7 +836,7 @@ function groundBoxes() {
   groupIds.forEach((groupId) => {
     // Flags (isBoxWall / isPlinthPanel / isLeg) live on the RAW nodes only —
     // the resolved copies don't carry them.
-    const rawById = new Map(panels.filter((p) => p.groupId === groupId).map((p) => [p.id, p]));
+    const rawById = new Map(panels.filter((p) => boxGroupOf(p) === groupId).map((p) => [p.id, p])); // box + its drawers/doors/plinth/legs
     const resolved = resolveConstraints(panels).filter((r) => rawById.has(r.id));
     const support = resolved.filter((r) => rawById.get(r.id).isPlinthPanel || rawById.get(r.id).isLeg);
     const base = support.length ? support : resolved.filter((r) => rawById.get(r.id).isBoxWall && /bottom/i.test(r.name || ''));
@@ -843,7 +844,7 @@ function groundBoxes() {
     const lowest = Math.min(...base.map((r) => r.position.y - computeWorldHalfExtents(r).y));
     const dy = lowest - FLOOR_MM;
     if (Math.abs(dy) < 0.01) return;
-    panels = panels.map((p) => (p.groupId === groupId && p.basePosition
+    panels = panels.map((p) => (boxGroupOf(p) === groupId && p.basePosition
       ? { ...p, basePosition: { ...p.basePosition, y: p.basePosition.y - dy } }
       : p));
   });
@@ -879,7 +880,7 @@ function applyRelayoutResult(result) {
   // same group now, against the walls' brand-new geometry, so a door
   // never has to be manually re-fixed after any other box edit — see
   // features/door.js#applyDoorAdjustmentsForGroup's own doc comment.
-  const groupId = panels.find((p) => p.id === result.patches[0]?.id)?.groupId;
+  const groupId = boxGroupOf(panels.find((p) => p.id === result.patches[0]?.id));
   if (groupId) {
     panels = applyDoorAdjustmentsForGroup(panels, groupId);
     // Same reasoning, drawer-front counterpart — see
@@ -1076,6 +1077,14 @@ function handleCanvasSelectClick(clickedId, ctrlKey) {
     return;
   }
 
+  if (clicked.isDoor) {
+    // a door is a group of one — select it directly
+    setSelectedGroupId(clicked.groupId);
+    setSelectedId(clickedId);
+    renderAll();
+    return;
+  }
+
   if (getSelectedGroupId() === clicked.groupId) {
     // already "inside" this group's context (whether the group
     // itself was selected, or a sibling member was) — drill straight
@@ -1115,7 +1124,11 @@ function handleListSelectPanel(clickedId, ctrlKey) {
 function handleListSelectGroup(groupId) {
   multiSelectedIds.clear();
   setSelectedGroupId(groupId);
-  setSelectedId(null);
+  // a door is a group of one: show its own fields. The plinth keeps a group view
+  // (so the whole plinth can be edited / deleted at once).
+  const members = panels.filter((p) => p.groupId === groupId);
+  const door = members.find((p) => p.isDoor);
+  setSelectedId(door && members.length === 1 ? door.id : null);
   renderAll();
 }
 
@@ -1290,7 +1303,7 @@ function renderAllInner() {
     // that function's own comment on why it's needed to know which
     // way the front's outer face points (so the handle protrudes from
     // the visible side, not the one facing into the box).
-    panels.filter((p) => p.isDrawerFront).map((p) => [p.id, { isDrawerFront: true, sign: p.sign }])
+    panels.filter((p) => p.isDrawerFront).map((p) => [p.id, { isDrawerFront: true, sign: p.sign, drawerIndex: p.drawerIndex }])
   );
   // Same reasoning again, for a drawer box panel's own isDrawerBoxPanel
   // flag — these 4 panels per front (left/right/bottom/back) are
@@ -1300,12 +1313,12 @@ function renderAllInner() {
   // silently always false the same way isDrawerFront's would be
   // without the map just above.
   const drawerBoxPanelFieldsById = new Map(
-    panels.filter((p) => p.isDrawerBoxPanel).map((p) => [p.id, { isDrawerBoxPanel: true }])
+    panels.filter((p) => p.isDrawerBoxPanel).map((p) => [p.id, { isDrawerBoxPanel: true, drawerBoxFrontId: p.drawerBoxFrontId }])
   );
   // Same re-attachment for plinth panels (walls + ribs) so scene.js/
   // gizmos.js see isPlinthPanel and hide every resize/move handle.
   const plinthPanelFieldsById = new Map(
-    panels.filter((p) => p.isPlinthPanel).map((p) => [p.id, { isPlinthPanel: true }])
+    panels.filter((p) => p.isPlinthPanel).map((p) => [p.id, { isPlinthPanel: true, plinthRole: p.plinthRole }])
   );
   const legFieldsById = new Map(
     panels.filter((p) => p.isLeg).map((p) => [p.id, { isLeg: true, displayColor: p.displayColor }])
@@ -1456,7 +1469,10 @@ function renderInspectorOnly() {
   // same authoritative flag renderAll() already trusts over anything
   // resolveConstraints might produce — see that call site's comment.
   // A drawer is its own group; the walls it can need restored belong to the cabinet it is linked to.
-  const hiddenGroupMembers = (selectedPanel?.isDrawerFront ? panels.filter((p) => p.groupId === boxGroupOf(selectedPanel)) : groupMembers).filter((p) => p.hidden && p.isBoxWall);
+  const hiddenBoxId = selectedPanel ? boxGroupOf(selectedPanel) : getSelectedGroupId();
+  // drawers were built against the box's current walls: while the box has any, no wall can be restored
+  const boxHasDrawers = panels.some((p) => p.isDrawerFront && boxGroupOf(p) === hiddenBoxId);
+  const hiddenGroupMembers = boxHasDrawers ? [] : (selectedPanel?.isDrawerFront ? panels.filter((p) => p.groupId === boxGroupOf(selectedPanel)) : groupMembers).filter((p) => p.hidden && p.isBoxWall);
   const groupMemberCount = visibleGroupMembers.length;
   // The unified DRAWER view (group, front or box panel selected — all the
   // same right-hand view). null when the selection is not part of a drawer.
@@ -1472,8 +1488,25 @@ function renderInspectorOnly() {
       open: !!anchorFront.drawerOpen,
       material: stackMembers.every((p) => p.material === stackMembers[0].material) ? stackMembers[0].material : null,
       mode: anchorFront.drawerLayoutMode || 'equal',
-      fronts: stackFronts.map((f) => ({ index: f.drawerIndex, heightMm: resolved.find((r) => r.id === f.id)?.height ?? f.drawerHeights?.[f.drawerIndex] ?? 0 })),
+      // the drawer whose table row is highlighted (null when the whole group is selected)
+      selectedFrontId: selectedPanel && (selectedPanel.isDrawerFront || selectedPanel.isDrawerBoxPanel) ? anchorFront.id : null,
+      fronts: stackFronts.map((f) => ({
+        id: f.id,
+        index: f.drawerIndex,
+        heightMm: resolved.find((r) => r.id === f.id)?.height ?? f.drawerHeights?.[f.drawerIndex] ?? 0,
+        hasBox: panels.some((p) => p.isDrawerBoxPanel && p.drawerBoxFrontId === f.id),
+        open: !!f.drawerOpen,
+        fixed: !!f.drawerFixed?.[f.drawerIndex],
+        topMarginMm: f.drawerBoxSpec?.topMarginMm ?? DEFAULT_DRAWER_BOX_TOP_MARGIN_MM,
+        bottomMarginMm: f.drawerBoxSpec?.bottomMarginMm ?? DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM,
+      })),
     }
+    : null;
+
+  // The plinth is a group of its own: when the whole plinth is selected the group view
+  // also shows its Height / Edges (any plinth panel carries them).
+  const plinthGroupPanel = !selectedPanel && groupMembers.length > 0 && groupMembers.every((p) => p.isPlinthPanel)
+    ? (groupMembers.find((p) => p.plinthRole === 'left') || groupMembers[0])
     : null;
 
   // null means "Mixed materials".
@@ -1521,8 +1554,13 @@ function renderInspectorOnly() {
       onPlinthHeightChange: updateSelectedPlinthHeight,
       onPlinthEdgeChange: updateSelectedPlinthEdge,
       drawerView,
+      plinthGroupPanel,
+      legGroup: !selectedPanel && groupMembers.length > 0 && groupMembers.every((p) => p.isLeg),
+      onDrawerNotice: (message) => showToast(message),
       onDeleteDrawerGroup: deleteDrawerGroup,
-      onDrawerLayoutModeChange: (mode) => updateDrawerStackLayout({ mode }),
+      onSelectDrawer: (frontId) => handleListSelectPanel(frontId, false),
+      onDrawerLayoutModeChange: setDrawerLayoutMode,
+      onResetDrawerRow: resetDrawerRow,
       onDrawerFrontHeightChange: (index, valueMm) => updateDrawerStackLayout({ mode: 'custom', index, valueMm }),
     });
   }
@@ -1657,6 +1695,10 @@ function updateSelectedField(field, value) {
     }
     const before = panels;
     updateNode(selectedId, { material: catalogEntry.name, thickness: catalogEntry.thicknessMm });
+    if (node.isDrawerFront || node.isDrawerBoxPanel) {
+      // a drawer part's thickness feeds the drawer's own layout: re-derive it
+      panels = applyDrawerAdjustmentsForGroup(panels, boxGroupOf(node));
+    }
     const after = panels;
     recordHistoryCommand(ChangeMaterialCommand, before, after);
     renderAll();
@@ -1933,7 +1975,11 @@ function removeSelected() {
     // group-level selection (nothing drilled into) — permanent delete
     // of the whole group.
     const before = panels;
-    panels = panels.filter((p) => p.groupId !== groupId);
+    const removedSupport = panels.some((p) => p.groupId === groupId && (p.isPlinthPanel || p.isLeg));
+    panels = panels.filter((p) => p.groupId !== groupId && p.boxGroupId !== groupId); // a box takes its drawers/doors/plinth/legs with it
+    // a plinth / legs set was what held the box up: it comes back down to the
+    // floor and its drawers, doors... follow it
+    if (removedSupport) groundBoxes();
     const after = panels;
     setSelectedGroupId(null);
     setSelectedId(panels.length > 0 ? panels[0].id : null);
@@ -1978,7 +2024,7 @@ function removeSelected() {
       after = after.filter((p) => p.drawerBoxFrontId !== node.id);
     }
     panels = after;
-    setSelectedGroupId(node.groupId);
+    setSelectedGroupId(node.isDoor ? boxGroupOf(node) : node.groupId);
     setSelectedId(null);
     recordHistoryCommand(node.isDoor ? DeleteDoorCommand : (node.isDrawerFront ? DeleteDrawerCommand : DeleteShelfCommand), before, after);
     renderAll();
@@ -2035,7 +2081,8 @@ function restoreFace(nodeId) {
   // wall while any door still exists would put it right back into the
   // space the door's own placement already claimed, overlapping it.
   // Remove every door in the group first, then the wall can come back.
-  const hasDoor = panels.some((p) => p.groupId === node.groupId && p.isDoor);
+  if (panels.some((p) => p.isDrawerFront && boxGroupOf(p) === node.groupId)) return; // never offered while drawers exist
+  const hasDoor = panels.some((p) => boxGroupOf(p) === node.groupId && p.isDoor);
   if (hasDoor) {
     restoreBlockedMessage = `Can't restore ${getDisplayName(node)} while a door exists in this box — remove the door(s) first`;
     clearTimeout(restoreBlockedTimer);
@@ -2077,12 +2124,16 @@ function toggleSelectedDoorOpen() {
 // shift applied to all 5 of the drawer's own panels is computed fresh
 // every render (see renderAll()'s own openDrawerShiftByPanelId), never
 // stored.
-function toggleSelectedDrawerOpen() {
+function toggleSelectedDrawerOpen(frontId) {
   const node = drawerAnchor();
   if (!node) return;
-  // one button for the whole stack: open them all, or close them all
-  const open = !node.drawerOpen;
-  panels = panels.map((p) => (p.isDrawerFront && p.drawerStackId === node.drawerStackId ? { ...p, drawerOpen: open } : p));
+  const stack = panels.filter((p) => p.isDrawerFront && p.drawerStackId === node.drawerStackId);
+  const targets = frontId ? stack.filter((p) => p.id === frontId) : stack;
+  if (!targets.length) return;
+  // one front: flip it. All: open them all, unless they're all already open
+  const open = frontId ? !targets[0].drawerOpen : !targets.every((p) => p.drawerOpen);
+  const ids = new Set(targets.map((p) => p.id));
+  panels = panels.map((p) => (ids.has(p.id) ? { ...p, drawerOpen: open } : p));
   renderAll();
 }
 
@@ -2092,21 +2143,20 @@ function toggleSelectedDrawerOpen() {
 // floor HERE, not just inside features/drawer.js#computeDrawerBoxPlacement,
 // so the field shown in the inspector never lies about what the box
 // actually built.
-function updateSelectedDrawerBoxMargin(field, rawValue) {
+function updateSelectedDrawerBoxMargin(field, rawValue, frontId) {
   const node = drawerAnchor();
-  if (!node || !node.drawerBoxSpec) return;
+  if (!node || !node.drawerBoxSpec || !Number.isFinite(rawValue)) return;
 
   const floor = field === 'topMarginMm' ? DEFAULT_DRAWER_BOX_TOP_MARGIN_MM : DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM;
   const clamped = Math.max(floor, rawValue);
-  if (node.drawerBoxSpec[field] === clamped) return;
+  // one front (table row) or the whole stack (the "All" row)
+  const isTarget = (p) => p.isDrawerFront && p.drawerStackId === node.drawerStackId && (!frontId || p.id === frontId);
+  if (!panels.some((p) => isTarget(p) && p.drawerBoxSpec && p.drawerBoxSpec[field] !== clamped)) return;
 
   const before = panels;
-  // margins are a property of the whole drawer group: every front of the stack gets them
-  panels = panels.map((p) => (p.isDrawerFront && p.drawerStackId === node.drawerStackId ? { ...p, drawerBoxSpec: { ...p.drawerBoxSpec, [field]: clamped } } : p));
-  // Re-derives this front's own box (and only this front's — see
-  // applyDrawerAdjustmentsForGroup's own per-stack loop) against the
-  // just-updated spec, same recompute path a boundary-panel resize
-  // already drives.
+  panels = panels.map((p) => (isTarget(p) ? { ...p, drawerBoxSpec: { ...p.drawerBoxSpec, [field]: clamped } } : p));
+  // Re-derives each front's own box against its just-updated spec, same
+  // recompute path a boundary-panel resize already drives.
   panels = applyDrawerAdjustmentsForGroup(panels, boxGroupOf(node));
   const after = panels;
   recordHistoryCommand(SetDrawerBoxMarginCommand, before, after);
@@ -2115,13 +2165,18 @@ function updateSelectedDrawerBoxMargin(field, rawValue) {
 
 // Right-toolbar edge fields: one edge's in/out and/or inset mm.
 function updateSelectedPlinthEdge(edge, patch) {
-  const node = panels.find((p) => p.id === getSelectedId());
-  if (!node || !node.isPlinthPanel) return;
+  const node = selectedPlinthNode();
+  if (!node) return;
 
+  if ('insetMm' in patch && !(Number.isFinite(patch.insetMm) && patch.insetMm > 0)) {
+    showToast('Offset must be greater than 0');
+    renderAll(); // reset the field to the stored value
+    return;
+  }
   const current = normalizePlinthEdgeFit(node.plinthEdgeFit);
   const next = { ...current, [edge]: { ...current[edge], ...patch } };
   const before = panels;
-  const after = applyPlinthAdjustment(panels, node.groupId, undefined, next);
+  const after = applyPlinthAdjustment(panels, boxGroupOf(node), undefined, next);
   if (after === before) {
     showToast("Not enough room for that plinth edge setting");
     renderAll(); // reset the field to the stored value
@@ -2151,7 +2206,7 @@ function handleAddLegs(groupId) {
   const before = panels;
   panels = result.panels;
   recordHistoryCommand(AddLegsCommand, before, panels);
-  setSelectedGroupId(groupId);
+  setSelectedGroupId(panels.find((p) => p.isLeg && p.boxGroupId === groupId)?.groupId ?? groupId);
   setSelectedId(null);
   renderAll();
 }
@@ -2178,22 +2233,31 @@ function handleAddPlinth(groupId) {
   recordHistoryCommand(AddPlinthCommand, before, panels);
   // Select one plinth panel so its edge/height fields show in the
   // right toolbar (same as a freshly added door/drawer).
-  setSelectedGroupId(groupId);
-  setSelectedId(panels.find((p) => p.groupId === groupId && p.plinthRole === 'left')?.id ?? null);
+  const leftPlinth = panels.find((p) => boxGroupOf(p) === groupId && p.isPlinthPanel && p.plinthRole === 'left');
+  setSelectedGroupId(leftPlinth?.groupId ?? groupId);
+  setSelectedId(leftPlinth?.id ?? null);
   renderAll();
 }
 
 // ui/properties.js's Plinth height field — goes through history; the
 // box is raised/lowered by the height change so the plinth's bottom
 // stays where it was (see features/plinth.js#applyPlinthAdjustment).
+// The plinth panel the inspector is editing: the selected plinth panel, or — when
+// the whole plinth (its group) is selected — any panel of that group.
+function selectedPlinthNode() {
+  const node = panels.find((p) => p.id === getSelectedId());
+  if (node?.isPlinthPanel) return node;
+  const groupId = getSelectedGroupId();
+  return groupId ? panels.find((p) => p.groupId === groupId && p.isPlinthPanel) : undefined;
+}
+
 function updateSelectedPlinthHeight(rawValue) {
-  const selectedId = getSelectedId();
-  const node = panels.find((p) => p.id === selectedId);
-  if (!node || !node.isPlinthPanel) return;
+  const node = selectedPlinthNode();
+  if (!node) return;
 
   const clamped = Math.max(MIN_PLINTH_HEIGHT_MM, rawValue);
   const before = panels;
-  const after = applyPlinthAdjustment(panels, node.groupId, clamped);
+  const after = applyPlinthAdjustment(panels, boxGroupOf(node), clamped);
   if (after === before) return;
   panels = after;
   recordHistoryCommand(SetPlinthHeightCommand, before, after);
@@ -2254,6 +2318,58 @@ function updateDrawerStackLayout(change) {
   const result = applyDrawerLayout(panels, front.drawerStackId, change);
   if (!result.ok) { showToast(result.message); renderAll(); return; }
   panels = result.panels;
+  recordHistoryCommand(SetDrawerBoxMarginCommand, before, panels);
+  renderAll();
+}
+
+// "Apply All" / "Custom". Apply All = equally spaced drawers AND one top/bottom
+// margin for every drawer (the top drawer's values are taken); Custom keeps
+// today's heights/margins, now editable per drawer. One history step.
+function setDrawerLayoutMode(mode) {
+  const front = drawerAnchor();
+  if (!front) return;
+  if ((front.drawerLayoutMode || 'equal') === mode) return;
+  const before = panels;
+  const result = applyDrawerLayout(panels, front.drawerStackId, { mode });
+  if (!result.ok) { showToast(result.message); renderAll(); return; }
+  panels = result.panels;
+  if (mode === 'equal') {
+    const stack = panels.filter((p) => p.isDrawerFront && p.drawerStackId === front.drawerStackId);
+    const ref = [...stack].sort((a, b) => b.drawerIndex - a.drawerIndex).find((p) => p.drawerBoxSpec);
+    if (ref) {
+      const { topMarginMm, bottomMarginMm } = ref.drawerBoxSpec;
+      panels = panels.map((p) => (p.isDrawerFront && p.drawerStackId === front.drawerStackId && p.drawerBoxSpec
+        ? { ...p, drawerBoxSpec: { ...p.drawerBoxSpec, topMarginMm, bottomMarginMm } }
+        : p));
+      panels = applyDrawerAdjustmentsForGroup(panels, boxGroupOf(front));
+    }
+  }
+  recordHistoryCommand(SetDrawerBoxMarginCommand, before, panels);
+  renderAll();
+}
+
+// Reset button of one row in Custom mode: the drawer's top/bottom margins go
+// back to the defaults and its height is released — it shares the remaining
+// height equally with the other drawers that are not fixed. One history step.
+function resetDrawerRow(frontId) {
+  const anchor = drawerAnchor();
+  if (!anchor) return;
+  const stackId = anchor.drawerStackId;
+  const target = frontId ? panels.find((p) => p.id === frontId && p.isDrawerFront && p.drawerStackId === stackId) : null;
+  if (frontId && !target) return;
+  const before = panels;
+  let next = panels;
+  if (target) {
+    // Custom row: release the height too
+    const result = applyDrawerLayout(next, stackId, { mode: 'custom', index: target.drawerIndex, reset: true });
+    if (!result.ok) { showToast(result.message); renderAll(); return; }
+    next = result.panels;
+  }
+  // margins back to the defaults — one drawer, or every drawer of the stack ("Apply All")
+  next = next.map((p) => (p.isDrawerFront && p.drawerStackId === stackId && p.drawerBoxSpec && (!target || p.id === target.id)
+    ? { ...p, drawerBoxSpec: { ...p.drawerBoxSpec, topMarginMm: DEFAULT_DRAWER_BOX_TOP_MARGIN_MM, bottomMarginMm: DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM } }
+    : p));
+  panels = applyDrawerAdjustmentsForGroup(next, boxGroupOf(anchor));
   recordHistoryCommand(SetDrawerBoxMarginCommand, before, panels);
   renderAll();
 }

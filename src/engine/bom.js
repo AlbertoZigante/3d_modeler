@@ -89,22 +89,26 @@ function footprintKey(node) {
 // a group's own display name, only an id borrowed from one of its
 // members (see modeller-main.js's addBox/groupSelectedPanels), so
 // this is purely a presentation-time label, computed fresh every call.
+// Doors and the plinth are groups of their own but belong to their box in a cut list.
+const labelKey = (node) => ((node.isDoor || node.isPlinthPanel || node.isLeg) ? (node.boxGroupId ?? node.groupId) : node.groupId);
+
 function buildGroupLabels(panels) {
   const labels = new Map();
   let boxCount = 0;
   let groupCount = 0;
   let drawerCount = 0;
   panels.forEach((node) => {
-    if (!node.groupId || labels.has(node.groupId)) return;
+    const key = labelKey(node);
+    if (!key || labels.has(key)) return;
     if (node.isDrawerFront || node.isDrawerBoxPanel) {
       drawerCount += 1;
-      labels.set(node.groupId, `Drawer ${drawerCount}`);
+      labels.set(key, `Drawer ${drawerCount}`);
     } else if (node.isBoxPanel) {
       boxCount += 1;
-      labels.set(node.groupId, `Box ${boxCount}`);
+      labels.set(key, `Box ${boxCount}`);
     } else {
       groupCount += 1;
-      labels.set(node.groupId, `Group ${groupCount}`);
+      labels.set(key, `Group ${groupCount}`);
     }
   });
   return labels;
@@ -112,7 +116,7 @@ function buildGroupLabels(panels) {
 
 function assemblyLabel(node, groupLabels) {
   if (!node.groupId) return '—'; // standalone panel, not part of any assembly
-  return groupLabels.get(node.groupId) || 'Group';
+  return groupLabels.get(labelKey(node)) || 'Group';
 }
 
 /**

@@ -11,6 +11,7 @@
  *
  * Run with: node tests/drawer.test.mjs
  */
+import { addPlinthAndRaiseBox } from '../src/features/plinth.js';
 import { assert, assertEqual, section, report, ensureMaterialCatalog } from './helpers.mjs';
 import { addBox } from '../src/features/box.js';
 import { computeBoundaryRectangle } from '../src/shared/geometry.js';
@@ -236,17 +237,54 @@ section('applyDrawerLayout — equal heights vs a height chosen per front', () =
   const total = heights(panels).reduce((a, b) => a + b, 0);
   assert(heights(panels).every((h) => Math.abs(h - total / 3) < 0.01), 'starts as 3 equal drawers');
 
-  const r = applyDrawerLayout(panels, stackId, { mode: 'custom', index: 0, valueMm: 100 });
-  assert(r.ok, 'setting the bottom front to 100 mm works');
+  const r = applyDrawerLayout(panels, stackId, { mode: 'custom', index: 2, valueMm: 100 });
+  assert(r.ok, 'setting the top front to 100 mm works');
   const h = heights(r.panels);
-  assert(Math.abs(h[0] - 100) < 0.01, 'the bottom front is exactly 100 mm');
+  assert(Math.abs(h[2] - 100) < 0.01, 'the top front is exactly 100 mm');
   assert(Math.abs(h.reduce((a, b) => a + b, 0) - total) < 0.01, 'the stack still fills the opening exactly');
-  assert(Math.abs(h[2] - total / 3) < 0.01, 'the front that was not next to it is untouched');
+  assert(Math.abs(h[0] - h[1]) < 0.01 && Math.abs(h[0] - (total - 100) / 2) < 0.01, 'the fronts not fixed yet share the remaining height equally');
+
+  const r2 = applyDrawerLayout(r.panels, stackId, { mode: 'custom', index: 1, valueMm: 150 });
+  const h2 = heights(r2.panels);
+  assert(r2.ok && Math.abs(h2[2] - 100) < 0.01 && Math.abs(h2[1] - 150) < 0.01, 'a second edit keeps the first fixed height');
+  assert(Math.abs(h2[0] - (total - 250)) < 0.01, 'the last front left alone (here the bottom one) is the automatic one');
+  assert(!applyDrawerLayout(r2.panels, stackId, { mode: 'custom', index: 0, valueMm: 100 }).ok, 'the automatic (last unfixed) front cannot be edited');
+
+  const rr = applyDrawerLayout(r2.panels, stackId, { mode: 'custom', index: 1, reset: true });
+  const hr = heights(rr.panels);
+  assert(rr.ok && Math.abs(hr[2] - 100) < 0.01, 'resetting a front keeps the other fixed heights');
+  assert(Math.abs(hr[0] - hr[1]) < 0.01 && Math.abs(hr[0] - (total - 100) / 2) < 0.01, 'the released front shares the remaining height equally with the free ones');
+
+  // any front can be the automatic one: fix bottom + middle, the TOP is left over
+  const t1 = applyDrawerLayout(panels, stackId, { mode: 'custom', index: 0, valueMm: 90 });
+  const t2 = applyDrawerLayout(t1.panels, stackId, { mode: 'custom', index: 1, valueMm: 120 });
+  const ht = heights(t2.panels);
+  assert(t2.ok && Math.abs(ht[2] - (total - 210)) < 0.01, 'the top front can be the automatic one');
+  assert(!applyDrawerLayout(t2.panels, stackId, { mode: 'custom', index: 2, valueMm: 100 }).ok, 'and then it is locked');
 
   const e = applyDrawerLayout(r.panels, stackId, { mode: 'equal' });
   assert(e.ok && heights(e.panels).every((x) => Math.abs(x - total / 3) < 0.01), 'back to equal heights');
-  assert(!applyDrawerLayout(panels, stackId, { mode: 'custom', index: 0, valueMm: 5 }).ok, 'a front below the minimum is refused');
-  assert(!applyDrawerLayout(panels, stackId, { mode: 'custom', index: 2, valueMm: total }).ok, 'a height that squeezes its neighbour below the minimum is refused');
+  assert(!applyDrawerLayout(panels, stackId, { mode: 'custom', index: 2, valueMm: 5 }).ok, 'a front below the minimum is refused');
+  assert(!applyDrawerLayout(panels, stackId, { mode: 'custom', index: 2, valueMm: total }).ok, 'a height that squeezes the others below the minimum is refused');
+});
+
+section('adding a plinth raises the drawers together with the box', () => {
+  const { nodes: boxNodes } = addBox([]);
+  const boundaryResult = computeBoundaryRectangle(boxNodes, boundaryPanels(boxNodes));
+  const placement = computeDrawerFrontsPlacement(boxNodes, boundaryResult, DEFAULT_DRAWER_EDGE_FIT, { material: 'Melamine White 18mm', thicknessMm: 18, count: 2 });
+  let panels = [...boxNodes];
+  placement.panelPatches.forEach((patch) => { panels = applyPanelPatch(panels, patch, placement.normalAxis); });
+  panels = [...panels, ...createDrawerFrontNodes(boxNodes, placement, {})];
+  const posY = (list, id) => resolveConstraints(list).find((r) => r.id === id).position.y;
+  const front = panels.find((p) => p.isDrawerFront);
+  const wall = panels.find((p) => p.isBoxWall);
+  const frontBefore = posY(panels, front.id);
+  const wallBefore = posY(panels, wall.id);
+  const res = addPlinthAndRaiseBox(panels, wall.groupId, {});
+  assert(res.ok, 'a plinth can be added');
+  const dyWall = posY(res.panels, wall.id) - wallBefore;
+  assert(dyWall > 0, 'the box rises');
+  assert(Math.abs((posY(res.panels, front.id) - frontBefore) - dyWall) < 0.01, 'the drawer front rises by the same amount');
 });
 
 report();

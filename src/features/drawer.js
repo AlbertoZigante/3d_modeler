@@ -400,9 +400,14 @@ export function applyDrawerAdjustmentsForGroup(panels, groupId) {
  * Changes how the heights of one drawer stack's fronts are decided.
  *   { mode: 'equal' }                       -> all fronts the same height
  *   { mode: 'custom' }                      -> keep today's heights, now editable
- *   { mode: 'custom', index, valueMm }      -> front `index` (0 = bottom) gets
- *        valueMm; the neighbour above (or below, for the top front) absorbs the
- *        difference, so the stack still fills the opening exactly.
+ *   { mode: 'custom', index, valueMm }      -> front `index` (0 = bottom) is
+ *        FIXED at valueMm. The fronts the user has not fixed share whatever
+ *        height is left, equally — so when only one front is still unfixed it
+ *        is the automatic one, and it may be ANY front: the last one the user
+ *        leaves alone. That last unfixed front cannot be edited itself.
+ *   { mode: 'custom', index, reset: true }  -> front `index` is released: it is
+ *        no longer fixed and shares the remaining height equally with the
+ *        other unfixed fronts.
  * Pure: returns { ok, panels } or { ok:false, message }.
  */
 export function applyDrawerLayout(panels, stackId, change) {
@@ -411,30 +416,51 @@ export function applyDrawerLayout(panels, stackId, change) {
   if (!fronts.length) return { ok: false, message: 'No drawer stack found.' };
   const boxGroup = boxGroupOf(fronts[0]);
   const n = fronts.length;
-  let mode = change.mode === 'equal' ? 'equal' : 'custom';
+  const mode = change.mode === 'equal' ? 'equal' : 'custom';
   let heights = fronts.map((f) => f.drawerHeights?.[f.drawerIndex]);
   if (heights.some((h) => !Number.isFinite(h))) {
     return { ok: false, message: 'This drawer stack has no readable heights yet.' };
+  }
+  // which fronts the user has fixed (equal mode forgets them all)
+  let fixed = fronts.map((f) => mode === 'custom' && !!f.drawerFixed?.[f.drawerIndex]);
+
+  if (mode === 'custom' && change.reset) {
+    const i = change.index;
+    if (!(i >= 0 && i < n)) return { ok: false, message: 'Unknown drawer front.' };
+    if (fixed[i]) {
+      const total = heights.reduce((a, b) => a + b, 0);
+      fixed = fixed.slice();
+      fixed[i] = false;
+      const free = fixed.map((x, k) => (x ? -1 : k)).filter((k) => k >= 0);
+      const share = (total - heights.reduce((acc, h, k) => acc + (fixed[k] ? h : 0), 0)) / free.length;
+      if (share < MIN_PANEL_DIM_MM) return { ok: false, message: 'Not possible: the drawers would become too short.' };
+      heights = heights.slice();
+      free.forEach((k) => { heights[k] = share; });
+    }
   }
 
   if (mode === 'custom' && Number.isFinite(change.valueMm)) {
     if (n < 2) return { ok: false, message: 'A single drawer fills the whole opening — add more drawers to set different heights.' };
     const i = change.index;
     if (!(i >= 0 && i < n)) return { ok: false, message: 'Unknown drawer front.' };
-    const j = i + 1 < n ? i + 1 : i - 1; // the neighbour that gives/takes the difference
-    const delta = heights[i] - change.valueMm;
-    const nextI = change.valueMm;
-    const nextJ = heights[j] + delta;
-    if (nextI < MIN_PANEL_DIM_MM || nextJ < MIN_PANEL_DIM_MM) {
-      return { ok: false, message: `Not possible: every front must stay at least ${MIN_PANEL_DIM_MM} mm high (the neighbouring front would become ${Math.round(nextJ)} mm).` };
+    if (!fixed[i] && fixed.filter((x) => !x).length === 1) {
+      return { ok: false, message: 'This drawer height is automatic — it takes whatever the other drawers leave.' };
     }
+    const total = heights.reduce((a, b) => a + b, 0);
+    fixed = fixed.slice();
+    fixed[i] = true;
     heights = heights.slice();
-    heights[i] = nextI;
-    heights[j] = nextJ;
+    heights[i] = change.valueMm;
+    const free = fixed.map((x, k) => (x ? -1 : k)).filter((k) => k >= 0);
+    const share = (total - heights.reduce((acc, h, k) => acc + (fixed[k] ? h : 0), 0)) / free.length;
+    if (change.valueMm < MIN_PANEL_DIM_MM || share < MIN_PANEL_DIM_MM) {
+      return { ok: false, message: `Not possible: every front must stay at least ${MIN_PANEL_DIM_MM} mm high (the automatic ${free.length > 1 ? 'fronts would' : 'front would'} become ${Math.round(share)} mm).` };
+    }
+    free.forEach((k) => { heights[k] = share; });
   }
 
   let next = panels.map((p) => (p.isDrawerFront && p.drawerStackId === stackId
-    ? { ...p, drawerLayoutMode: mode, drawerHeights: heights }
+    ? { ...p, drawerLayoutMode: mode, drawerHeights: heights, drawerFixed: fixed }
     : p));
   next = applyDrawerAdjustmentsForGroup(next, boxGroup);
   // The recompute leaves a stack untouched when it cannot be built (e.g. too short):

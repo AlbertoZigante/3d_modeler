@@ -10,7 +10,7 @@
  * Each leg is a 30 x 30 mm block, 70 mm tall, set 10 mm in from the
  * Bottom's outer edge (leg face to Bottom edge), rendered black.
  */
-import { createPanelNode, computeWorldHalfExtents } from '../modeller/modules.js';
+import { createPanelNode, nextId, computeWorldHalfExtents } from '../modeller/modules.js';
 import { resolveConstraints } from '../modeller/snap.js';
 import { VERTICAL_ROTATION } from '../shared/geometry.js';
 import { findBoxSibling } from './box.js';
@@ -28,6 +28,9 @@ const LEG_ROLES = ['back-left', 'back-right', 'front-left', 'front-right'];
  * @returns {{ok:true, groupId, legs:Array<{role,center,dims}>, heightMm}
  *   | {ok:false, reason:'no-bottom-panel'|'panel-too-short'}}
  */
+// A leg set is a group of its own, linked to its box through boxGroupId.
+const inBox = (p, groupId) => (p.boxGroupId ?? p.groupId) === groupId;
+
 export function computeLegPlacement(panels, groupId) {
   const bottomRaw = findBoxSibling(panels, groupId, 'Bottom');
   if (!bottomRaw) return { ok: false, reason: 'no-bottom-panel' };
@@ -52,14 +55,15 @@ export function computeLegPlacement(panels, groupId) {
   return { ok: true, groupId, legs, heightMm: LEG_HEIGHT_MM };
 }
 
-export function createLegNodes(panels, placement) {
+export function createLegNodes(panels, placement, legGroupId = nextId()) {
   const basePosition = panels.find((p) => p.groupId === placement.groupId)?.basePosition || { x: 0, y: 0, z: 0 };
   return placement.legs.map((leg) => {
     const node = createPanelNode({
       name: `Leg ${leg.role}`,
       material: LEG_MATERIAL,
       rotation: VERTICAL_ROTATION, // width -> z, height -> y, thickness -> x
-      groupId: placement.groupId,
+      groupId: legGroupId,            // independent group: the legs
+      boxGroupId: placement.groupId,  // link to the box they carry
       isBoxPanel: true,
       isLeg: true,
       legRole: leg.role,
@@ -84,8 +88,8 @@ export function createLegNodes(panels, placement) {
  * @returns {{ok:true, panels, groupId, heightMm}|{ok:false, reason}}
  */
 export function addLegsAndRaiseBox(panels, groupId) {
-  if (panels.some((p) => p.groupId === groupId && p.isLeg)) return { ok: false, reason: 'already-has-legs' };
-  if (panels.some((p) => p.groupId === groupId && p.isPlinthPanel)) return { ok: false, reason: 'has-plinth' };
+  if (panels.some((p) => inBox(p, groupId) && p.isLeg)) return { ok: false, reason: 'already-has-legs' };
+  if (panels.some((p) => inBox(p, groupId) && p.isPlinthPanel)) return { ok: false, reason: 'has-plinth' };
   const placement = computeLegPlacement(panels, groupId);
   if (!placement.ok) return placement;
   const next = shiftGroupY([...panels, ...createLegNodes(panels, placement)], groupId, placement.heightMm);
@@ -97,13 +101,13 @@ export function addLegsAndRaiseBox(panels, groupId) {
  * No-op when the group has no legs or no placement is currently possible.
  */
 export function applyLegAdjustment(panels, groupId) {
-  const existing = panels.filter((p) => p.groupId === groupId && p.isLeg);
+  const existing = panels.filter((p) => inBox(p, groupId) && p.isLeg);
   if (existing.length === 0) return panels;
   const placement = computeLegPlacement(panels, groupId);
   if (!placement.ok) return panels;
   const byRole = new Map(placement.legs.map((l) => [l.role, l]));
   return panels.map((p) => {
-    if (!(p.groupId === groupId && p.isLeg)) return p;
+    if (!(inBox(p, groupId) && p.isLeg)) return p;
     const leg = byRole.get(p.legRole);
     if (!leg) return p;
     return { ...p, offset: { x: leg.center.x - p.basePosition.x, y: leg.center.y - p.basePosition.y, z: leg.center.z - p.basePosition.z } };
