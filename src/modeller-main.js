@@ -501,12 +501,9 @@ const { reconcile, setViewMode, setFacePickMode, setFaceHighlight, setPanelHighl
     // applyDoorAdjustmentsForGroup is a cheap no-op (same array
     // reference back) when the group has no doors at all, which is
     // how doorsChanged below tells the two cases apart.
-    let doorsChanged = false;
-    if (node.groupId) {
-      const beforeDoors = panels;
-      panels = applyDoorAdjustmentsForGroup(panels, boxGroupOf(node));
-      doorsChanged = panels !== beforeDoors;
-    }
+    const beforeDoors = panels;
+    panels = refreshFrontsAround(panels, [nodeId]); // doors AND drawers bounded by this panel
+    const doorsChanged = panels !== beforeDoors;
 
     if (doorsChanged) {
       renderAll(); // more than just this node changed — full reconcile, not just the inspector
@@ -585,20 +582,9 @@ window.addEventListener('pointerup', () => {
     // during the drag. That means any door bounded by one of the
     // dragged panels (a multi-selected shelf, say) is left stale until
     // this one catch-up pass, once the drag actually finishes.
-    const groupIds = new Set(
-      Array.from(groupDragStartOffsets.keys())
-        .map((id) => boxGroupOf(panels.find((p) => p.id === id)))
-        .filter(Boolean)
-    );
-    let doorsChanged = false;
-    groupIds.forEach((groupId) => {
-      const before2 = panels;
-      panels = applyDoorAdjustmentsForGroup(panels, groupId);
-      // drawers are a separate group now: they follow the cabinet they are linked to
-      panels = applyDrawerAdjustmentsForGroup(panels, groupId);
-      if (panels !== before2) doorsChanged = true;
-    });
-    if (doorsChanged) renderAll();
+    const before2 = panels;
+    panels = refreshFrontsAround(panels, Array.from(groupDragStartOffsets.keys()));
+    if (panels !== before2) renderAll();
   }
 
   const after = panels;
@@ -658,9 +644,7 @@ function applyDimensionChange(nodeId, dims, offsetDeltaMm) {
   // resize (this handler backs the resize-handle drag, mostly shelves;
   // see gizmos.js) can change a door's boundary just as easily as a
   // move can. No-op when `current`'s group has no doors.
-  if (current.groupId) {
-    panels = applyDoorAdjustmentsForGroup(panels, boxGroupOf(current));
-  }
+  panels = refreshFrontsAround(panels, [current.id]); // doors AND drawers bounded by this panel
 
   const after = panels;
   recordHistoryCommand(ResizePanelCommand, before, after);
@@ -1029,6 +1013,26 @@ document.addEventListener('keydown', (e) => {
 // attachTool.js — this function is still the only place `panels`
 // actually changes.
 // -------------------------------------------------------------
+// A shelf (or any other panel) can be one of the 4 boundary panels of a door or
+// of a drawer stack (their stored boundaryIds). After it moves / is resized,
+// every door and drawer it bounds is re-derived against the new geometry —
+// plus the doors/drawers of the group it belongs to. Cheap no-op (same array
+// back) when nothing depends on it.
+function refreshFrontsAround(list, movedIds) {
+  const ids = new Set(movedIds);
+  const boxes = new Set();
+  list.forEach((p) => {
+    if (ids.has(p.id) && p.groupId) boxes.add(boxGroupOf(p));
+    if ((p.isDoor || p.isDrawerFront) && p.boundaryIds && Object.values(p.boundaryIds).some((id) => ids.has(id))) boxes.add(boxGroupOf(p));
+  });
+  let next = list;
+  boxes.forEach((g) => {
+    next = applyDoorAdjustmentsForGroup(next, g);
+    next = applyDrawerAdjustmentsForGroup(next, g);
+  });
+  return next;
+}
+
 function updateNode(id, patch) {
   panels = panels.map((p) => (p.id === id ? { ...p, ...patch } : p));
 }
@@ -1429,6 +1433,8 @@ function renderAllInner() {
   updateToolHint();
 }
 
+let lastInspectorKey = null; // selection the inspector last rendered (see renderInspectorOnly)
+
 function renderInspectorOnly() {
   const selectedId = getSelectedId();
   const selectedGroupId = getSelectedGroupId();
@@ -1526,6 +1532,16 @@ function renderInspectorOnly() {
   const drawerHasBox = !!(selectedPanel?.isDrawerFront && panels.some((p) => p.isDrawerBoxPanel && p.drawerBoxFrontId === selectedPanel.id));
 
   if (inspectorEl) {
+    // A new selection starts at the top of the inspector: the Node section comes
+    // first, and a scroll position left over from a long view (the drawer table,
+    // say) would otherwise hide it.
+    const inspectorKey = `${selectedId ?? ''}|${selectedGroupId ?? ''}`;
+    if (inspectorKey !== lastInspectorKey) {
+      lastInspectorKey = inspectorKey;
+      for (let el = inspectorEl; el && el !== document.body; el = el.parentElement) {
+        if (el.scrollTop) el.scrollTop = 0;
+      }
+    }
     renderProperties(inspectorEl, {
       selectedPanel,
       resolvedPanel,
@@ -1878,6 +1894,7 @@ function updateSelectedTransformField(group, axis, value) {
     renderAll();
     return;
   }
+  panels = refreshFrontsAround(panels, [selectedId]); // a typed move of a shelf re-fits the doors/drawers it bounds
   const after = panels;
   recordHistoryCommand(MovePanelCommand, before, after);
   renderAll();
