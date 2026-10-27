@@ -9,7 +9,7 @@
  * STAGE 2: `renderAll()` runs `resolveConstraints(panels)` once per
  * render — this is THE seam where raw graph (literals + constraints)
  * becomes resolved graph (concrete numbers everywhere). scene.reconcile(),
- * computeBom(), and renderPanelList() all consume the RESOLVED array;
+ * the BOM request (ui/cutlist.js requestBom), and renderPanelList() all consume the RESOLVED array;
  * only renderProperties() sees the raw node too, since the inspector
  * is the one place that needs to know a constraint exists at all (to
  * render it locked, and to offer "Unlink").
@@ -45,8 +45,6 @@ import {
 import { resolveConstraints } from './modeller/snap.js';
 import { createModellerScene } from './modeller/scene.js';
 import { getSelectedId, setSelectedId, getSelectedGroupId, setSelectedGroupId } from './modeller/selection.js';
-import { computeBom } from './engine/bom.js';
-import { exportCutListPdf } from './engine/pdfExport-bom.js';
 import { exportHistoryPdf } from './engine/pdfExport-history.js';
 import { exportJointsPdf } from './engine/pdfExport-joints.js';
 import { exportAssemblyPlanPdf } from './engine/pdfExport-assembly.js';
@@ -60,7 +58,7 @@ import { renderRelations } from './ui/relations.js';
 import { renderWarnings } from './ui/warnings.js';
 import { initResizableLayout } from './ui/layout.js';
 import { showToast, showDesignLimitError, showPanelSizeLimitError } from './ui/toast.js';
-import { openCutListWindow, openNestingPlan, renderNestingSummary, setBomRows, getLastBomRows } from './ui/cutlist.js';
+import { openCutListWindow, openNestingPlan, renderNestingSummary, requestBom, exportBomPdf } from './ui/cutlist.js';
 import {
   clampOffsetToDesignLimits,
   clampGroupOffsetToDesignLimits,
@@ -255,9 +253,7 @@ printHistoryBtn?.addEventListener('click', (event) => {
 // Same "resolve, then read" pattern as the BOM/nesting buttons below —
 // this always reflects the CURRENT design, never a stale snapshot, and
 // deliberately re-runs detectJoints() rather than caching its result
-// anywhere, for the same reason computeBom() isn't cached (see
-// engine/bom.js's own header note: cheap, pure, and any staleness bug
-// would be worse than the recompute cost).
+// anywhere, so any staleness bug is impossible by construction.
 printJointsBtn?.addEventListener('click', (event) => {
   showActionToast('Generating PDF…');
   const resolved = resolveConstraints(panels);
@@ -329,10 +325,8 @@ topbarNestCutlistBtn?.addEventListener('click', (event) => {
 syncHistoryButtons();
 
 document.getElementById('export-bom-pdf-btn')?.addEventListener('click', () => {
-  const rows = getLastBomRows();
-  if (rows.length === 0) return;
   showActionToast('Generating PDF…');
-  exportCutListPdf(rows, { projectName: 'Cut List' });
+  exportBomPdf();
 });
 
 // ---- Scene (view layer). Consumes RESOLVED panels only. ----
@@ -1423,9 +1417,8 @@ function renderAllInner() {
 
   renderInspectorOnly();
 
-  const rows = computeBom(visiblePanels);
-  setBomRows(rows);
-  renderNestingSummary(); // re-check staleness against the freshly recomputed BOM rows, without re-nesting
+  requestBom(visiblePanels); // async + debounced: BOM is computed by the API (see ui/cutlist.js)
+  renderNestingSummary(); // re-check staleness against the latest BOM rows, without re-nesting
   stageLabelEl.textContent = `${visiblePanels.length} node(s) · constraints active`;
 
   checkJointWarnings(resolvedWithCodes);
@@ -2830,8 +2823,7 @@ bootstrap().then(() => {
   } else if (exportPdf === 'nesting') {
     openNestingPlan();
   } else if (exportPdf === 'bom') {
-    const rows = getLastBomRows();
-    if (rows.length > 0) exportCutListPdf(rows, { projectName: 'Cut List' });
+    exportBomPdf();
   } else if (exportPdf === 'assembly') {
     const resolved = resolveConstraints(panels);
     const plan = buildAssemblyPlan(panels);

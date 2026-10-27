@@ -50,7 +50,7 @@ function drawRow(doc, startX, y, cells) {
 /**
  * @param {{projectName?:string, fileName?:string, mode?:'save'|'open'}} [options]
  */
-export function exportCutListPdf(rows, { projectName = 'Cut List', fileName = 'cut-list.pdf', mode = 'save' } = {}) {
+export function exportCutListPdf(rows, { projectName = 'Cut List', fileName = 'cut-list.pdf', mode = 'save', targetWindow = null } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageHeight = doc.internal.pageSize.getHeight();
   const usableWidth = COLUMNS.reduce((sum, c) => sum + c.widthMm, 0);
@@ -100,7 +100,7 @@ export function exportCutListPdf(rows, { projectName = 'Cut List', fileName = 'c
   doc.setFont(undefined, 'bold');
   doc.text(`Total area: ${totalAreaM2.toFixed(3)} m²`, startX, y);
 
-  outputPdf(doc, mode, fileName);
+  outputPdf(doc, mode, fileName, targetWindow);
 }
 
 // ---------------------------------------------------------------
@@ -114,7 +114,7 @@ export function exportCutListPdf(rows, { projectName = 'Cut List', fileName = 'c
 //
 // Kerf and edge-banding margin are NOT asked about here or anywhere
 // upstream of this call — they're read automatically from
-// MATERIAL_CATALOG by nestCutList (see engine/nesting.js's own KERF
+// MATERIAL_CATALOG by nestCutList (see the api repo: app/services/nesting.py KERF
 // / EDGE BANDING TRIM MARGIN file-header notes) as supplier/material
 // properties, never something the person using this button needs to
 // know or set.
@@ -339,11 +339,11 @@ function drawSheetPage(doc, materialLabel, sheet, sheetNumber, totalSheets) {
 }
 
 /**
- * @param {ReturnType<typeof import('./nesting.js').nestCutList>} nestResults
- * @param {ReturnType<typeof import('./nesting.js').summarizeNestingResult>} summary
+ * @param {Array} nestResults  (API: POST /v1/nesting -> results)
+ * @param {object} summary  (API: POST /v1/nesting -> summary)
  * @param {{projectName?:string, fileName?:string, mode?:'save'|'open'}} [options]
  */
-export function exportNestingPdf(nestResults, summary, { projectName = 'Nesting Plan', fileName = 'nesting-plan.pdf', mode = 'save' } = {}) {
+export function exportNestingPdf(nestResults, summary, { projectName = 'Nesting Plan', fileName = 'nesting-plan.pdf', mode = 'save', targetWindow = null } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   drawNestingSummaryPage(doc, summary, projectName);
 
@@ -355,5 +355,5 @@ export function exportNestingPdf(nestResults, summary, { projectName = 'Nesting 
     });
   });
 
-  outputPdf(doc, mode, fileName);
+  outputPdf(doc, mode, fileName, targetWindow);
 }

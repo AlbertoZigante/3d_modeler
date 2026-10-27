@@ -20,6 +20,9 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run build
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_BASE: ${{ vars.VITE_BASE }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

@@ -426,7 +426,7 @@ export function exportJointsPdf(report, hardwarePlan, { projectName = 'Joint Rep
 //
 // Kerf and edge-banding margin are NOT asked about here or anywhere
 // upstream of this call — they're read automatically from
-// MATERIAL_CATALOG by nestCutList (see engine/nesting.js's own KERF
+// MATERIAL_CATALOG by nestCutList (see the api repo: app/services/nesting.py KERF
 // / EDGE BANDING TRIM MARGIN file-header notes) as supplier/material
 // properties, never something the person using this button needs to
 // know or set.

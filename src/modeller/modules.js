@@ -29,6 +29,7 @@
  * before — this is additive, not a breaking migration.
  */
 
+import { apiEnabled, getMaterials } from '../api/client.js';
 import * as THREE from 'three';
 
 let idCounter = 1;
@@ -151,7 +152,7 @@ export function nextConstraintId() {
 // ---- PIECE CODES ----
 // A stable "LE0001"-style identifier assigned to every panel at
 // creation time — used for assembly instructions and the cut list
-// (see engine/bom.js, engine/pdfExport.js). Assigned ONCE and never
+// (see api repo app/services/bom.py, engine/pdfExport.js). Assigned ONCE and never
 // regenerated: renaming a panel later, or reordering `panels` (a box
 // relayout, an ungroup), must never change a code someone may already
 // have written on a physical cut piece. This is exactly why it's
@@ -160,7 +161,7 @@ export function nextConstraintId() {
 // ---- PIECE CODES ----
 // A stable "LE0001"-style identifier assigned to every panel at
 // creation time — used for assembly instructions and the cut list
-// (see engine/bom.js, engine/pdfExport.js). Assigned ONCE and never
+// (see api repo app/services/bom.py, engine/pdfExport.js). Assigned ONCE and never
 // regenerated.
 const PIECE_CODE_PREFIXES = {
   left: 'LE', right: 'RI', top: 'TO', bottom: 'BO', back: 'BA', front: 'FR',
@@ -275,14 +276,31 @@ function parseMaterialsCsv(text) {
 }
 
 // Awaited once, at app startup, before the initial addBox() runs —
-// see modeller-main.js's bootstrap(). On any failure (network, empty
-// file, every row invalid) falls back to a minimal built-in catalog
-// rather than leaving MATERIAL_CATALOG empty, which would crash
-// addBox()'s MATERIAL_CATALOG[0] lookup outright. The fallback is
-// deliberately impoverished (one material) so it's immediately
-// obvious in the UI that something's wrong, rather than silently
-// degrading.
+// see modeller-main.js's bootstrap(). SOURCE ORDER:
+//   1. the API (GET /v1/catalog/materials) — the single source of truth;
+//   2. the bundled public/data/materials.csv — offline/dev fallback only
+//      (the design tool keeps working, but BOM/nesting need the API);
+//   3. a minimal built-in default, so MATERIAL_CATALOG is never empty
+//      (addBox()'s MATERIAL_CATALOG[0] lookup would crash outright).
+// The last fallback is deliberately impoverished (one material) so it's
+// immediately obvious in the UI that something's wrong.
+function normalizeApiMaterial(m) {
+  const { kerfMm, ...rest } = m;
+  // kerfMm omitted entirely when null/invalid — same convention as parseMaterialsCsv
+  return Number.isFinite(kerfMm) && kerfMm >= 0 ? { ...rest, kerfMm } : rest;
+}
+
 export async function loadMaterialCatalog(url = `${import.meta.env.BASE_URL}data/materials.csv`) {
+  if (apiEnabled) {
+    try {
+      const rows = await getMaterials();
+      if (!Array.isArray(rows) || rows.length === 0) throw new Error('API returned an empty material catalog');
+      MATERIAL_CATALOG = rows.map(normalizeApiMaterial);
+      return MATERIAL_CATALOG;
+    } catch (err) {
+      console.warn('Could not load material catalog from the API — falling back to the bundled CSV.', err);
+    }
+  }
   try {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -292,7 +310,7 @@ export async function loadMaterialCatalog(url = `${import.meta.env.BASE_URL}data
     MATERIAL_CATALOG = rows;
   } catch (err) {
     console.error(
-      `Could not load material catalog from "${url}" — falling back to a minimal built-in default. The app will run, but only one material will be available until this is fixed.`,
+      `Could not load material catalog from the API or from "${url}" — falling back to a minimal built-in default. The app will run, but only one material will be available until this is fixed.`,
       err
     );
     MATERIAL_CATALOG = FALLBACK_MATERIAL_CATALOG;

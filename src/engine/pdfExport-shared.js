@@ -57,9 +57,13 @@ export function drawTableRow(doc, startX, y, columns, cells) {
  * @param {'save'|'open'} mode
  * @param {string} fileName
  */
-export function outputPdf(doc, mode, fileName) {
+export function outputPdf(doc, mode, fileName, targetWindow = null) {
   if (mode === 'open') {
-    window.open(doc.output('bloburl'), '_blank');
+    const url = doc.output('bloburl');
+    // targetWindow: a tab opened synchronously inside the click handler (before an
+    // async API call), so the popup blocker doesn't eat the late window.open().
+    if (targetWindow && !targetWindow.closed) targetWindow.location.href = url;
+    else window.open(url, '_blank');
   } else {
     doc.save(fileName);
   }
