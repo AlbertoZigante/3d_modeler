@@ -77,6 +77,7 @@
 import { resolveConstraints } from '../modeller/snap.js';
 import { detectJoints, detectFeatureJoints } from './joints.js';
 import { buildHardwarePlan } from './hardware.js';
+import { computeWorldHalfExtents } from '../modeller/modules.js';
 
 const STRUCTURAL_JOINT_TYPES = new Set(['corner_butt', 't_butt', 'face_to_face']);
 
@@ -1268,17 +1269,87 @@ function phase4BuildPanelCorners(part) {
   );
 }
 
+/*
+ * Panel graphics: identical to the master branch's assembly diagram
+ * (pdfExport-assembly.js) — every panel is a plain wireframe box of
+ * its world-axis-aligned extents, drawn under a 30° "cabinet oblique"
+ * projection with depth foreshortened to 50%, one projection scale
+ * shared by every step. Panels placed in earlier steps are faint
+ * grey, this step's panels are bold, and join/integrate steps get a
+ * red insertion arrow. No fills, shading or hidden-line removal.
+ */
+const PHASE4_OBLIQUE_ANGLE_RAD = Math.PI / 6;
+const PHASE4_OBLIQUE_DEPTH_SCALE = 0.5;
+
+const PHASE4_BOX_EDGES = (() => {
+  const edges = [];
+
+  for (let i = 0; i < 8; i++) {
+    for (let bit = 0; bit < 3; bit++) {
+      const j = i ^ (1 << bit);
+
+      if (j > i) {
+        edges.push([i, j]);
+      }
+    }
+  }
+
+  return edges;
+})();
+
+function phase4ProjectOblique(point) {
+  return {
+    px:
+      point.x +
+      point.z *
+        Math.cos(PHASE4_OBLIQUE_ANGLE_RAD) *
+        PHASE4_OBLIQUE_DEPTH_SCALE,
+
+    py:
+      point.y +
+      point.z *
+        Math.sin(PHASE4_OBLIQUE_ANGLE_RAD) *
+        PHASE4_OBLIQUE_DEPTH_SCALE,
+  };
+}
+
+function phase4WireCorners(part) {
+  const half = computeWorldHalfExtents({
+    rotation: part.rotation,
+    width: part.width,
+    height: part.height,
+    thickness: part.thickness ?? part.depth,
+  });
+
+  const p = part.position;
+  const corners = [];
+
+  for (let i = 0; i < 8; i++) {
+    corners.push({
+      x: p.x + (i & 1 ? 1 : -1) * half.x,
+      y: p.y + (i & 2 ? 1 : -1) * half.y,
+      z: p.z + (i & 4 ? 1 : -1) * half.z,
+    });
+  }
+
+  return corners;
+}
+
 function phase4BuildAssemblyStateSvg(
   step,
-  allParts = []
+  allParts = [],
+  placedBeforeIds = []
 ) {
   if (!step) {
     return '';
   }
 
-  const parts = Array.isArray(allParts)
-    ? allParts
-    : [];
+  const parts =
+    (Array.isArray(allParts) ? allParts : [])
+      .filter(
+        part =>
+          !(part?.resolved?.hidden ?? part?.raw?.hidden)
+      );
 
   if (!parts.length) {
     return `
@@ -1293,130 +1364,54 @@ function phase4BuildAssemblyStateSvg(
     `;
   }
 
-  const placedIds = new Set(
-    [
-      ...(Array.isArray(step.placedPanelIds)
-        ? step.placedPanelIds
-        : []),
-
-      ...(Array.isArray(step.assemblyPanelIds)
-        ? step.assemblyPanelIds
-        : []),
-
-      ...(Array.isArray(step.panelIds)
-        ? step.panelIds
-        : []),
-
-      ...(Array.isArray(step.otherPanelIds)
-        ? step.otherPanelIds
-        : []),
-    ].map(String)
-  );
-
-  /*
-   * If the step contains no explicit placement list,
-   * use its panel IDs.
-   */
-  if (!placedIds.size && Array.isArray(step.panelIds)) {
-    step.panelIds.forEach(id =>
-      placedIds.add(String(id))
+  const placedBefore =
+    new Set(
+      (Array.isArray(placedBeforeIds) ? placedBeforeIds : [])
+        .map(String)
     );
-  }
 
-  const visibleParts =
-    placedIds.size
-      ? parts.filter(part =>
-          placedIds.has(String(part.id))
-        )
-      : parts;
+  const stepIds =
+    (Array.isArray(step.panelIds) ? step.panelIds : [])
+      .map(String);
 
-  if (!visibleParts.length) {
-    return `
-      <div class="phase4-assembly-state empty">
-        <div class="phase4-assembly-state-title">
-          3D assembly state
-        </div>
-        <div class="phase4-assembly-state-empty">
-          No panels placed in this step
-        </div>
-      </div>
-    `;
-  }
+  const partById =
+    new Map(
+      parts.map(part => [String(part.id), part])
+    );
 
-  const newIds = new Set(
-    Array.isArray(step.panelIds)
-      ? step.panelIds.map(String)
-      : []
-  );
+  const cornersById =
+    new Map(
+      parts.map(part => [
+        String(part.id),
+        phase4WireCorners(part),
+      ])
+    );
 
   /*
-   * PDF drawing area.
+   * Shared projection bounds over the WHOLE design, so a panel is the
+   * same size on every page.
    */
-  const viewWidth = 780;
-  const viewHeight = 430;
+  let minPx = Infinity;
+  let maxPx = -Infinity;
+  let minPy = Infinity;
+  let maxPy = -Infinity;
 
-  /*
-   * Camera basis.
-   *
-   * This is intentionally separate from the model coordinates.
-   * Model coordinates are NOT altered.
-   */
-  const camera = {
-    rightX: 0.82,
-    rightY: 0.00,
-    rightZ: -0.42,
+  cornersById.forEach(corners => {
+    corners.forEach(corner => {
+      const { px, py } = phase4ProjectOblique(corner);
 
-    upX: -0.30,
-    upY: 0.86,
-    upZ: 0.36,
-
-    depthX: 0.42,
-    depthY: 0.42,
-    depthZ: 0.82,
-  };
-
-  const geometry = visibleParts.map(part => {
-    const corners =
-      phase4BuildPanelCorners(part);
-
-    const projected =
-      corners.map(point =>
-        phase4ProjectPoint(
-          point,
-          camera
-        )
-      );
-
-    return {
-      part,
-      corners,
-      projected,
-    };
-  });
-
-  /*
-   * Determine the actual projected bounds.
-   */
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minY = Infinity;
-  let maxY = -Infinity;
-
-  geometry.forEach(item => {
-    item.projected.forEach(point => {
-      minX = Math.min(minX, point.x);
-      maxX = Math.max(maxX, point.x);
-
-      minY = Math.min(minY, point.y);
-      maxY = Math.max(maxY, point.y);
+      minPx = Math.min(minPx, px);
+      maxPx = Math.max(maxPx, px);
+      minPy = Math.min(minPy, py);
+      maxPy = Math.max(maxPy, py);
     });
   });
 
   if (
-    !Number.isFinite(minX) ||
-    !Number.isFinite(maxX) ||
-    !Number.isFinite(minY) ||
-    !Number.isFinite(maxY)
+    !Number.isFinite(minPx) ||
+    !Number.isFinite(maxPx) ||
+    !Number.isFinite(minPy) ||
+    !Number.isFinite(maxPy)
   ) {
     return `
       <div class="phase4-assembly-state empty">
@@ -1430,210 +1425,120 @@ function phase4BuildAssemblyStateSvg(
     `;
   }
 
-  const projectedWidth =
-    Math.max(maxX - minX, 0.001);
+  const viewWidth = 780;
+  const viewHeight = 430;
 
-  const projectedHeight =
-    Math.max(maxY - minY, 0.001);
-
-  const marginX = 65;
-  const marginY = 55;
-
-  /*
-   * Auto-fit the entire current assembly state.
-   */
-  const fitScale =
-    Math.min(
-      (viewWidth - marginX * 2) /
-        projectedWidth,
-
-      (viewHeight - marginY * 2) /
-        projectedHeight
-    ) * 0.1;
+  const spanPx = maxPx - minPx || 1;
+  const spanPy = maxPy - minPy || 1;
 
   const scale =
-    Math.max(
-      20,
-      Math.min(
-        fitScale,
-        220
-      )
+    Math.min(
+      viewWidth / spanPx,
+      viewHeight / spanPy
+    ) * 0.85;
+
+  const offsetX = (viewWidth - spanPx * scale) / 2;
+  const offsetY = (viewHeight - spanPy * scale) / 2;
+
+  const toSvg = point => {
+    const { px, py } = phase4ProjectOblique(point);
+
+    return {
+      x: offsetX + (px - minPx) * scale,
+      y: offsetY + (maxPy - py) * scale,
+    };
+  };
+
+  /*
+   * 130 mm-wide diagram box in the master PDF == viewWidth here.
+   */
+  const unit = viewWidth / 130;
+
+  const wireframe = (id, color, width) => {
+    const corners =
+      cornersById.get(id).map(toSvg);
+
+    return `
+      <g stroke="${color}" stroke-width="${(width * unit).toFixed(2)}" stroke-linecap="round" fill="none">
+        ${
+          PHASE4_BOX_EDGES.map(([i, j]) =>
+            `<line x1="${corners[i].x.toFixed(2)}" y1="${corners[i].y.toFixed(2)}" x2="${corners[j].x.toFixed(2)}" y2="${corners[j].y.toFixed(2)}" />`
+          ).join('')
+        }
+      </g>
+    `;
+  };
+
+  const fadedMarkup =
+    [...placedBefore]
+      .filter(id => cornersById.has(id))
+      .map(id => wireframe(id, 'rgb(180,180,180)', 0.25))
+      .join('');
+
+  const stepKind = String(step.kind || '');
+
+  const focusIds =
+    stepIds.filter(
+      id =>
+        !placedBefore.has(id) ||
+        stepKind === 'join' ||
+        stepKind === 'integrate' ||
+        stepKind === 'pre_install'
     );
 
-  const offsetX =
-    viewWidth / 2 -
-    ((minX + maxX) / 2) * scale;
+  const boldMarkup =
+    focusIds
+      .filter(id => cornersById.has(id))
+      .map(id => wireframe(id, 'rgb(20,20,20)', 0.6))
+      .join('');
 
-  const offsetY =
-    viewHeight / 2 -
-    ((minY + maxY) / 2) * scale;
+  let arrowMarkup = '';
 
-  const toSvg = point => ({
-    x:
-      point.x * scale +
-      offsetX,
+  if (stepKind === 'join' || stepKind === 'integrate') {
+    const targetId =
+      stepIds.find(id => !placedBefore.has(id)) ??
+      stepIds[0];
 
-    y:
-      viewHeight -
-      (
-        point.y * scale +
-        offsetY
-      ),
-  });
+    const target = partById.get(targetId);
 
-  /*
-   * Panel faces.
-   *
-   * 0 = front
-   * 1 = right
-   * 2 = back
-   * 3 = left
-   * 4 = bottom
-   * 5 = top
-   */
-  const faces = [
-    [0, 1, 2, 3],
-    [1, 5, 6, 2],
-    [5, 4, 7, 6],
-    [4, 0, 3, 7],
-    [3, 2, 6, 7],
-    [4, 5, 1, 0],
-  ];
+    if (target) {
+      const end = toSvg(target.position);
 
-  const faceObjects = [];
+      const start = {
+        x: end.x - viewWidth * 0.28,
+        y: end.y - viewHeight * 0.28,
+      };
 
-  geometry.forEach(item => {
-    faces.forEach((face, faceIndex) => {
-      const points =
-        face.map(index =>
-          item.projected[index]
-        );
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      const headLen = 3.2 * unit;
+      const headAngle = Math.PI / 7;
 
-      const averageDepth =
-        points.reduce(
-          (sum, point) =>
-            sum + point.depth,
-          0
-        ) / points.length;
+      const head =
+        [headAngle, -headAngle].map(a => {
+          const hx = ux * Math.cos(a) - uy * Math.sin(a);
+          const hy = ux * Math.sin(a) + uy * Math.cos(a);
 
-      faceObjects.push({
-        item,
-        faceIndex,
-        points,
-        averageDepth,
-      });
-    });
-  });
+          return `<line x1="${end.x.toFixed(2)}" y1="${end.y.toFixed(2)}" x2="${(end.x - hx * headLen).toFixed(2)}" y2="${(end.y - hy * headLen).toFixed(2)}" />`;
+        }).join('');
 
-  /*
-   * Painter's algorithm:
-   * farthest faces first.
-   */
-  faceObjects.sort(
-    (a, b) =>
-      a.averageDepth -
-      b.averageDepth
-  );
-
-  const faceMarkup =
-    faceObjects.map(face => {
-      const points =
-        face.points
-          .map(point => {
-            const svg =
-              toSvg(point);
-
-            return `${svg.x.toFixed(2)},${svg.y.toFixed(2)}`;
-          })
-          .join(' ');
-
-      const isNew =
-        newIds.has(
-          String(face.item.part.id)
-        );
-
-      /*
-       * Keep the drawing neutral.
-       * New/active panels are slightly stronger.
-       */
-      const opacity =
-        isNew
-          ? 0.92
-          : 0.55;
-
-      return `
-        <polygon
-          points="${points}"
-          fill="currentColor"
-          fill-opacity="${opacity}"
-          stroke="currentColor"
-          stroke-width="1.2"
-          stroke-opacity="0.75"
-        />
-      `;
-    }).join('');
-
-  /*
-   * Labels are rendered after all faces so that
-   * they remain readable.
-   */
-  const labelMarkup =
-    geometry.map(item => {
-      const projectedCenter =
-        item.projected.reduce(
-          (acc, point) => ({
-            x: acc.x + point.x,
-            y: acc.y + point.y,
-            depth: acc.depth + point.depth,
-          }),
-          {
-            x: 0,
-            y: 0,
-            depth: 0,
-          }
-        );
-
-      projectedCenter.x /=
-        item.projected.length;
-
-      projectedCenter.y /=
-        item.projected.length;
-
-      const svg =
-        toSvg(projectedCenter);
-
-      const isNew =
-        newIds.has(
-          String(item.part.id)
-        );
-
-      return `
-        <g
-          transform="
-            translate(
-              ${svg.x.toFixed(2)}
-              ${svg.y.toFixed(2)}
-            )
-          "
-        >
-          <text
-            x="0"
-            y="0"
-            text-anchor="middle"
-            font-size="11"
-            font-weight="${isNew ? '700' : '500'}"
-            fill="currentColor"
-          >
-            ${phase4EscapeHtml(
-              item.part.code
-            )}
-          </text>
+      arrowMarkup = `
+        <g stroke="rgb(200,40,40)" stroke-width="${(0.5 * unit).toFixed(2)}" stroke-linecap="round" fill="none">
+          <line x1="${start.x.toFixed(2)}" y1="${start.y.toFixed(2)}" x2="${end.x.toFixed(2)}" y2="${end.y.toFixed(2)}" />
+          ${head}
         </g>
       `;
-    }).join('');
+    }
+  }
 
   const placedCount =
-    visibleParts.length;
+    new Set([
+      ...[...placedBefore].filter(id => cornersById.has(id)),
+      ...focusIds.filter(id => cornersById.has(id)),
+    ]).size;
 
   const totalCount =
     parts.length;
@@ -1669,16 +1574,9 @@ function phase4BuildAssemblyStateSvg(
           overflow:visible;
         "
       >
-        <g
-          fill="none"
-          stroke="currentColor"
-        >
-          ${faceMarkup}
-        </g>
-
-        <g>
-          ${labelMarkup}
-        </g>
+        ${fadedMarkup}
+        ${boldMarkup}
+        ${arrowMarkup}
       </svg>
 
       <div
@@ -2468,7 +2366,8 @@ export function buildAssemblyManualModel(
       const assemblyStateSvg =
         phase4BuildAssemblyStateSvg(
           step,
-          visualParts
+          visualParts,
+          [...placedPanelIds]
         );
 
       /*
