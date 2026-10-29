@@ -47,11 +47,10 @@ import { createModellerScene } from './modeller/scene.js';
 import { getSelectedId, setSelectedId, getSelectedGroupId, setSelectedGroupId } from './modeller/selection.js';
 import { exportHistoryPdf } from './engine/pdfExport-history.js';
 import { exportJointsPdf } from './engine/pdfExport-joints.js';
-import { exportAssemblyPlanPdf } from './engine/pdfExport-assembly.js';
+import { buildAssemblySequence, exportAssemblyManualPdf } from './engine/assembly.js';
 import { detectJoints, detectFeatureJoints, buildJointsReport, findOrphanPanels, findCrossGroupJoints } from './engine/joints.js';
 import { validateDesign } from './engine/validator.js';
 import { buildHardwarePlan } from './engine/hardware.js';
-import { buildAssemblyPlan } from './engine/ergonomics.js';
 import { renderProperties } from './ui/properties.js';
 import { renderPanelList } from './ui/toolbar.js';
 import { renderRelations } from './ui/relations.js';
@@ -308,11 +307,11 @@ exportJointsJsonBtn?.addEventListener('click', () => {
 // `resolved` directly (not just the plan) since the schematic
 // diagrams draw real panel geometry, which the plan's own step
 // objects reference only by id.
-printAssemblyBtn?.addEventListener('click', (event) => {
+printAssemblyBtn?.addEventListener('click', () => {
   showActionToast('Generating PDF…');
   const resolved = resolveConstraints(panels);
-  const plan = buildAssemblyPlan(panels);
-  exportAssemblyPlanPdf(plan, resolved, { projectName: 'Assembly Instructions', mode: 'open', newWindow: event.ctrlKey || event.metaKey });
+  const sequence = buildAssemblySequence(panels);
+  exportAssemblyManualPdf(sequence, { projectName: 'Assembly Instructions', mode: 'open', panels, resolvedPanels: resolved });
 });
 topbarOpenCutlistBtn?.addEventListener('click', (event) => {
   showActionToast('Generating PDF…');
@@ -2826,8 +2825,8 @@ bootstrap().then(() => {
     exportBomPdf();
   } else if (exportPdf === 'assembly') {
     const resolved = resolveConstraints(panels);
-    const plan = buildAssemblyPlan(panels);
-    exportAssemblyPlanPdf(plan, resolved, { projectName: 'Assembly Instructions', mode: 'open' });
+    const sequence = buildAssemblySequence(panels);
+    exportAssemblyManualPdf(sequence, { projectName: 'Assembly Instructions', mode: 'open', panels, resolvedPanels: resolved });
   } else {
     runOnboarding();
   }
