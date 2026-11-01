@@ -5,7 +5,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
   return {
     // /3d_modeler/ on GitHub Pages; set VITE_BASE=/ when served from app.<domain>
-    base: env.VITE_BASE || '/3d_modeler/',
+    base: env.VITE_BASE || '/',
     build: {
       rollupOptions: {
         input: {
