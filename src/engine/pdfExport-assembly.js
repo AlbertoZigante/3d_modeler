@@ -29,9 +29,8 @@
  * what -bom.js, -joints.js or -history.js own.
  */
 
-import { jsPDF } from 'jspdf';
 import { computeWorldHalfExtents } from '../modeller/modules.js';
-import { PAGE_MARGIN_MM, TEXT_LINE_HEIGHT_MM, outputPdf } from './pdfExport-shared.js';
+import { createPdf, PAGE_MARGIN_MM, TEXT_LINE_HEIGHT_MM, outputPdf } from './pdfExport-shared.js';
 
 const OBLIQUE_ANGLE_RAD = Math.PI / 6; // 30° receding depth axis — a common "cabinet oblique" convention
 const OBLIQUE_DEPTH_SCALE = 0.5; // depth foreshortened to 50% — keeps the drawing from reading as badly skewed
@@ -193,7 +192,7 @@ function drawStepDiagram(doc, step, resolvedById, placedIdsSoFar, bounds, box) {
  * @param {{projectName?:string, fileName?:string, mode?:'save'|'open'}} [options]
  */
 export function exportAssemblyPlanPdf(plan, resolvedPanels, { projectName = 'Assembly Instructions', fileName = 'assembly-instructions.pdf', mode = 'save' } = {}) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const doc = createPdf({ unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const startX = PAGE_MARGIN_MM;
 

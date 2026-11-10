@@ -1205,6 +1205,7 @@ function renderPropertiesContent({
 
           <input
             type="number"
+            data-unit="mm"
             id="collinear-gap-input"
             value="${escapeAttribute(
               Number(collinearGapMm ?? 0)

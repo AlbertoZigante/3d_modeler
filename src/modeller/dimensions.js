@@ -376,6 +376,7 @@ export function createDimensionOverlay(host, handlers = {}) {
   // The only editing UI: a plain text field drawn over the label.
   const input = document.createElement('input');
   input.type = 'text';
+  input.dataset.unit = 'mm'; // shows the chosen unit, reads back as mm (src/units)
   input.inputMode = 'decimal';
   input.className = 'quote-inline-input';
   Object.assign(input.style, {

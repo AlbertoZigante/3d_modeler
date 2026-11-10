@@ -40,6 +40,7 @@
  * computeJointExtremities), the same relationship
  * engine/joints.js#buildJointsReport has to detectJoints itself.
  */
+import { getUnit, MM_PER_INCH } from '../units/index.js';
 import { resolveConstraints } from '../modeller/snap.js';
 import { detectJoints, detectFeatureJoints, computeJointExtremities } from './joints.js';
 
@@ -460,17 +461,20 @@ export function buildHardwarePlan(panels) {
  * @param {{x:number,y:number,z:number}[]} positions
  * @returns {string}
  */
+// Display only: whole mm, or inches (2 decimals) when the person chose inches.
+const pt = (v) => (getUnit() === 'in' ? String(Number((v / MM_PER_INCH).toFixed(2))) : String(Math.round(v)));
+
 function summarizePositions(positions) {
   if (positions.length === 1) {
     const p = positions[0];
-    return `(${Math.round(p.x)}, ${Math.round(p.y)}, ${Math.round(p.z)})`;
+    return `(${pt(p.x)}, ${pt(p.y)}, ${pt(p.z)})`;
   }
   const varyingAxes = ['x', 'y', 'z'].filter((axis) => new Set(positions.map((p) => Math.round(p[axis]))).size > 1);
   if (varyingAxes.length === 1) {
     const axis = varyingAxes[0];
-    return `${axis.toUpperCase()}: ${positions.map((p) => Math.round(p[axis])).join(', ')}mm`;
+    return `${axis.toUpperCase()}: ${positions.map((p) => pt(p[axis])).join(', ')}${getUnit() === 'in' ? ' in' : 'mm'}`;
   }
-  return positions.map((p) => `(${Math.round(p.x)}, ${Math.round(p.y)}, ${Math.round(p.z)})`).join('; ');
+  return positions.map((p) => `(${pt(p.x)}, ${pt(p.y)}, ${pt(p.z)})`).join('; ');
 }
 
 /**

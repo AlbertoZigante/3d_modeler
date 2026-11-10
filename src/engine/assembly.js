@@ -78,6 +78,7 @@ import { resolveConstraints } from '../modeller/snap.js';
 import { detectJoints, detectFeatureJoints } from './joints.js';
 import { buildHardwarePlan } from './hardware.js';
 import { computeWorldHalfExtents } from '../modeller/modules.js';
+import { translateHtml } from '../i18n/index.js';
 
 const STRUCTURAL_JOINT_TYPES = new Set(['corner_butt', 't_butt', 'face_to_face']);
 
@@ -2927,9 +2928,7 @@ function phase4RenderPartsPage(model) {
             .map(
               (value) =>
                 Number(value) > 0
-                  ? Math.round(
-                      Number(value) * 1000
-                    )
+                  ? Math.round(Number(value) * 100) / 100
                   : '—'
             )
             .join(' × ');
@@ -3770,7 +3769,7 @@ export function exportAssemblyManualPdf(
     resolvedPanels = [],
   } = {}
 ) {
-  const html =
+  const rawHtml =
     buildAssemblyManualHtml(
       sequence,
       {
@@ -3786,6 +3785,9 @@ export function exportAssemblyManualPdf(
           resolvedPanels || [],
       }
     );
+
+  // The manual follows the site language (no-op in English).
+  const html = translateHtml(rawHtml);
 
   /*
    * Existing browser/PDF opening behaviour.

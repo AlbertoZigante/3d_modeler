@@ -12,6 +12,21 @@
  * file's own header for what it keeps to itself and why.
  */
 
+import { jsPDF } from 'jspdf';
+import { localize } from '../i18n/index.js';
+
+/**
+ * Every PDF is created here so its text follows the site language: each
+ * string drawn with doc.text() goes through the same catalog as the UI
+ * (English stays English when there is no translation).
+ */
+export function createPdf(options = { unit: 'mm', format: 'a4' }) {
+  const doc = new jsPDF(options);
+  const drawText = doc.text.bind(doc);
+  doc.text = (text, ...rest) => drawText(Array.isArray(text) ? text.map(localize) : localize(text), ...rest);
+  return doc;
+}
+
 export const PAGE_MARGIN_MM = 15;
 export const HEADER_BLOCK_HEIGHT_MM = 18;
 export const TEXT_LINE_HEIGHT_MM = 6;

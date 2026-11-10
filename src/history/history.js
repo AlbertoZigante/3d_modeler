@@ -26,6 +26,8 @@
  * Default history length is 20. This is intentionally larger than the
  * requested minimum of 10, but can be changed when creating HistoryManager.
  */
+import { formatDateTime } from '../i18n/index.js';
+
 
 
 /* ================================================================
@@ -643,7 +645,7 @@ export class HistoryManager {
   getActivityLogText() {
     const TYPE_PREFIX = { do: '', undo: 'Undo: ', redo: 'Redo: ', cancel: 'Cancelled: ', warning: 'Warning shown to user: ' };
     return this.activityLog
-      .map((entry) => `${entry.timestamp.toLocaleString()} — ${TYPE_PREFIX[entry.type] ?? ''}${entry.label}`)
+      .map((entry) => `${formatDateTime(entry.timestamp)} — ${TYPE_PREFIX[entry.type] ?? ''}${entry.label}`)
       .join('\n');
   }
 

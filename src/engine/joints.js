@@ -117,6 +117,7 @@
  */
 import { computeWorldHalfExtents, getAlignedAxis, LOCAL_FACES } from '../modeller/modules.js';
 import { facingFace, computeWorldAABB, boxesOverlap } from '../shared/geometry.js';
+import { lengthDigits, getUnit, MM_PER_INCH } from '../units/index.js';
 import { resolveConstraints } from '../modeller/snap.js';
 import { dimFieldForAxis } from '../shared/frontFit.js';
 
@@ -846,9 +847,12 @@ export function buildJointsReport(resolvedPanels, joints, collisions, featureJoi
  * @param {ReturnType<typeof buildJointsReport>['joints'][number]} j
  * @returns {{id:string, type:string, panelA:string, panelB:string, axis:string, faces:string, gap:string, point1:string, point2:string, length:string}}
  */
+// Display only: whole mm, or inches (2 decimals) when the person chose inches.
+const pt = (v) => (getUnit() === 'in' ? String(Number((v / MM_PER_INCH).toFixed(2))) : String(Math.round(v)));
+
 export function formatJointTableRow(j) {
   const { p1, p2, lengthMm } = computeJointExtremities(j);
-  const formatPoint = (p) => `(${Math.round(p.x)}, ${Math.round(p.y)}, ${Math.round(p.z)})`;
+  const formatPoint = (p) => `(${pt(p.x)}, ${pt(p.y)}, ${pt(p.z)})`;
   return {
     id: j.displayId ?? j.id,
     type: j.type,
@@ -856,7 +860,7 @@ export function formatJointTableRow(j) {
     panelB: j.panelBCode ?? j.panelB,
     axis: j.contactAxis.toUpperCase(),
     faces: `${j.faceA}/${j.faceB}`,
-    gap: j.gap.toFixed(1),
+    gap: lengthDigits(j.gap, 1),
     point1: formatPoint(p1),
     point2: formatPoint(p2),
     length: `${Math.round(lengthMm)}mm`,
@@ -875,7 +879,7 @@ export function formatJointTableRow(j) {
  * @returns {{id:string, kind:string, panelA:string, panelB:string, side:string, point1:string, point2:string, length:string}}
  */
 export function formatFeatureJointTableRow(j) {
-  const formatPoint = (p) => `(${Math.round(p.x)}, ${Math.round(p.y)}, ${Math.round(p.z)})`;
+  const formatPoint = (p) => `(${pt(p.x)}, ${pt(p.y)}, ${pt(p.z)})`;
   return {
     id: j.displayId ?? j.id,
     kind: j.kind,

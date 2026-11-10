@@ -31,6 +31,8 @@
  * handles (the live panels array, the scene's pick-mode hooks) that
  * don't exist as static module exports anywhere.
  */
+import './i18n/boot.js';
+import { protectNames } from './units/index.js';
 import {
   createPanelNode,
   computeNextBasePosition,
@@ -1269,6 +1271,10 @@ function renderAll() {
     } catch (err2) { console.error(err2); }
   }
 }
+
+// Display unit (mm / in) changed in the top bar: redraw everything that shows a length.
+// The model itself never changes — it is always millimetres.
+document.addEventListener('dm:unitchange', () => renderAll());
 
 function renderAllInner() {
   const selectedId = getSelectedId();
@@ -2748,6 +2754,7 @@ function unlinkOrRemoveConstraint(identifier, opts = {}) {
 // load; only this first box needs to wait.
 async function bootstrap() {
   await loadMaterialCatalog();
+  protectNames(MATERIAL_CATALOG.map((m) => m.name)); // "…18mm" is a name, not a length
   handleAddBox();
   history.clear();
 }

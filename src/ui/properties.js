@@ -444,7 +444,7 @@ function drawerTableHTML(v) {
     if (f ? !f.hasBox : boxed.length === 0) return '<span class="dt-na">—</span>';
     const value = f ? f[field] : commonBox(field);
     const floor = field === 'topMarginMm' ? DEFAULT_DRAWER_BOX_TOP_MARGIN_MM : DEFAULT_DRAWER_BOX_BOTTOM_MARGIN_MM;
-    return `<input type="number" class="dt-input drawer-margin-field" data-field="${field}" ${f ? `data-front-id="${f.id}"` : ''} min="${floor}" step="1" value="${value}" placeholder="mixed" />`;
+    return `<input type="number" data-unit="mm" class="dt-input drawer-margin-field" data-field="${field}" ${f ? `data-front-id="${f.id}"` : ''} min="${floor}" step="1" value="${value}" placeholder="mixed" />`;
   };
   const openCell = (f) => {
     if (f ? !f.hasBox : boxed.length === 0) return '<span class="dt-na">—</span>';
@@ -461,7 +461,7 @@ function drawerTableHTML(v) {
   const applyAllRow = `
       <tr class="dt-all">
         <td class="dt-name">All</td>
-        <td><input type="number" class="dt-input drawer-height-field" data-index="0" value="${round1(rows[0].heightMm)}" readonly data-reason="Apply All: every drawer has the same height. Switch to Custom to set heights one by one." /></td>
+        <td><input type="number" data-unit="mm" class="dt-input drawer-height-field" data-index="0" value="${round1(rows[0].heightMm)}" readonly data-reason="Apply All: every drawer has the same height. Switch to Custom to set heights one by one." /></td>
         <td>${marginCell('topMarginMm', null)}</td>
         <td>${marginCell('bottomMarginMm', null)}</td>
         <td>${openCell(null)}</td>
@@ -475,7 +475,7 @@ function drawerTableHTML(v) {
     return `
       <tr class="${f.id === v.selectedFrontId ? 'dt-selected' : ''}" data-front-id="${f.id}">
         <td class="dt-name drawer-row-select" data-front-id="${f.id}" title="Select drawer ${k + 1}">${k + 1}</td>
-        <td class="${auto ? 'dt-auto-cell' : ''}"><input type="number" class="dt-input drawer-height-field" data-index="${f.index}" min="10" step="1" value="${round1(f.heightMm)}" ${v.count > 1 && !auto ? '' : `readonly data-reason="${v.count > 1 ? 'This height is set by the other drawers: it is what they leave, so the stack always fills the opening. Change another drawer\'s height instead.' : 'A single drawer fills the whole opening. Add more drawers to set different heights.'}"`} />${shared ? '<span class="dt-auto">auto</span>' : ''}</td>
+        <td class="${auto ? 'dt-auto-cell' : ''}"><input type="number" data-unit="mm" class="dt-input drawer-height-field" data-index="${f.index}" min="10" step="1" value="${round1(f.heightMm)}" ${v.count > 1 && !auto ? '' : `readonly data-reason="${v.count > 1 ? 'This height is set by the other drawers: it is what they leave, so the stack always fills the opening. Change another drawer\'s height instead.' : 'A single drawer fills the whole opening. Add more drawers to set different heights.'}"`} />${shared ? '<span class="dt-auto">auto</span>' : ''}</td>
         <td>${marginCell('topMarginMm', f)}</td>
         <td>${marginCell('bottomMarginMm', f)}</td>
         <td>${openCell(f)}</td>
@@ -587,7 +587,7 @@ function nodeSectionHTML(selectedPanel, resolvedPanel) {
       <div class="field-row">
         <label title="${full}">${short} 🔒</label>
         <div class="field-input-wrap locked">
-          <input type="text" value="${Number(value).toFixed(1)}" disabled class="field-input" title="${hint} — not directly editable" />
+          <input type="text" data-unit="mm" value="${Number(value).toFixed(1)}" disabled class="field-input" title="${hint} — not directly editable" />
         </div>
       </div>`).join('')}
     </div>
@@ -650,7 +650,7 @@ function dimFieldHTML(field, selectedPanel, resolvedPanel, isLocked, isStructura
       <div class="field-row">
         <label>${label} 🔒</label>
         <div class="field-input-wrap locked">
-          <input type="text" value="${resolvedPanel[field].toFixed(1)}" disabled class="field-input" title="Derived from its boundary panels — not directly editable" />
+          <input type="text" data-unit="mm" value="${resolvedPanel[field].toFixed(1)}" disabled class="field-input" title="Derived from its boundary panels — not directly editable" />
           ${compact ? '' : '<span class="field-unit">mm</span>'}
         </div>
       </div>`;
@@ -660,7 +660,7 @@ function dimFieldHTML(field, selectedPanel, resolvedPanel, isLocked, isStructura
       <div class="field-row">
         <label>${label} 🔗</label>
         <div class="field-input-wrap locked">
-          <input type="text" value="${resolvedPanel[field].toFixed(1)}" disabled class="field-input" />
+          <input type="text" data-unit="mm" value="${resolvedPanel[field].toFixed(1)}" disabled class="field-input" />
           ${compact ? '' : '<span class="field-unit">mm</span>'}
         </div>
         <button class="unlink-btn" data-field="${field}">Unlink</button>
@@ -674,7 +674,7 @@ function numberFieldHTML(label, field, value, unit = 'mm', { min } = {}, extraCl
     <div class="field-row">
       <label>${label}</label>
       <div class="field-input-wrap">
-        <input type="number" ${min != null ? `min="${min}"` : ''} value="${value}" data-field="${field}" class="field-input ${extraClass}" />
+        <input type="number" data-unit="mm" ${min != null ? `min="${min}"` : ''} value="${value}" data-field="${field}" class="field-input ${extraClass}" />
         ${unit ? `<span class="field-unit">${unit}</span>` : ''}
       </div>
     </div>`;
@@ -684,7 +684,7 @@ function axisFieldHTML(group, axis, value, locked = false) {
   return `
     <div class="transform-field-wrap">
       <span class="axis-label axis-${axis}">${axis.toUpperCase()}</span>
-      <input type="number" step="any" value="${Number(value).toFixed(1)}"
+      <input type="number" data-unit="mm" step="any" value="${Number(value).toFixed(1)}"
         data-group="${group}" data-axis="${axis}"
         ${locked ? 'disabled' : ''}
         class="field-input transform-field" />

@@ -98,7 +98,7 @@ export function renderPlinthSchema(plinthEdgeFit) {
     const { x, y } = INPUT_POS[edge];
     const mm = Number(fit[edge]?.insetMm);
     const value = Number.isFinite(mm) && mm > 0 ? mm : 30;
-    return `<input type="number" min="1" step="any" value="${value}" data-edge="${edge}" class="field-input plinth-edge-inset" title="${edge[0].toUpperCase()}${edge.slice(1)} offset (mm, must be > 0)" style="position:absolute; left:${pct(x, VIEW_W)}; top:${pct(y, VIEW_H)}; transform:translate(-50%,-50%); width:52px; padding:2px 4px; font-size:11px; text-align:center;" />`;
+    return `<input type="number" data-unit="mm" min="1" step="any" value="${value}" data-edge="${edge}" class="field-input plinth-edge-inset" title="${edge[0].toUpperCase()}${edge.slice(1)} offset (mm, must be > 0)" style="position:absolute; left:${pct(x, VIEW_W)}; top:${pct(y, VIEW_H)}; transform:translate(-50%,-50%); width:52px; padding:2px 4px; font-size:11px; text-align:center;" />`;
   }).join('');
 
   return `

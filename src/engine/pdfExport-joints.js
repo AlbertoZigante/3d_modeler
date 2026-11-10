@@ -16,10 +16,10 @@
  * what engine/pdfExport-bom.js, -history.js or -assembly.js own.
  */
 
-import { jsPDF } from 'jspdf';
 import { formatSummaryLines, formatAttentionLines, formatJointTableRow, formatFeatureJointTableRow } from './joints.js';
 import { formatHardwareTableRow } from './hardware.js';
-import { PAGE_MARGIN_MM, HEADER_BLOCK_HEIGHT_MM, TEXT_LINE_HEIGHT_MM, drawTableRow, outputPdf } from './pdfExport-shared.js';
+import { formatDateTime } from '../i18n/index.js';
+import { createPdf, PAGE_MARGIN_MM, HEADER_BLOCK_HEIGHT_MM, TEXT_LINE_HEIGHT_MM, drawTableRow, outputPdf } from './pdfExport-shared.js';
 
 const JOINTS_TABLE_COLUMNS = [
   { key: 'id', header: 'Joint ID', widthMm: 14 },
@@ -63,7 +63,7 @@ const TABLE_ROW_HEIGHT_MM = 6;
  * @param {{projectName?:string, fileName?:string, mode?:'save'|'open'}} [options]
  */
 export function exportJointsPdf(report, hardwarePlan, { projectName = 'Joint Report', fileName = 'joint-report.pdf', mode = 'save' } = {}) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const doc = createPdf({ unit: 'mm', format: 'a4' });
   const pageHeight = doc.internal.pageSize.getHeight();
   const startX = PAGE_MARGIN_MM;
   const tableWidth = JOINTS_TABLE_COLUMNS.reduce((sum, c) => sum + c.widthMm, 0);
@@ -76,7 +76,7 @@ export function exportJointsPdf(report, hardwarePlan, { projectName = 'Joint Rep
     y += 8;
     doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
-    doc.text(`Generated ${new Date().toLocaleString()}`, startX, y);
+    doc.text(`Generated ${formatDateTime()}`, startX, y);
     y += 6;
   }
 

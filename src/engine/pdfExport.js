@@ -1,4 +1,5 @@
-import { jsPDF } from 'jspdf';
+import { edgeLabel, formatDateTime } from '../i18n/index.js';
+import { createPdf } from './pdfExport-shared.js';
 import { formatSummaryLines, formatAttentionLines, formatJointTableRow, formatFeatureJointTableRow } from './joints.js';
 import { formatHardwareTableRow } from './hardware.js';
 import { computeWorldHalfExtents } from '../modeller/modules.js';
@@ -42,7 +43,7 @@ function rowCell(row, key) {
   if (key === 'size') return `${formatDim(row.widthMm)} × ${formatDim(row.heightMm)}`;
   if (key === 'areaM2') return row.areaM2.toFixed(3);
   if (key === 'grain') return row.grainInterchangeable ? 'Free' : 'Fixed';
-  if (key === 'edges') return row.bandedEdgesLabel === '—' ? '—' : `${row.bandedEdgesLabel} (${formatDim(row.bandingLengthM)}m)`;
+  if (key === 'edges') return !row.bandedEdges?.length ? '—' : `${edgeLabel(row.bandedEdges)} (${formatDim(row.bandingLengthM)}m)`;
   if (key === 'ids') return row.pieceCodes.join(', ');
   return String(row[key] ?? '');
 }
@@ -71,7 +72,7 @@ function drawRow(doc, startX, y, cells) {
  * gets silently blocked as a popup by most browsers.
  */
 export function exportCutListPdf(rows, { projectName = 'Cut List', fileName = 'cut-list.pdf', mode = 'save', newWindow = false } = {}) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const doc = createPdf({ unit: 'mm', format: 'a4' });
   const pageHeight = doc.internal.pageSize.getHeight();
   const usableWidth = COLUMNS.reduce((sum, c) => sum + c.widthMm, 0);
   const startX = PAGE_MARGIN_MM;
@@ -85,7 +86,7 @@ export function exportCutListPdf(rows, { projectName = 'Cut List', fileName = 'c
 
     doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
-    doc.text(new Date().toLocaleString(), startX, y);
+    doc.text(formatDateTime(), startX, y);
     y += 8;
 
     doc.setFont(undefined, 'bold');
@@ -143,7 +144,7 @@ export function exportCutListPdf(rows, { projectName = 'Cut List', fileName = 'c
 const TEXT_LINE_HEIGHT_MM = 6;
 
 function renderLinesPdf(lines, { projectName, fileName, mode, newWindow, countLabel, emptyMessage }) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const doc = createPdf({ unit: 'mm', format: 'a4' });
   const pageHeight = doc.internal.pageSize.getHeight();
   const startX = PAGE_MARGIN_MM;
   let y = PAGE_MARGIN_MM;
@@ -156,7 +157,7 @@ function renderLinesPdf(lines, { projectName, fileName, mode, newWindow, countLa
 
     doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
-    doc.text(`Generated ${new Date().toLocaleString()} — ${countLabel}`, startX, y);
+    doc.text(`Generated ${formatDateTime()} — ${countLabel}`, startX, y);
     y += 6;
     doc.setLineWidth(0.3);
     doc.line(startX, y, doc.internal.pageSize.getWidth() - PAGE_MARGIN_MM, y);
@@ -257,7 +258,7 @@ const TABLE_ROW_HEIGHT_MM = 6;
  * @param {{projectName?:string, fileName?:string, mode?:'save'|'open'}} [options]
  */
 export function exportJointsPdf(report, hardwarePlan, { projectName = 'Joint Report', fileName = 'joint-report.pdf', mode = 'save', newWindow = false } = {}) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const doc = createPdf({ unit: 'mm', format: 'a4' });
   const pageHeight = doc.internal.pageSize.getHeight();
   const pageWidth = doc.internal.pageSize.getWidth();
   const startX = PAGE_MARGIN_MM;
@@ -271,7 +272,7 @@ export function exportJointsPdf(report, hardwarePlan, { projectName = 'Joint Rep
     y += 8;
     doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
-    doc.text(`Generated ${new Date().toLocaleString()}`, startX, y);
+    doc.text(`Generated ${formatDateTime()}`, startX, y);
     y += 6;
   }
 
@@ -448,7 +449,7 @@ function drawNestingSummaryPage(doc, summary, projectName) {
 
   doc.setFontSize(9);
   doc.setFont(undefined, 'normal');
-  doc.text(new Date().toLocaleString(), startX, y);
+  doc.text(formatDateTime(), startX, y);
   y += 10;
 
   doc.setFont(undefined, 'bold');
@@ -656,7 +657,7 @@ function drawSheetPage(doc, materialLabel, sheet, sheetNumber, totalSheets) {
  * @param {{projectName?:string, fileName?:string, mode?:'save'|'open'}} [options]
  */
 export function exportNestingPdf(nestResults, summary, { projectName = 'Nesting Plan', fileName = 'nesting-plan.pdf', mode = 'save', newWindow = false } = {}) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const doc = createPdf({ unit: 'mm', format: 'a4' });
   drawNestingSummaryPage(doc, summary, projectName);
 
   nestResults.forEach((result) => {
@@ -859,7 +860,7 @@ function drawStepDiagram(doc, step, resolvedById, placedIdsSoFar, bounds, box) {
  * @param {{projectName?:string, fileName?:string, mode?:'save'|'open'}} [options]
  */
 export function exportAssemblyPlanPdf(plan, resolvedPanels, { projectName = 'Assembly Instructions', fileName = 'assembly-instructions.pdf', mode = 'save', newWindow = false } = {}) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const doc = createPdf({ unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const startX = PAGE_MARGIN_MM;
 

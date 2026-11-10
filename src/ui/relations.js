@@ -141,6 +141,7 @@ function renderConstraintList(constraints, allPanels) {
             (${escapeHtml(c.myFace ?? '')})
             <input
               type="number"
+              data-unit="mm"
               class="quote-value-input"
               data-constraint-id="${relationId}"
               value="${escapeHtml(String(c.value ?? 0))}"

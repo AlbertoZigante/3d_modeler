@@ -24,10 +24,11 @@ const TIMEOUT_MS = 20000;
 export const apiEnabled = API_URL.length > 0;
 
 export class ApiError extends Error {
-  constructor(message, { status = 0, cause } = {}) {
+  constructor(message, { status = 0, cause, code } = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.code = code; // stable machine code from the API ('invalid_api_key', ...)
     this.cause = cause;
   }
 }
@@ -50,7 +51,13 @@ async function request(path, { method = 'GET', body, signal } = {}) {
       signal: controller.signal,
     });
     if (!response.ok) {
-      throw new ApiError(`API ${method} ${path} failed (HTTP ${response.status})`, { status: response.status });
+      let code;
+      try { code = (await response.json())?.code; } catch { /* body is not JSON */ }
+      // Messages stay English here; the UI layer translates them (src/i18n).
+      const message = code === 'invalid_api_key'
+        ? 'Invalid or missing API key'
+        : `API ${method} ${path} failed (HTTP ${response.status})`;
+      throw new ApiError(message, { status: response.status, code });
     }
     return await response.json();
   } catch (err) {

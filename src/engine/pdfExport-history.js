@@ -13,11 +13,11 @@
  * never needs to touch what -bom.js, -joints.js or -assembly.js own.
  */
 
-import { jsPDF } from 'jspdf';
-import { PAGE_MARGIN_MM, TEXT_LINE_HEIGHT_MM, outputPdf } from './pdfExport-shared.js';
+import { formatDateTime } from '../i18n/index.js';
+import { createPdf, PAGE_MARGIN_MM, TEXT_LINE_HEIGHT_MM, outputPdf } from './pdfExport-shared.js';
 
 function renderLinesPdf(lines, { projectName, fileName, mode, countLabel, emptyMessage }) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const doc = createPdf({ unit: 'mm', format: 'a4' });
   const pageHeight = doc.internal.pageSize.getHeight();
   const startX = PAGE_MARGIN_MM;
   let y = PAGE_MARGIN_MM;
@@ -30,7 +30,7 @@ function renderLinesPdf(lines, { projectName, fileName, mode, countLabel, emptyM
 
     doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
-    doc.text(`Generated ${new Date().toLocaleString()} — ${countLabel}`, startX, y);
+    doc.text(`Generated ${formatDateTime()} — ${countLabel}`, startX, y);
     y += 6;
     doc.setLineWidth(0.3);
     doc.line(startX, y, doc.internal.pageSize.getWidth() - PAGE_MARGIN_MM, y);
