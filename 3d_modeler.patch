@@ -1,0 +1,83 @@
+diff --git a/.env.example b/.env.example
+index c89200a..af5b7ce 100644
+--- a/.env.example
++++ b/.env.example
+@@ -4,3 +4,5 @@ VITE_API_URL=http://localhost:8000
+ VITE_API_KEY=
+ # Optional: base path. Default /3d_modeler/ (GitHub Pages). Use / on a custom domain.
+ VITE_BASE=/3d_modeler/
++# Marketing site (repo: site). Dev defaults to http://localhost:4321; required for production builds.
++VITE_SITE_URL=http://localhost:4321
+diff --git a/dashboard.html b/dashboard.html
+index 88f57b5..35d2fc1 100644
+--- a/dashboard.html
++++ b/dashboard.html
+@@ -489,7 +489,7 @@
+ 
+   <div id="sidebar">
+ 
+-    <a href="./index.html" style="font-size:11px;color:#a4977f;text-decoration:none;">← Home</a>
++    <a href="./index.html" data-site-home style="font-size:11px;color:#a4977f;text-decoration:none;">← Home</a>
+ 
+     <div class="account-card">
+       <div class="user-card">
+diff --git a/modeller.html b/modeller.html
+index 3d1fbda..db603e1 100644
+--- a/modeller.html
++++ b/modeller.html
+@@ -2174,6 +2174,7 @@
+ 
+     <a
+       href="index.html"
++      data-site-home
+       class="back-btn"
+     >
+       ← Back
+diff --git a/src/i18n/boot.js b/src/i18n/boot.js
+index 9b4ef86..5b1d591 100644
+--- a/src/i18n/boot.js
++++ b/src/i18n/boot.js
+@@ -2,6 +2,7 @@
+ // (or in the modeller's own selector) and the display unit (mm / in) picked in the top bar.
+ import { initI18n, locale, setLocale } from './index.js';
+ import { getUnit, setUnit } from '../units/index.js';
++import { bindSiteLinks } from '../shared/siteLink.js';
+ 
+ // Language / unit problems must never stop the app itself from starting.
+ try {
+@@ -21,3 +22,6 @@ if (unitSelect) {
+   unitSelect.value = getUnit();
+   unitSelect.addEventListener('change', () => setUnit(unitSelect.value));
+ }
++
++// "Back" / "Home" links (data-site-home) go to the site's landing page in the current language.
++try { bindSiteLinks(); } catch (err) { console.error('[siteLink] failed', err); }
+diff --git a/src/shared/siteLink.js b/src/shared/siteLink.js
+new file mode 100644
+index 0000000..7513f76
+--- /dev/null
++++ b/src/shared/siteLink.js
+@@ -0,0 +1,23 @@
++/**
++ * shared/siteLink.js — links from the app back to the marketing site (repo: site).
++ *
++ * Config (Vite env, see .env.example):
++ *   VITE_SITE_URL  base URL of the site. In `vite dev` defaults to
++ *                  http://localhost:4321; in a production build it must be set,
++ *                  otherwise the links keep their local fallback href.
++ *
++ * Any element with `data-site-home` is pointed at the site's landing page in the
++ * visitor's current language (e.g. http://localhost:4321/fr).
++ */
++import { locale } from '../i18n/index.js';
++
++const env = import.meta.env ?? {};
++const SITE_URL = String(env.VITE_SITE_URL ?? (env.DEV ? 'http://localhost:4321' : '')).replace(/\/+$/, '');
++
++export const siteEnabled = SITE_URL.length > 0;
++export const siteHomeUrl = () => `${SITE_URL}/${locale}`;
++
++export function bindSiteLinks() {
++  if (!siteEnabled) return;
++  document.querySelectorAll('[data-site-home]').forEach((a) => { a.href = siteHomeUrl(); });
++}

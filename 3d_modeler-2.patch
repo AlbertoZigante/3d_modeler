@@ -1,0 +1,174 @@
+diff --git a/modeller.html b/modeller.html
+index db603e1..e09d165 100644
+--- a/modeller.html
++++ b/modeller.html
+@@ -62,16 +62,41 @@
+        TOP BAR
+        ========================================================= */
+ 
+-    .unit-switch select {
+-      font: inherit;
+-      font-size: 12px;
+-      padding: 3px 6px;
+-      border: 1px solid #e3d3ba;
+-      border-radius: 6px;
+-      background: #fff;
+-      color: inherit;
+-      cursor: pointer;
+-    }
++    /* Language flag dropdown (opens on hover / focus, like the site's menus) */
++    .lang-dd { position: relative; }
++    .lang-trigger {
++      display: flex; align-items: center; gap: 6px;
++      font: inherit; font-size: 12px; padding: 3px 8px;
++      border: 1px solid #e3d3ba; border-radius: 6px;
++      background: #fff; color: inherit; cursor: pointer;
++    }
++    .lang-trigger:hover { background: #e9dcc5; }
++    .lang-menu {
++      display: none; position: absolute; top: 100%; right: 0; min-width: 150px;
++      padding: 4px 0; background: #fff; border: 1px solid #e3d3ba; border-radius: 8px;
++      box-shadow: 0 6px 18px rgba(0,0,0,.12); z-index: 60;
++    }
++    .lang-dd:hover .lang-menu, .lang-dd:focus-within .lang-menu { display: block; }
++    .lang-menu button {
++      display: flex; align-items: center; gap: 8px; width: 100%;
++      padding: 6px 12px; border: 0; background: none;
++      font: inherit; font-size: 12px; color: #3a3126; text-align: left; cursor: pointer;
++    }
++    .lang-menu button:hover, .lang-menu button[aria-current="true"] { background: #f3e8d8; }
++    .flag { display: inline-block; flex: none; width: 20px; height: 14px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.18); overflow: hidden; }
++    .flag svg { display: block; width: 100%; height: 100%; }
++
++    /* mm / in switch: off = mm, on = in */
++    .unit-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #7a6d58; cursor: pointer; user-select: none; }
++    .unit-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
++    .unit-track { position: relative; width: 34px; height: 18px; border-radius: 9px; background: #d97742; transition: background .15s; }
++    .unit-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: transform .15s; }
++    .unit-toggle input:checked + .unit-track::after { transform: translateX(16px); }
++    .unit-toggle input:focus-visible + .unit-track { outline: 2px solid #3a3126; outline-offset: 2px; }
++    .unit-toggle .u-mm { font-weight: 700; color: #3a3126; }
++    .unit-toggle .u-in { font-weight: 400; }
++    .unit-toggle:has(input:checked) .u-mm { font-weight: 400; color: #7a6d58; }
++    .unit-toggle:has(input:checked) .u-in { font-weight: 700; color: #3a3126; }
+     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+ 
+     #topbar {
+@@ -91,7 +116,7 @@
+ 
+       flex-shrink: 0;
+ 
+-      z-index: 10;
++      z-index: 60;
+     }
+ 
+ 
+@@ -2235,20 +2260,21 @@
+ 
+     <div class="spacer"></div>
+ 
+-    <label class="unit-switch" data-no-i18n>
+-      <span class="sr-only">Language</span>
+-      <select id="lang-select" aria-label="Language" title="Language">
+-        <option value="en" lang="en">English</option>
+-        <option value="fr" lang="fr">Français</option>
+-        <option value="it" lang="it">Italiano</option>
+-      </select>
+-    </label>
+-    <label class="unit-switch" data-no-i18n>
+-      <span class="sr-only">Units</span>
+-      <select id="unit-select" aria-label="Units" title="Display units (the model is always stored in mm)">
+-        <option value="mm">mm</option>
+-        <option value="in">in</option>
+-      </select>
++    <div class="lang-dd" id="lang-dd" tabindex="0" data-no-i18n>
++      <span class="lang-trigger" role="button" aria-haspopup="menu" aria-label="Language" title="Language">
++        <span class="flag" data-flag="current"></span><span aria-hidden="true">▾</span>
++      </span>
++      <div class="lang-menu" role="menu">
++        <button type="button" role="menuitem" data-lang="en" lang="en"><span class="flag" data-flag="en"></span>English</button>
++        <button type="button" role="menuitem" data-lang="fr" lang="fr"><span class="flag" data-flag="fr"></span>Français</button>
++        <button type="button" role="menuitem" data-lang="it" lang="it"><span class="flag" data-flag="it"></span>Italiano</button>
++      </div>
++    </div>
++    <label class="unit-toggle" data-no-i18n title="Display units (the model is always stored in mm)">
++      <span class="u-mm">mm</span>
++      <input type="checkbox" id="unit-select" role="switch" aria-label="Units: off = mm, on = in">
++      <span class="unit-track"></span>
++      <span class="u-in">in</span>
+     </label>
+ 
+ 
+diff --git a/src/i18n/boot.js b/src/i18n/boot.js
+index 5b1d591..b7a6929 100644
+--- a/src/i18n/boot.js
++++ b/src/i18n/boot.js
+@@ -3,6 +3,7 @@
+ import { initI18n, locale, setLocale } from './index.js';
+ import { getUnit, setUnit } from '../units/index.js';
+ import { bindSiteLinks } from '../shared/siteLink.js';
++import { flagFor } from '../shared/flags.js';
+ 
+ // Language / unit problems must never stop the app itself from starting.
+ try {
+@@ -11,16 +12,29 @@ try {
+   console.error('[i18n] init failed — the app continues in English / mm', err);
+ }
+ 
+-const langSelect = document.getElementById('lang-select');
+-if (langSelect) {
+-  langSelect.value = locale;
+-  langSelect.addEventListener('change', () => setLocale(langSelect.value));
++// Flag dropdown (#lang-dd): trigger shows the current flag, menu items carry data-lang.
++const langDd = document.getElementById('lang-dd');
++if (langDd) {
++  const sync = () => {
++    langDd.querySelectorAll('[data-flag]').forEach((el) => { el.innerHTML = flagFor(el.dataset.flag === 'current' ? locale : el.dataset.flag); });
++    langDd.querySelectorAll('.lang-menu [data-lang]').forEach((b) => b.setAttribute('aria-current', String(b.dataset.lang === locale)));
++  };
++  sync();
++  langDd.querySelectorAll('.lang-menu [data-lang]').forEach((b) =>
++    b.addEventListener('click', () => {
++      setLocale(b.dataset.lang);
++      sync();
++      document.activeElement?.blur(); // closes the menu (it opens on hover / focus)
++    }));
+ }
+ 
+-const unitSelect = document.getElementById('unit-select');
+-if (unitSelect) {
+-  unitSelect.value = getUnit();
+-  unitSelect.addEventListener('change', () => setUnit(unitSelect.value));
++// mm / in switch (#unit-select is a checkbox: off = mm, on = in).
++const unitSwitch = document.getElementById('unit-select');
++if (unitSwitch) {
++  const showUnit = () => { unitSwitch.checked = getUnit() === 'in'; };
++  showUnit();
++  unitSwitch.addEventListener('change', () => setUnit(unitSwitch.checked ? 'in' : 'mm'));
++  document.addEventListener('dm:unitchange', showUnit);
+ }
+ 
+ // "Back" / "Home" links (data-site-home) go to the site's landing page in the current language.
+diff --git a/src/shared/flags.js b/src/shared/flags.js
+new file mode 100644
+index 0000000..c3b6c4b
+--- /dev/null
++++ b/src/shared/flags.js
+@@ -0,0 +1,17 @@
++/** shared/flags.js — inline SVG flags (emoji flags do not render on Windows). */
++const svg = (body) =>
++  `<svg viewBox="0 0 60 40" preserveAspectRatio="none" aria-hidden="true" focusable="false">${body}</svg>`;
++
++export const FLAGS = {
++  en: svg(
++    '<rect width="60" height="40" fill="#012169"/>' +
++    '<path d="M0 0L60 40M60 0L0 40" stroke="#fff" stroke-width="8"/>' +
++    '<path d="M0 0L60 40M60 0L0 40" stroke="#C8102E" stroke-width="3"/>' +
++    '<path d="M30 0V40M0 20H60" stroke="#fff" stroke-width="12"/>' +
++    '<path d="M30 0V40M0 20H60" stroke="#C8102E" stroke-width="7"/>'
++  ),
++  fr: svg('<rect width="20" height="40" fill="#0055A4"/><rect x="20" width="20" height="40" fill="#fff"/><rect x="40" width="20" height="40" fill="#EF4135"/>'),
++  it: svg('<rect width="20" height="40" fill="#009246"/><rect x="20" width="20" height="40" fill="#fff"/><rect x="40" width="20" height="40" fill="#CE2B37"/>'),
++};
++
++export const flagFor = (lang) => FLAGS[lang] ?? '';
