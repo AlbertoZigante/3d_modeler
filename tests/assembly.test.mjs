@@ -13,6 +13,10 @@ import { computeBoundaryRectangle } from '../src/shared/geometry.js';
 import { computeDoorPlacement, createDoorNode, applyPanelPatch, DEFAULT_DOOR_EDGE_FIT } from '../src/features/door.js';
 import { computeDrawerFrontsPlacement, createDrawerFrontNodes, computeDrawerBoxPlacement, createDrawerBoxNodes, DEFAULT_DRAWER_EDGE_FIT } from '../src/features/drawer.js';
 import { buildAssemblySequence, formatAssemblySequenceLines } from '../src/engine/assembly.js';
+import { STAGES } from '../src/engine/assembly/stages/index.js';
+import { makeIsSameRigidUnit } from '../src/engine/assembly/clusters.js';
+import { addPlinthAndRaiseBox } from '../src/features/plinth.js';
+import { panelRole } from '../src/engine/assembly/roles.js';
 
 await ensureMaterialCatalog();
 
@@ -51,7 +55,7 @@ section('buildAssemblySequence — plain box', () => {
   // Sanity: text formatting produces one line per step, correctly numbered
   const lines = formatAssemblySequenceLines(sequence);
   assertEqual(lines.length, 5, 'text output: one line per step');
-  assert(lines[0].startsWith('01.'), 'text output: steps are 1-indexed and zero-padded');
+  assert(lines[0].startsWith('S01.'), 'text output: steps are 1-indexed and zero-padded');
 });
 
 // ---------------------------------------------------------------
@@ -179,6 +183,124 @@ section('buildAssemblySequence — determinism', () => {
   const linesA = formatAssemblySequenceLines(seqA);
   const linesB = formatAssemblySequenceLines(seqB);
   assertEqual(linesA.join('\n'), linesB.join('\n'), 'determinism: calling buildAssemblySequence twice on the same panels produces an identical sequence');
+});
+
+// ---------------------------------------------------------------
+// Stage order — doors+handles, drawers, drawer guides, plinth, then
+// the rest of the furniture, then integration
+// ---------------------------------------------------------------
+const STAGE_IDS = STAGES.map((s) => s.id);
+
+function buildStagedFixture() {
+  // drawer fixture + a door + two plinth boards, all on the same carcass
+  let panels = [...drawerFixturePanels];
+  const byName = (n) => panels.find((p) => p.name === n);
+  const boundary = computeBoundaryRectangle(panels, [byName('Left'), byName('Right'), byName('Top'), byName('Bottom')]);
+  const doorPlacement = computeDoorPlacement(panels, boundary, DEFAULT_DOOR_EDGE_FIT, { material: 'Melamine White 18mm', thicknessMm: 18, hinge: 'left' });
+  const doorNode = createDoorNode(panels, doorPlacement);
+  doorPlacement.panelPatches.forEach((patch) => { panels = applyPanelPatch(panels, patch, doorPlacement.normalAxis); });
+  const template = panels.find((p) => p.name === 'Left');
+  const plinthFront = { ...template, id: 'plinth-front', name: 'Plinth Front', pieceCode: 'PL0001', isPlinth: true, isBoxWall: false, isBoxPanel: false, groupId: null, hidden: false, constraints: [] };
+  const plinthBack = { ...template, id: 'plinth-back', name: 'Plinth Back', pieceCode: 'PL0002', isPlinth: true, isBoxWall: false, isBoxPanel: false, groupId: null, hidden: false, constraints: [] };
+  panels = [...panels, doorNode, plinthFront, plinthBack];
+  return { panels, doorNode, plinthIds: [plinthFront.id, plinthBack.id] };
+}
+
+section('buildAssemblySequence — stage order (doors, drawers, guides, plinth, carcass)', () => {
+  const { panels, doorNode, plinthIds } = buildStagedFixture();
+  const seq = buildAssemblySequence(panels);
+
+  assertEqual(seq.stages.map((s) => s.id).join(','), 'doors,drawers,guides,plinth,carcass,integration', 'stages: exposed in the required order');
+  assert(seq.steps.every((s) => STAGE_IDS.includes(s.stage)), 'every step carries a known stage id');
+
+  // Stage index never goes backwards through the sequence
+  let last = -1;
+  seq.steps.forEach((s) => {
+    const idx = STAGE_IDS.indexOf(s.stage);
+    assert(idx >= last, `step ${s.stepId} (${s.stage}) does not come before an earlier stage`);
+    last = Math.max(last, idx);
+  });
+
+  const stageSteps = (id) => seq.steps.filter((s) => s.stage === id);
+  ['doors', 'drawers', 'guides', 'plinth', 'carcass', 'integration'].forEach((id) => assert(stageSteps(id).length > 0, `stage ${id} has steps`));
+
+  // 1. doors: door panel, then its handle, and the handle is the last door step
+  const doorSteps = stageSteps('doors');
+  assert(doorSteps.every((s) => s.panelIds.includes(doorNode.id)), 'doors stage only touches the door');
+  const handleStep = doorSteps.find((s) => s.kind === 'fit_handle');
+  assert(!!handleStep, 'doors stage: the door gets a handle step');
+  assertEqual(handleStep.index, doorSteps[doorSteps.length - 1].index, 'doors stage: handle is the last door step');
+  assertEqual(handleStep.hardware[0].kind, 'handle', 'doors stage: handle step carries a handle hardware entry');
+  assert(handleStep.subassemblyComplete, 'doors stage: the door (with handle) is flagged complete');
+
+  // 2. drawers: box panels first, then front, then front handle
+  const drawerSteps = stageSteps('drawers');
+  assert(drawerSteps.some((s) => s.clusterKind === 'drawer_box'), 'drawers stage: drawer box panels present');
+  assert(drawerSteps.some((s) => s.clusterKind === 'drawer_front'), 'drawers stage: drawer front present');
+  const lastBoxIdx = Math.max(...drawerSteps.filter((s) => s.clusterKind === 'drawer_box').map((s) => s.index));
+  const firstFrontIdx = Math.min(...drawerSteps.filter((s) => s.clusterKind === 'drawer_front').map((s) => s.index));
+  assert(lastBoxIdx < firstFrontIdx, 'drawers stage: drawer box is finished before the front');
+  assertEqual(drawerSteps.filter((s) => s.kind === 'fit_handle').length, 1, 'drawers stage: exactly one handle (drawer front)');
+
+  // 3. guides: runner brackets on the carcass panels, before any carcass join
+  const guideSteps = stageSteps('guides');
+  assertEqual(guideSteps.length, 2, 'guides stage: one guide per carcass side');
+  assert(guideSteps.every((s) => s.kind === 'pre_install' && s.hardware[0].kind === 'runner'), 'guides stage: runner pre-installs only');
+  const carcassFirst = Math.min(...stageSteps('carcass').map((s) => s.index));
+  assert(guideSteps.every((s) => s.index < carcassFirst), 'guides stage: all guides are fitted before the carcass starts');
+  const carcassRunnerPreinstalls = stageSteps('carcass').filter((s) => s.kind === 'pre_install' && s.hardware.some((h) => h.kind === 'runner'));
+  assertEqual(carcassRunnerPreinstalls.length, 0, 'carcass stage: runner brackets are not installed a second time');
+
+  // 4. plinth: own sub-assemblies, before the carcass, fitted at integration
+  const plinthSteps = stageSteps('plinth');
+  assert(plinthSteps.every((s) => s.panelIds.every((id) => plinthIds.includes(id))), 'plinth stage: only plinth panels');
+  assert(plinthSteps.every((s) => s.kind !== 'unattached'), 'plinth stage: plinth is not flagged as unattached');
+  assert(plinthSteps.every((s) => s.index < carcassFirst), 'plinth stage: before the carcass');
+  assert(Math.min(...guideSteps.map((s) => s.index)) > Math.max(...drawerSteps.map((s) => s.index)), 'guides come after all drawer steps');
+  assert(Math.min(...plinthSteps.map((s) => s.index)) > Math.max(...guideSteps.map((s) => s.index)), 'plinth comes after all guide steps');
+  plinthIds.forEach((id) => {
+    const cluster = seq.clusters.find((c) => c.panelIds.includes(id));
+    assertEqual(cluster.role, 'plinth', `plinth panel ${id} sits in a plinth cluster, not the carcass`);
+  });
+
+  // 6. integration: plinth fit first, hinges last
+  const integ = stageSteps('integration');
+  assert(integ[0].panelIds.some((id) => plinthIds.includes(id)), 'integration: plinth is fitted first');
+  assertEqual(integ[integ.length - 1].panelIds[0], doorNode.id, 'integration: hanging the door is still the last step');
+  const lines = formatAssemblySequenceLines(seq);
+  assertEqual(lines.length, seq.steps.length, 'text output still has one line per step');
+});
+
+section('assembly roles — plinth detection and rigid units', () => {
+  assertEqual(panelRole({ name: 'Plinth Front' }), 'plinth', 'name "Plinth Front" -> plinth');
+  assertEqual(panelRole({ name: 'Kickboard' }), 'plinth', 'name "Kickboard" -> plinth');
+  assertEqual(panelRole({ name: 'Zoccolo' }), 'plinth', 'name "Zoccolo" -> plinth');
+  assertEqual(panelRole({ name: 'Anything', isPlinth: true }), 'plinth', 'isPlinth flag -> plinth');
+  assertEqual(panelRole({ name: 'Bottom' }), 'bottom', 'Bottom is still a bottom, not a plinth');
+  const raw = new Map([
+    ['p1', { id: 'p1', name: 'Plinth Front' }],
+    ['p2', { id: 'p2', name: 'Plinth Side' }],
+    ['c1', { id: 'c1', name: 'Bottom' }],
+  ]);
+  const same = makeIsSameRigidUnit(raw);
+  assert(same('p1', 'p2'), 'plinth boards join each other');
+  assert(!same('p1', 'c1'), 'plinth never rigidly joins the carcass (incidental contact)');
+});
+
+section('buildAssemblySequence — real plinth feature (addPlinthAndRaiseBox)', () => {
+  const { nodes } = addBox([]);
+  const added = addPlinthAndRaiseBox(nodes, nodes[0].groupId, {});
+  assert(added.ok, 'plinth added to the box');
+  const seq = buildAssemblySequence(added.panels);
+  const plinthPanelIds = added.panels.filter((p) => p.isPlinthPanel).map((p) => p.id);
+  const plinthCluster = seq.clusters.find((c) => c.role === 'plinth');
+  assert(!!plinthCluster, 'plinth panels form their own sub-assembly');
+  assertEqual(plinthCluster.panelIds.length, plinthPanelIds.length, 'every plinth panel (perimeter + ribs) is in it');
+  const firstCarcass = seq.steps.find((s) => s.stage === 'carcass');
+  assert(seq.steps.filter((s) => s.stage === 'plinth').every((s) => s.index < firstCarcass.index), 'plinth is built before the carcass');
+  const last = seq.steps[seq.steps.length - 1];
+  assertEqual(last.kind, 'integrate', 'plinth is fitted in the integration stage');
+  assert(plinthPanelIds.every((id) => last.panelIds.includes(id)), 'the integration step names the plinth panels');
 });
 
 report();
