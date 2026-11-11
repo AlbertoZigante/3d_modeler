@@ -16,6 +16,8 @@ import { buildAssemblySequence, formatAssemblySequenceLines } from '../src/engin
 import { STAGES } from '../src/engine/assembly/stages/index.js';
 import { makeIsSameRigidUnit } from '../src/engine/assembly/clusters.js';
 import { addPlinthAndRaiseBox } from '../src/features/plinth.js';
+import { buildAssemblyManualModel } from '../src/engine/assembly.js';
+import { resolveConstraints } from '../src/modeller/snap.js';
 import { panelRole } from '../src/engine/assembly/roles.js';
 
 await ensureMaterialCatalog();
@@ -154,11 +156,11 @@ section('buildAssemblySequence — drawer fixture', () => {
   const runnerPreInstalls = sequence.steps.filter((s) => s.kind === 'pre_install' && s.hardware.some((h) => h.kind === 'runner'));
   assertEqual(runnerPreInstalls.length, 4, 'drawer fixture: 4 runner pre_install steps (2 sides x 2 panels each)');
 
-  // Drawer front: known gap, honestly flagged
+  // Drawer front: anchor of its drawer unit
   const frontNode = frontNodes[0];
   const frontStep = sequence.steps.find((s) => s.panelIds.includes(frontNode.id));
   assert(!!frontStep, 'drawer fixture: the drawer front appears somewhere in the sequence');
-  assertEqual(frontStep.kind, 'unattached', 'drawer fixture: the drawer front is honestly flagged as unattached (known gap — see file header)');
+  assertEqual(frontStep.kind, 'fit_handle', 'drawer fixture: the drawer front is now the anchor of its drawer unit (its last step is the handle)');
 
   // Integration: exactly one, referencing both drawer box sides and both carcass sides, combined into ONE step
   const integrateSteps = sequence.steps.filter((s) => s.kind === 'integrate');
@@ -300,7 +302,80 @@ section('buildAssemblySequence — real plinth feature (addPlinthAndRaiseBox)', 
   assert(seq.steps.filter((s) => s.stage === 'plinth').every((s) => s.index < firstCarcass.index), 'plinth is built before the carcass');
   const last = seq.steps[seq.steps.length - 1];
   assertEqual(last.kind, 'integrate', 'plinth is fitted in the integration stage');
+  assertEqual([...new Set(seq.steps.filter((s) => s.stage === 'plinth').map((s) => s.componentTitle))].join(), 'PLINTH', 'a single plinth is titled PLINTH');
   assert(plinthPanelIds.every((id) => last.panelIds.includes(id)), 'the integration step names the plinth panels');
+});
+
+// ---------------------------------------------------------------
+// Component sections: titles, drawer build order, identical drawers
+// ---------------------------------------------------------------
+function buildThreeDrawerFixture(count = 3) {
+  let { nodes: p } = addBox([]);
+  const g = (n) => p.find((x) => x.name === n);
+  const br = computeBoundaryRectangle(p, ['Left', 'Right', 'Top', 'Bottom'].map(g));
+  const fp = computeDrawerFrontsPlacement(p, br, DEFAULT_DRAWER_EDGE_FIT, { material: 'Melamine White 18mm', thicknessMm: 18, count });
+  const fn = createDrawerFrontNodes(p, fp, {});
+  fp.panelPatches.forEach((x) => { p = applyPanelPatch(p, x, fp.normalAxis); });
+  p = [...p, ...fn];
+  fn.forEach((f) => {
+    const bp = computeDrawerBoxPlacement(p, f, { material: 'Melamine White 18mm', thicknessMm: 18 });
+    p = [...p, ...createDrawerBoxNodes(p, bp)];
+  });
+  return p;
+}
+
+section('buildAssemblySequence — drawer unit order and identical drawers', () => {
+  const panels = buildThreeDrawerFixture(3);
+  const seq = buildAssemblySequence(panels);
+  const drawerSteps = seq.steps.filter((s) => s.stage === 'drawers');
+
+  assertEqual(drawerSteps.length, 7, '3 identical drawers are described ONCE: 2 guides, 4 box panels, 1 handle');
+  assert(drawerSteps.every((s) => s.repeatCount === 3), 'every drawer step carries repeatCount 3');
+  assert(drawerSteps.every((s) => s.componentTitle === 'DRAWER ×3'), 'section title says DRAWER ×3');
+  assertEqual(drawerSteps.map((s) => s.kind).join(','), 'pre_install,pre_install,join,join,join,join,fit_handle', 'order: guide, guide, sides, back, bottom, handle');
+  const role = (s) => panels.find((p) => p.id === s.panelIds[0])?.drawerBoxRole;
+  assertEqual(`${role(drawerSteps[0])},${role(drawerSteps[1])}`, 'left,right', 'guides go on the left then the right side');
+  assertEqual(`${role(drawerSteps[2])},${role(drawerSteps[3])},${role(drawerSteps[4])},${role(drawerSteps[5])}`, 'left,right,back,bottom', 'then left side, right side, back, bottom');
+  const frontId = panels.find((p) => p.isDrawerFront).id;
+  assert(drawerSteps[2].otherPanelIds.includes(frontId) && drawerSteps[3].otherPanelIds.includes(frontId), 'the sides are attached to the drawer front');
+  assertEqual(drawerSteps[6].panelIds[0], frontId, 'the handle goes on the drawer front, last');
+  assert(drawerSteps.every((s) => s.unitPanelIds.length === 5), 'drawer steps show only the 5 panels of one drawer');
+
+  // Hardware totals still count every drawer's guides and handle
+  const model = buildAssemblyManualModel(seq, { panels, resolvedPanels: resolveConstraints(panels) });
+  const ids = model.hardware.map((h) => h.id);
+  assertEqual(ids.filter((id) => id.startsWith('RN')).length, 6 + 0, 'hardware list has all 6 drawer guides (2 per drawer)');
+  assertEqual(ids.filter((id) => id.startsWith('HN')).length, 3, 'hardware list has all 3 handles');
+
+  // Each of the 3 drawers is still slid in during integration
+  assertEqual(seq.steps.filter((s) => s.kind === 'integrate' && s.stage === 'integration' && /drawer box/.test(s.description)).length, 3, 'integration: one slide-in step per drawer');
+});
+
+section('buildAssemblySequence — a single drawer is not marked as repeated', () => {
+  const seq = buildAssemblySequence(drawerFixturePanels);
+  const drawerSteps = seq.steps.filter((s) => s.stage === 'drawers');
+  assert(drawerSteps.every((s) => s.repeatCount === 1 && s.componentTitle === 'DRAWER 1'), 'single drawer: title DRAWER 1, no repeat');
+});
+
+section('manual — component titles and scoped diagrams', () => {
+  const { panels, doorNode, plinthIds } = buildStagedFixture();
+  const seq = buildAssemblySequence(panels);
+  const model = buildAssemblyManualModel(seq, { panels, resolvedPanels: resolveConstraints(panels) });
+  const titleOf = (stage) => [...new Set(model.steps.filter((s) => s.stage === stage).map((s) => s.componentTitle))];
+  assertEqual(titleOf('doors').join(), 'DOOR', 'door steps are titled DOOR');
+  assert(titleOf('plinth').every((x) => /^PLINTH/.test(x)), 'plinth steps are titled PLINTH (numbered when there are several separate plinths)');
+  assertEqual(titleOf('drawers').join(), 'DRAWER 1', 'drawer steps are titled DRAWER 1');
+  assertEqual(titleOf('carcass').join(), 'CARCASS', 'carcass steps are titled CARCASS');
+
+  const total = (step) => Number(/\/\s*(\d+)\s*panels placed/.exec(step.diagramHtml)?.[1]);
+  const doorStep = model.steps.find((s) => s.stage === 'doors');
+  assertEqual(total(doorStep), 1, 'door diagram shows only the door (1 panel), not the carcass');
+  const drawerStep = model.steps.find((s) => s.stage === 'drawers');
+  assertEqual(total(drawerStep), 5, 'drawer diagram shows only the drawer (5 panels)');
+  const plinthStep = model.steps.find((s) => s.stage === 'plinth');
+  assertEqual(total(plinthStep), plinthStep.unitPanelIds.length, 'plinth diagram shows only the plinth panels');
+  const carcassStep = model.steps.find((s) => s.stage === 'carcass');
+  assert(total(carcassStep) > 5, 'carcass diagram still shows the whole furniture');
 });
 
 report();

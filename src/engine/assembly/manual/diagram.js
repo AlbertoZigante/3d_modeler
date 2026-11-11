@@ -71,17 +71,30 @@ export function phase4WireCorners(part) {
 export function phase4BuildAssemblyStateSvg(
   step,
   allParts = [],
-  placedBeforeIds = []
+  placedBeforeIds = [],
+  scopeIds = null
 ) {
   if (!step) {
     return '';
   }
+
+  // When a scope is given (door, drawer, plinth...), ONLY that group is
+  // drawn, and the view is fitted to it.
+  const scope =
+    Array.isArray(scopeIds) && scopeIds.length
+      ? new Set(scopeIds.map(String))
+      : null;
 
   const parts =
     (Array.isArray(allParts) ? allParts : [])
       .filter(
         part =>
           !(part?.resolved?.hidden ?? part?.raw?.hidden)
+      )
+      .filter(
+        part =>
+          !scope ||
+          scope.has(String(part?.id ?? part?.raw?.id ?? part?.resolved?.id))
       );
 
   if (!parts.length) {

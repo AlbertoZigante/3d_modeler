@@ -7,12 +7,16 @@ import { desiredOrientation, roleOfStepPanel } from './roles.js';
 import { ergonomicStepScore } from './scoring.js';
 import { actionForStep, humanInstruction, warningsForStep } from './humanModel.js';
 
+// Section title of the steps that are not a single component.
+const STAGE_TITLES = { guides: 'DRAWER GUIDES', carcass: 'CARCASS', integration: 'FINAL ASSEMBLY' };
+
 export function createStepEmitter(ctx) {
   const { rawById, resolvedById, nameById, codeOf, clusterOfPanel } = ctx;
   const steps = [];
   let stepIndex = 1;
   let assemblyOrientation = 'flat';
   let currentStage = null;
+  let currentUnit = null; // the component under construction (door, drawer, plinth...) or null
 
   const repositionCostBetween = (from, to) => {
     if (!from || !to || from === to || from === 'unknown' || to === 'unknown') return 0;
@@ -74,15 +78,23 @@ export function createStepEmitter(ctx) {
     if (orientation !== 'unknown') assemblyOrientation = orientation;
     const primarySubassembly = primaryId != null ? clusterOfPanel.get(primaryId) : null;
 
+    const unit = currentUnit;
     pushStep({
+      componentKind: unit?.kind ?? currentStage,
+      componentTitle: unit?.title ?? STAGE_TITLES[currentStage] ?? null,
+      componentSubtitle: unit?.subtitle ?? null,
+      // Panels shown in the manual diagram for this step; null = whole furniture.
+      unitPanelIds: unit?.unitPanelIds ?? null,
+      repeatCount: unit?.repeatCount ?? 1,
+      repeatLabels: unit?.repeatLabels ?? null,
       phase: partial.phase ?? (partial.kind === 'integrate' ? 'integration' : partial.kind === 'pre_install' ? 'prepare' : 'subassembly'),
       stage: currentStage,
       orientation,
       requiresReposition,
       repositionCost,
       ergonomic,
-      subassemblyId: partial.subassemblyId ?? primarySubassembly?.id ?? null,
-      subassemblyName: partial.subassemblyName ?? primarySubassembly?.name ?? null,
+      subassemblyId: partial.subassemblyId ?? unit?.subassemblyId ?? primarySubassembly?.id ?? null,
+      subassemblyName: partial.subassemblyName ?? unit?.subassemblyName ?? primarySubassembly?.name ?? null,
       clusterKind: partial.clusterKind ?? primarySubassembly?.role ?? null,
       ...partial,
     });
@@ -91,6 +103,7 @@ export function createStepEmitter(ctx) {
   return {
     steps,
     emitStep,
-    setStage: (stageId) => { currentStage = stageId; },
+    setStage: (stageId) => { currentStage = stageId; currentUnit = null; },
+    setUnit: (unit) => { currentUnit = unit; },
   };
 }

@@ -305,7 +305,7 @@ export function phase4BuildHardwareSummary(sequence) {
 
   phase4Array(sequence?.steps).forEach(
     (step) => {
-      phase4Array(step.hardware).forEach(
+      [...phase4Array(step.hardware), ...phase4Array(step.repeatHardware)].forEach(
         (entry) => {
           const id =
             entry.displayId ||

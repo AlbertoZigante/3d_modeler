@@ -73,28 +73,31 @@ export function emitClusterSteps(ctx, cluster) {
 }
 
 /**
- * Handle step for every door / drawer front of the cluster, emitted after
- * the panel itself is built (handles go on while the front is still flat
- * and off the furniture).
+ * Handle step for ONE door / drawer front, emitted after the panel itself
+ * is built (handles go on while the front is still flat and off the
+ * furniture).
  */
-export function emitHandleSteps(ctx, cluster) {
+export function emitHandleStep(ctx, panelId) {
   const { emitStep, codeOf, handleByPanel } = ctx;
-  cluster.order.forEach(({ newPanel }) => {
-    const handle = handleByPanel.get(newPanel);
-    if (!handle) return;
-    const what = handle.axis === 'y' ? 'door' : 'drawer front';
-    emitStep({
-      kind: 'fit_handle',
-      phase: 'prepare',
-      action: 'install',
-      panelIds: [newPanel],
-      otherPanelIds: [],
-      jointIds: [],
-      hardware: [handle],
-      orientation: 'flat',
-      description: `Fit handle ${handle.displayId} on ${what} ${codeOf(newPanel)}.`,
-      instruction: `Fit handle ${handle.displayId} (${handle.hardware.series}) on ${codeOf(newPanel)}: ${describeHandlePlacement(handle)}.`,
-      warnings: ['Fit the handle while the panel is flat on a protected surface.'],
-    });
+  const handle = handleByPanel.get(panelId);
+  if (!handle) return;
+  const what = ctx.rawById.get(panelId)?.isDoor ? 'door' : 'drawer front';
+  emitStep({
+    kind: 'fit_handle',
+    phase: 'prepare',
+    action: 'install',
+    panelIds: [panelId],
+    otherPanelIds: [],
+    jointIds: [],
+    hardware: [handle],
+    orientation: 'flat',
+    description: `Fit handle ${handle.displayId} on ${what} ${codeOf(panelId)}.`,
+    instruction: `Fit handle ${handle.displayId} (${handle.hardware.series}) on ${codeOf(panelId)}: ${describeHandlePlacement(handle)}.`,
+    warnings: ['Fit the handle while the panel is flat on a protected surface.'],
   });
+}
+
+/** Handle steps for every door / drawer front of a cluster. */
+export function emitHandleSteps(ctx, cluster) {
+  cluster.order.forEach(({ newPanel }) => emitHandleStep(ctx, newPanel));
 }

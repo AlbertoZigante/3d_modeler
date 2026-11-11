@@ -32,7 +32,12 @@ export function buildAssemblyManualModel(
     ]
   );
 
+  // Furniture-wide placed panels (carcass view), and per-component placed
+  // panels for steps that show only one component (door, drawer, plinth...).
+  // Component steps never add to the furniture-wide set: a door or drawer
+  // is not on the carcass yet.
   const placedPanelIds = new Set();
+  const placedByUnit = new Map();
   const stepModels = steps.map(
     (step, index) => {
 
@@ -57,11 +62,28 @@ export function buildAssemblyManualModel(
           options
         );
 
+      const unitIds =
+        Array.isArray(step.unitPanelIds) && step.unitPanelIds.length
+          ? step.unitPanelIds
+          : null;
+      const unitKey = unitIds ? unitIds.join('|') : null;
+      // Fitting hardware on a loose panel shows that panel alone.
+      const isLoosePrep = Boolean(unitKey) && step.kind === 'pre_install';
+      const placedBefore = isLoosePrep
+        ? []
+        : unitKey
+        ? [
+            ...(placedByUnit.get(unitKey) || []),
+            ...phase4Array(step.otherPanelIds),
+          ]
+        : [...placedPanelIds];
+
       const assemblyStateSvg =
         phase4BuildAssemblyStateSvg(
           step,
           visualParts,
-          [...placedPanelIds]
+          placedBefore,
+          unitIds
         );
 
       /*
@@ -69,10 +91,17 @@ export function buildAssemblyManualModel(
       * so the step can still distinguish the
       * newly added panel(s).
       */
-      currentPanelIds.forEach(
-        (id) =>
-          placedPanelIds.add(id)
-      );
+      if (isLoosePrep) {
+        // nothing: the panel is not part of the component yet
+      } else if (unitKey) {
+        if (!placedByUnit.has(unitKey)) placedByUnit.set(unitKey, new Set());
+        currentPanelIds.forEach((id) => placedByUnit.get(unitKey).add(id));
+      } else {
+        currentPanelIds.forEach(
+          (id) =>
+            placedPanelIds.add(id)
+        );
+      }
       const warnings =
         phase4Warnings(step);
 
@@ -96,6 +125,9 @@ export function buildAssemblyManualModel(
 
         displayNumber:
           index + 1,
+
+        componentTitle:
+          step.componentTitle || null,
 
         totalSteps:
           steps.length,

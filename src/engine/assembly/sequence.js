@@ -137,6 +137,7 @@ export function buildAssemblySequence(panels) {
   const ctx = createAssemblyContext(panels);
   const emitter = createStepEmitter(ctx);
   ctx.emitStep = emitter.emitStep;
+  ctx.setUnit = emitter.setUnit;
 
   STAGES.forEach((stage) => {
     emitter.setStage(stage.id);

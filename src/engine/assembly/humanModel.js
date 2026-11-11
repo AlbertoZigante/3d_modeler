@@ -5,6 +5,7 @@ export function subassemblyLabel(role, ordinal) {
   if (role === 'door') return `Door assembly ${ordinal}`;
   if (role === 'drawer_box') return `Drawer assembly ${ordinal}`;
   if (role === 'drawer_front') return `Drawer front assembly ${ordinal}`;
+  if (role === 'plinth') return ordinal === 1 ? 'Plinth' : `Plinth assembly ${ordinal}`;
   if (role === 'carcass') return ordinal === 1 ? 'Main carcass' : `Carcass assembly ${ordinal}`;
   return `Sub-assembly ${ordinal}`;
 }
@@ -14,13 +15,13 @@ export function actionForStep(kind, phase, role) {
   if (kind === 'integrate') return 'integrate';
   if (kind === 'unattached') return 'inspect';
   if (phase === 'closure') return 'close';
-  if (role === 'door' || role === 'drawer_box' || role === 'drawer_front') return 'assemble';
+  if (role === 'door' || role === 'drawer_box' || role === 'drawer_front' || role === 'plinth') return 'assemble';
   return 'install';
 }
 
 export function roleDisplay(role) {
   return ({
-    door: 'door', drawer_box: 'drawer box', drawer_front: 'drawer front',
+    door: 'door', drawer_box: 'drawer box', drawer_front: 'drawer front', plinth: 'plinth board',
     back: 'back panel', top: 'top panel', bottom: 'bottom panel',
     vertical: 'vertical divider', horizontal: 'horizontal shelf',
   })[role] || 'component';

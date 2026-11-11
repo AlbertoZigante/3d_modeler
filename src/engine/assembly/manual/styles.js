@@ -316,6 +316,33 @@ export const MANUAL_CSS = `  @page {
     font-size: 10pt;
   }
 
+
+  .p4-step-component {
+    display: inline-block;
+    margin-bottom: 1.5mm;
+    padding: 1mm 3mm;
+    background: var(--p4-ink);
+    color: #fff;
+    font-size: 11pt;
+    font-weight: 900;
+    letter-spacing: .08em;
+    border-radius: 1mm;
+  }
+
+  .p4-repeat {
+    margin: 3mm 0;
+    padding: 2.5mm 3mm;
+    border: 2px solid var(--p4-ink);
+    border-radius: 1.5mm;
+    font-size: 9pt;
+  }
+
+  .p4-repeat strong {
+    display: block;
+    font-size: 12pt;
+    letter-spacing: .06em;
+  }
+
   .p4-step-phase {
     font-size: 8pt;
     font-weight: 800;

@@ -137,9 +137,13 @@ section('scoreErgonomics — drawer fixture, two-person on integration', () => {
 
   // No orientation/reorientation fields on non-join steps
   assert(integrateStep.ergonomics.orientationAxis === undefined, 'ergonomics: orientationAxis is not computed for integrate steps (no meaningful "which way is up" for a slide-in)');
-  const unattachedStep = steps.find((s) => s.kind === 'unattached');
-  assert(!!unattachedStep, 'fixture sanity: the drawer front is flagged unattached (known gap)');
-  assertEqual(unattachedStep.ergonomics.singleJointCaution, undefined, 'ergonomics: singleJointCaution is not computed for a step with no joints at all');
+  // The drawer front is now the anchor of its drawer: the sides are joined to it,
+  // so its weight is tracked together with the drawer box.
+  const handleStep = steps.find((s) => s.kind === 'fit_handle' && s.stage === 'drawers');
+  assert(!!handleStep, 'fixture sanity: the drawer has a handle step');
+  assertEqual(handleStep.ergonomics.singleJointCaution, undefined, 'ergonomics: singleJointCaution is not computed for a handle step (no joints)');
+  const frontAttachStep = steps.find((s) => s.kind === 'join' && s.stage === 'drawers' && s.otherPanelIds.length > 0);
+  assert(frontAttachStep.ergonomics.weightKg > 0, 'ergonomics: the drawer front and box are tracked as one group');
 });
 
 // ---------------------------------------------------------------

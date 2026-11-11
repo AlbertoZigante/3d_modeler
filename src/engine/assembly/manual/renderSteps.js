@@ -87,6 +87,13 @@ export function phase4RenderStep(step) {
         </div>
 
         <div class="p4-step-heading">
+          ${
+            step.componentTitle
+              ? `<div class="p4-step-component p4-comp-${phase4EscapeHtml(step.componentKind || 'carcass')}">
+                  ${phase4EscapeHtml(step.componentTitle)}
+                </div>`
+              : ''
+          }
           <div class="p4-step-phase">
             ${phase4EscapeHtml(step.phaseLabel)}
           </div>
@@ -148,6 +155,18 @@ export function phase4RenderStep(step) {
                   )}
                 </div>
               `
+              : ''
+          }
+
+          ${
+            step.repeatCount > 1
+              ? `<div class="p4-repeat">
+                  <strong>REPEAT ×${Number(step.repeatCount)}</strong>
+                  <div>${phase4EscapeHtml(
+                    step.componentSubtitle ||
+                    `Do this step for each of the ${step.repeatCount} identical drawers.`
+                  )}</div>
+                </div>`
               : ''
           }
 

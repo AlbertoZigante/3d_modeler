@@ -12,6 +12,8 @@ export function runGuides(ctx) {
   guideEntries.forEach((runner) => {
     const panelId = runner.panelB;
     const code = codeOf(panelId);
+    // Only the panel being prepared is shown in the manual diagram.
+    ctx.setUnit({ kind: 'guides', title: 'DRAWER GUIDES', unitPanelIds: [panelId] });
     const isShelf = /shelf|horizontal/i.test([rawById.get(panelId)?.name, rawById.get(panelId)?.role].filter(Boolean).join(' '));
     emitStep({
       kind: 'pre_install',
