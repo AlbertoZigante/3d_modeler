@@ -12,7 +12,7 @@
  * for what's actually shared vs. domain-specific.
  */
 
-import { edgeLabel, formatDateTime } from '../i18n/index.js';
+import { edgeLabel, formatDateTime, trc } from '../i18n/index.js';
 import { lengthDigits } from '../units/index.js';
 import { createPdf, PAGE_MARGIN_MM, HEADER_BLOCK_HEIGHT_MM, drawTableRow, outputPdf } from './pdfExport-shared.js';
 
@@ -42,7 +42,7 @@ function formatDimLegacy(mm) {
 function rowCell(row, key) {
   if (key === 'size') return `${formatDim(row.widthMm)} × ${formatDim(row.heightMm)}`;
   if (key === 'areaM2') return row.areaM2.toFixed(3);
-  if (key === 'grain') return row.grainInterchangeable ? 'Free' : 'Fixed';
+  if (key === 'grain') return row.grainInterchangeable ? trc('grain', 'Free') : trc('grain', 'Fixed');
   if (key === 'edges') return !row.bandedEdges?.length ? '—' : `${edgeLabel(row.bandedEdges)} (${formatDim(row.bandingLengthM)}m)`;
   if (key === 'ids') return row.pieceCodes.join(', ');
   if (key === 'thicknessMm') return lengthDigits(Number(row.thicknessMm), 0).replace(/\.0+$/, '');

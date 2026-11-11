@@ -579,6 +579,7 @@
   </div>
 
 <script type="module">
+  import { tr } from '/src/i18n/index.js';
 
   /*
    * Prototype dashboard: user + projects and their per-project
@@ -863,7 +864,7 @@
   }
 
   document.getElementById('new-project-btn').addEventListener('click', () => {
-    const name = window.prompt('Project name');
+    const name = window.prompt(tr('Project name'));
     if (!name) return;
     const project = { id: 'p' + Date.now(), name, steps: emptySteps() };
     projects.push(project);

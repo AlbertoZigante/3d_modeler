@@ -3,7 +3,12 @@
 import { initI18n, locale, setLocale } from './index.js';
 import { getUnit, setUnit } from '../units/index.js';
 
-initI18n();
+// Language / unit problems must never stop the app itself from starting.
+try {
+  initI18n();
+} catch (err) {
+  console.error('[i18n] init failed — the app continues in English / mm', err);
+}
 
 const langSelect = document.getElementById('lang-select');
 if (langSelect) {

@@ -201,6 +201,7 @@ export const CATALOG = [
   ['Drawer', 'Tiroir', 'Cassetto'],
   ['Height', 'Hauteur', 'Altezza'],
   ['width', 'largeur', 'larghezza'],
+  ['depth', 'profondeur', 'profondità'],
   ['height', 'hauteur', 'altezza'],
   ['thickness', 'épaisseur', 'spessore'],
   ['Width', 'Largeur', 'Larghezza'],
@@ -504,10 +505,9 @@ export const CATALOG = [
   ['W × H (mm)', 'L × H (mm)', 'L × A (mm)'],
   ['Thk', 'Ép.', 'Sp.'],
   ['Grain', 'Fil', 'Venatura'],
-  ['Edges', 'Chants', 'Bordi'],
   ['Qty', 'Qté', 'Q.tà'],
-  ['Free', 'Libre', 'Libera'],
-  ['Fixed', 'Fixe', 'Fissa'],
+  ['grain|Free', 'Libre', 'Libera'],   // context rows: trc('grain', 'Free') in the cut list PDF
+  ['grain|Fixed', 'Fixe', 'Fissa'],
   ['Total area: {} m²', 'Surface totale : {1} m²', 'Superficie totale: {1} m²'],
   ['Generated {} — {}', 'Généré le {1} — {2}', 'Generato il {1} — {2}'],
   ['Generated {}', 'Généré le {1}', 'Generato il {1}'],
@@ -767,6 +767,9 @@ export const CATALOG = [
   ['✓ Confirmed', '✓ Confirmé', '✓ Confermato'],
   ['Confirm & Pay', 'Confirmer et payer', 'Conferma e paga'],
   ['Modify', 'Modifier', 'Modifica'],
+  ['Not added', 'Non renseigné', 'Non aggiunto'],
+  ['Pending', 'En attente', 'In sospeso'],
+  ['Project name', 'Nom du projet', 'Nome del progetto'],
   ['Get PDF', 'Obtenir le PDF', 'Ottieni il PDF'],
 
   // ---- Landing page (index.html) -----------------------------------------

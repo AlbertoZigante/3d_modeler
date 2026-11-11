@@ -1,4 +1,4 @@
-import { edgeLabel, formatDateTime } from '../i18n/index.js';
+import { edgeLabel, formatDateTime, trc } from '../i18n/index.js';
 import { createPdf } from './pdfExport-shared.js';
 import { formatSummaryLines, formatAttentionLines, formatJointTableRow, formatFeatureJointTableRow } from './joints.js';
 import { formatHardwareTableRow } from './hardware.js';
@@ -42,7 +42,7 @@ function formatDim(mm) {
 function rowCell(row, key) {
   if (key === 'size') return `${formatDim(row.widthMm)} × ${formatDim(row.heightMm)}`;
   if (key === 'areaM2') return row.areaM2.toFixed(3);
-  if (key === 'grain') return row.grainInterchangeable ? 'Free' : 'Fixed';
+  if (key === 'grain') return row.grainInterchangeable ? trc('grain', 'Free') : trc('grain', 'Fixed');
   if (key === 'edges') return !row.bandedEdges?.length ? '—' : `${edgeLabel(row.bandedEdges)} (${formatDim(row.bandingLengthM)}m)`;
   if (key === 'ids') return row.pieceCodes.join(', ');
   return String(row[key] ?? '');

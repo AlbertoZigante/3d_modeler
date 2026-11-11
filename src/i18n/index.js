@@ -61,7 +61,7 @@ function compileCatalog() {
 compileCatalog();
 
 const SEPARATORS = ['  •  ', ' — ', ' · ', ' ↔ ', ' / ', '/', ', '];
-const PREFIXES = ['— ', '· ', '• ', '↺ ', '🔒 '];
+const PREFIXES = ['— ', '· ', '• ', '↺ ', '↳ ', '🔒 '];
 
 /** Translate one string (already whitespace-normalised). Returns it unchanged if unknown. */
 function tx(s) {
@@ -109,6 +109,11 @@ export function localize(text) {
 }
 
 const identity = () => locale === 'en' && getUnit() === 'mm';
+
+/** Translate with a context, for words that mean different things in different places ('grain|Free' vs plan 'Free'). */
+export function trc(context, text) {
+  return exact.get(`${context}|${text}`) ?? tr(text);
+}
 
 const ATTRS = ['title', 'placeholder', 'aria-label', 'alt'];
 const SKIP = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'CODE', 'PRE']);
@@ -196,10 +201,14 @@ export function initI18n() {
   document.title = localize(originalTitle);
   translateDom(document.body);
   new MutationObserver((records) => {
-    for (const r of records) {
-      if (r.type === 'childList') r.addedNodes.forEach((n) => translateDom(n));
-      else if (r.type === 'characterData') translateTextNode(r.target);
-      else if (r.type === 'attributes' && r.target.nodeType === 1) translateAttrs(r.target);
+    try {
+      for (const r of records) {
+        if (r.type === 'childList') r.addedNodes.forEach((n) => translateDom(n));
+        else if (r.type === 'characterData') translateTextNode(r.target);
+        else if (r.type === 'attributes' && r.target.nodeType === 1) translateAttrs(r.target);
+      }
+    } catch (err) {
+      console.error('[i18n] translation skipped', err);
     }
   }).observe(document.body, {
     childList: true, subtree: true, characterData: true,
