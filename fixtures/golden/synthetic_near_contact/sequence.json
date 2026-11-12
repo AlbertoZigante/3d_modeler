@@ -1,0 +1,168 @@
+{
+  "clusters": [
+    {
+      "id": "SUB01",
+      "name": "Main carcass",
+      "panelIds": [
+        "panel-1"
+      ],
+      "role": "carcass"
+    },
+    {
+      "id": "SUB02",
+      "name": "Carcass assembly 2",
+      "panelIds": [
+        "panel-2"
+      ],
+      "role": "carcass"
+    }
+  ],
+  "phases": [
+    {
+      "id": "prepare",
+      "name": "Prepare components"
+    },
+    {
+      "id": "subassembly",
+      "name": "Build independent sub-assemblies"
+    },
+    {
+      "id": "internal",
+      "name": "Build internal carcass components"
+    },
+    {
+      "id": "closure",
+      "name": "Close the carcass"
+    },
+    {
+      "id": "integration",
+      "name": "Final integration"
+    }
+  ],
+  "stages": [
+    {
+      "id": "doors",
+      "name": "Doors & handles"
+    },
+    {
+      "id": "drawers",
+      "name": "Drawer boxes, fronts & handles"
+    },
+    {
+      "id": "guides",
+      "name": "Drawer guides on carcass panels"
+    },
+    {
+      "id": "plinth",
+      "name": "Plinth"
+    },
+    {
+      "id": "carcass",
+      "name": "Main carcass"
+    },
+    {
+      "id": "integration",
+      "name": "Final integration"
+    }
+  ],
+  "steps": [
+    {
+      "action": "inspect",
+      "clusterKind": "carcass",
+      "componentKind": "carcass",
+      "componentSubtitle": null,
+      "componentTitle": "CARCASS",
+      "description": "Place PA0001 — no structural joint or hardware association found for it yet (see the known-gap note).",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 53,
+        "support": 10,
+        "toolAccess": 0,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [],
+      "index": 1,
+      "instruction": "Identify PA0001 and set it aside; no assembly connection is currently modeled for this part.",
+      "jointIds": [],
+      "kind": "unattached",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "PA0001"
+      ],
+      "panelIds": [
+        "panel-1"
+      ],
+      "panelNames": [
+        "A"
+      ],
+      "phase": "unattached",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "unknown",
+      "stage": "carcass",
+      "stepId": "S01",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "unitPanelIds": null,
+      "warnings": []
+    },
+    {
+      "action": "inspect",
+      "clusterKind": "carcass",
+      "componentKind": "carcass",
+      "componentSubtitle": null,
+      "componentTitle": "CARCASS",
+      "description": "Place PA0002 — no structural joint or hardware association found for it yet (see the known-gap note).",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 53,
+        "support": 10,
+        "toolAccess": 0,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [],
+      "index": 2,
+      "instruction": "Identify PA0002 and set it aside; no assembly connection is currently modeled for this part.",
+      "jointIds": [],
+      "kind": "unattached",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "PA0002"
+      ],
+      "panelIds": [
+        "panel-2"
+      ],
+      "panelNames": [
+        "B"
+      ],
+      "phase": "unattached",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "unknown",
+      "stage": "carcass",
+      "stepId": "S02",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB02",
+      "subassemblyName": "Carcass assembly 2",
+      "unitPanelIds": null,
+      "warnings": []
+    }
+  ]
+}

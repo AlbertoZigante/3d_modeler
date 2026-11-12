@@ -1,0 +1,175 @@
+{
+  "designs": [
+    "box_plain",
+    "box_shelf_h",
+    "box_shelf_v",
+    "box_tall",
+    "box_door_left",
+    "box_door_right",
+    "box_tall_door",
+    "box_drawer_1",
+    "box_drawers_3",
+    "box_drawer_fronts_only",
+    "box_plinth",
+    "box_legs",
+    "box_door_plinth",
+    "box_drawers_plinth",
+    "box_shelf_door",
+    "two_boxes",
+    "empty",
+    "single_panel",
+    "synthetic_overlap",
+    "synthetic_near_contact"
+  ],
+  "stages": [
+    "raw",
+    "resolved",
+    "joints",
+    "featureJoints",
+    "hardware",
+    "sequence",
+    "assembly"
+  ],
+  "summary": {
+    "box_door_left": {
+      "collisions": 0,
+      "hardwareItems": 13,
+      "joints": 12,
+      "panels": 7,
+      "steps": 10
+    },
+    "box_door_plinth": {
+      "collisions": 0,
+      "hardwareItems": 24,
+      "joints": 23,
+      "panels": 12,
+      "steps": 16
+    },
+    "box_door_right": {
+      "collisions": 0,
+      "hardwareItems": 13,
+      "joints": 12,
+      "panels": 7,
+      "steps": 10
+    },
+    "box_drawer_1": {
+      "collisions": 0,
+      "hardwareItems": 18,
+      "joints": 16,
+      "panels": 11,
+      "steps": 15
+    },
+    "box_drawer_fronts_only": {
+      "collisions": 0,
+      "hardwareItems": 9,
+      "joints": 10,
+      "panels": 8,
+      "steps": 6
+    },
+    "box_drawers_3": {
+      "collisions": 0,
+      "hardwareItems": 36,
+      "joints": 32,
+      "panels": 21,
+      "steps": 21
+    },
+    "box_drawers_plinth": {
+      "collisions": 0,
+      "hardwareItems": 38,
+      "joints": 35,
+      "panels": 21,
+      "steps": 24
+    },
+    "box_legs": {
+      "collisions": 0,
+      "hardwareItems": 12,
+      "joints": 12,
+      "panels": 10,
+      "steps": 9
+    },
+    "box_plain": {
+      "collisions": 0,
+      "hardwareItems": 8,
+      "joints": 8,
+      "panels": 6,
+      "steps": 5
+    },
+    "box_plinth": {
+      "collisions": 0,
+      "hardwareItems": 19,
+      "joints": 19,
+      "panels": 11,
+      "steps": 11
+    },
+    "box_shelf_door": {
+      "collisions": 0,
+      "hardwareItems": 17,
+      "joints": 16,
+      "panels": 8,
+      "steps": 11
+    },
+    "box_shelf_h": {
+      "collisions": 0,
+      "hardwareItems": 11,
+      "joints": 11,
+      "panels": 7,
+      "steps": 6
+    },
+    "box_shelf_v": {
+      "collisions": 0,
+      "hardwareItems": 11,
+      "joints": 11,
+      "panels": 7,
+      "steps": 6
+    },
+    "box_tall": {
+      "collisions": 0,
+      "hardwareItems": 8,
+      "joints": 8,
+      "panels": 6,
+      "steps": 5
+    },
+    "box_tall_door": {
+      "collisions": 0,
+      "hardwareItems": 13,
+      "joints": 12,
+      "panels": 7,
+      "steps": 10
+    },
+    "empty": {
+      "collisions": 0,
+      "hardwareItems": 0,
+      "joints": 0,
+      "panels": 0,
+      "steps": 0
+    },
+    "single_panel": {
+      "collisions": 0,
+      "hardwareItems": 0,
+      "joints": 0,
+      "panels": 1,
+      "steps": 1
+    },
+    "synthetic_near_contact": {
+      "collisions": 0,
+      "hardwareItems": 0,
+      "joints": 1,
+      "panels": 2,
+      "steps": 2
+    },
+    "synthetic_overlap": {
+      "collisions": 1,
+      "hardwareItems": 0,
+      "joints": 0,
+      "panels": 2,
+      "steps": 2
+    },
+    "two_boxes": {
+      "collisions": 0,
+      "hardwareItems": 16,
+      "joints": 16,
+      "panels": 12,
+      "steps": 10
+    }
+  }
+}

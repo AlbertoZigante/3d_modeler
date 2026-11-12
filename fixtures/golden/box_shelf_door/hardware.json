@@ -1,0 +1,802 @@
+{
+  "fasteners": [
+    {
+      "displayId": "FS001",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-1:panel-3:y",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-1",
+      "panelACode": "LE0001",
+      "panelAName": "Left",
+      "panelB": "panel-3",
+      "panelBCode": "TO0001",
+      "panelBName": "Top",
+      "positions": [
+        {
+          "x": 9,
+          "y": 718,
+          "z": -150
+        },
+        {
+          "x": 9,
+          "y": 718,
+          "z": -44
+        },
+        {
+          "x": 9,
+          "y": 718,
+          "z": 62
+        },
+        {
+          "x": 9,
+          "y": 718,
+          "z": 168
+        }
+      ]
+    },
+    {
+      "displayId": "FS002",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-1:panel-4:y",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-1",
+      "panelACode": "LE0001",
+      "panelAName": "Left",
+      "panelB": "panel-4",
+      "panelBCode": "BO0001",
+      "panelBName": "Bottom",
+      "positions": [
+        {
+          "x": 9,
+          "y": 18,
+          "z": -150
+        },
+        {
+          "x": 9,
+          "y": 18,
+          "z": -44
+        },
+        {
+          "x": 9,
+          "y": 18,
+          "z": 62
+        },
+        {
+          "x": 9,
+          "y": 18,
+          "z": 168
+        }
+      ]
+    },
+    {
+      "displayId": "FS003",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-1:panel-5:z",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-1",
+      "panelACode": "LE0001",
+      "panelAName": "Left",
+      "panelB": "panel-5",
+      "panelBCode": "BA0001",
+      "panelBName": "Back",
+      "positions": [
+        {
+          "x": 9,
+          "y": 68,
+          "z": -200
+        },
+        {
+          "x": 9,
+          "y": 218,
+          "z": -200
+        },
+        {
+          "x": 9,
+          "y": 368,
+          "z": -200
+        },
+        {
+          "x": 9,
+          "y": 518,
+          "z": -200
+        },
+        {
+          "x": 9,
+          "y": 668,
+          "z": -200
+        }
+      ]
+    },
+    {
+      "displayId": "FS004",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-1:panel-7:x",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-1",
+      "panelACode": "LE0001",
+      "panelAName": "Left",
+      "panelB": "panel-7",
+      "panelBCode": "SH0001",
+      "panelBName": "Shelf (H)",
+      "positions": [
+        {
+          "x": 18,
+          "y": 368,
+          "z": -150
+        },
+        {
+          "x": 18,
+          "y": 368,
+          "z": 0
+        },
+        {
+          "x": 18,
+          "y": 368,
+          "z": 150
+        }
+      ]
+    },
+    {
+      "displayId": "FS005",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-1:panel-9:x",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-1",
+      "panelACode": "LE0001",
+      "panelAName": "Left",
+      "panelB": "panel-9",
+      "panelBCode": "PA0001",
+      "panelBName": "Door",
+      "positions": [
+        {
+          "x": 18,
+          "y": 68,
+          "z": 209
+        },
+        {
+          "x": 18,
+          "y": 218,
+          "z": 209
+        },
+        {
+          "x": 18,
+          "y": 368,
+          "z": 209
+        },
+        {
+          "x": 18,
+          "y": 518,
+          "z": 209
+        },
+        {
+          "x": 18,
+          "y": 668,
+          "z": 209
+        }
+      ]
+    },
+    {
+      "displayId": "FS006",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-2:panel-3:y",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-2",
+      "panelACode": "RI0001",
+      "panelAName": "Right",
+      "panelB": "panel-3",
+      "panelBCode": "TO0001",
+      "panelBName": "Top",
+      "positions": [
+        {
+          "x": 491,
+          "y": 718,
+          "z": -150
+        },
+        {
+          "x": 491,
+          "y": 718,
+          "z": -44
+        },
+        {
+          "x": 491,
+          "y": 718,
+          "z": 62
+        },
+        {
+          "x": 491,
+          "y": 718,
+          "z": 168
+        }
+      ]
+    },
+    {
+      "displayId": "FS007",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-2:panel-4:y",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-2",
+      "panelACode": "RI0001",
+      "panelAName": "Right",
+      "panelB": "panel-4",
+      "panelBCode": "BO0001",
+      "panelBName": "Bottom",
+      "positions": [
+        {
+          "x": 491,
+          "y": 18,
+          "z": -150
+        },
+        {
+          "x": 491,
+          "y": 18,
+          "z": -44
+        },
+        {
+          "x": 491,
+          "y": 18,
+          "z": 62
+        },
+        {
+          "x": 491,
+          "y": 18,
+          "z": 168
+        }
+      ]
+    },
+    {
+      "displayId": "FS008",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-2:panel-5:z",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-2",
+      "panelACode": "RI0001",
+      "panelAName": "Right",
+      "panelB": "panel-5",
+      "panelBCode": "BA0001",
+      "panelBName": "Back",
+      "positions": [
+        {
+          "x": 491,
+          "y": 68,
+          "z": -200
+        },
+        {
+          "x": 491,
+          "y": 218,
+          "z": -200
+        },
+        {
+          "x": 491,
+          "y": 368,
+          "z": -200
+        },
+        {
+          "x": 491,
+          "y": 518,
+          "z": -200
+        },
+        {
+          "x": 491,
+          "y": 668,
+          "z": -200
+        }
+      ]
+    },
+    {
+      "displayId": "FS009",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-2:panel-7:x",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-2",
+      "panelACode": "RI0001",
+      "panelAName": "Right",
+      "panelB": "panel-7",
+      "panelBCode": "SH0001",
+      "panelBName": "Shelf (H)",
+      "positions": [
+        {
+          "x": 482,
+          "y": 368,
+          "z": -150
+        },
+        {
+          "x": 482,
+          "y": 368,
+          "z": 0
+        },
+        {
+          "x": 482,
+          "y": 368,
+          "z": 150
+        }
+      ]
+    },
+    {
+      "displayId": "FS010",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-2:panel-9:x",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-2",
+      "panelACode": "RI0001",
+      "panelAName": "Right",
+      "panelB": "panel-9",
+      "panelBCode": "PA0001",
+      "panelBName": "Door",
+      "positions": [
+        {
+          "x": 482,
+          "y": 68,
+          "z": 209
+        },
+        {
+          "x": 482,
+          "y": 218,
+          "z": 209
+        },
+        {
+          "x": 482,
+          "y": 368,
+          "z": 209
+        },
+        {
+          "x": 482,
+          "y": 518,
+          "z": 209
+        },
+        {
+          "x": 482,
+          "y": 668,
+          "z": 209
+        }
+      ]
+    },
+    {
+      "displayId": "FS011",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-3:panel-5:z",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-3",
+      "panelACode": "TO0001",
+      "panelAName": "Top",
+      "panelB": "panel-5",
+      "panelBCode": "BA0001",
+      "panelBName": "Back",
+      "positions": [
+        {
+          "x": 50,
+          "y": 727,
+          "z": -200
+        },
+        {
+          "x": 183.333,
+          "y": 727,
+          "z": -200
+        },
+        {
+          "x": 316.667,
+          "y": 727,
+          "z": -200
+        },
+        {
+          "x": 450,
+          "y": 727,
+          "z": -200
+        }
+      ]
+    },
+    {
+      "displayId": "FS012",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-3:panel-9:y",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-3",
+      "panelACode": "TO0001",
+      "panelAName": "Top",
+      "panelB": "panel-9",
+      "panelBCode": "PA0001",
+      "panelBName": "Door",
+      "positions": [
+        {
+          "x": 68,
+          "y": 718,
+          "z": 209
+        },
+        {
+          "x": 189.333,
+          "y": 718,
+          "z": 209
+        },
+        {
+          "x": 310.667,
+          "y": 718,
+          "z": 209
+        },
+        {
+          "x": 432,
+          "y": 718,
+          "z": 209
+        }
+      ]
+    },
+    {
+      "displayId": "FS013",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-4:panel-5:z",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-4",
+      "panelACode": "BO0001",
+      "panelAName": "Bottom",
+      "panelB": "panel-5",
+      "panelBCode": "BA0001",
+      "panelBName": "Back",
+      "positions": [
+        {
+          "x": 50,
+          "y": 9,
+          "z": -200
+        },
+        {
+          "x": 183.333,
+          "y": 9,
+          "z": -200
+        },
+        {
+          "x": 316.667,
+          "y": 9,
+          "z": -200
+        },
+        {
+          "x": 450,
+          "y": 9,
+          "z": -200
+        }
+      ]
+    },
+    {
+      "displayId": "FS014",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-4:panel-9:y",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-4",
+      "panelACode": "BO0001",
+      "panelAName": "Bottom",
+      "panelB": "panel-9",
+      "panelBCode": "PA0001",
+      "panelBName": "Door",
+      "positions": [
+        {
+          "x": 68,
+          "y": 18,
+          "z": 209
+        },
+        {
+          "x": 189.333,
+          "y": 18,
+          "z": 209
+        },
+        {
+          "x": 310.667,
+          "y": 18,
+          "z": 209
+        },
+        {
+          "x": 432,
+          "y": 18,
+          "z": 209
+        }
+      ]
+    },
+    {
+      "displayId": "FS015",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-5:panel-7:z",
+      "jointType": "t_butt",
+      "kind": "fastener",
+      "panelA": "panel-5",
+      "panelACode": "BA0001",
+      "panelAName": "Back",
+      "panelB": "panel-7",
+      "panelBCode": "SH0001",
+      "panelBName": "Shelf (H)",
+      "positions": [
+        {
+          "x": 68,
+          "y": 368,
+          "z": -200
+        },
+        {
+          "x": 189.333,
+          "y": 368,
+          "z": -200
+        },
+        {
+          "x": 310.667,
+          "y": 368,
+          "z": -200
+        },
+        {
+          "x": 432,
+          "y": 368,
+          "z": -200
+        }
+      ]
+    },
+    {
+      "displayId": "FS016",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-7:panel-9:z",
+      "jointType": "t_butt",
+      "kind": "fastener",
+      "panelA": "panel-7",
+      "panelACode": "SH0001",
+      "panelAName": "Shelf (H)",
+      "panelB": "panel-9",
+      "panelBCode": "PA0001",
+      "panelBName": "Door",
+      "positions": [
+        {
+          "x": 68,
+          "y": 368,
+          "z": 200
+        },
+        {
+          "x": 189.333,
+          "y": 368,
+          "z": 200
+        },
+        {
+          "x": 310.667,
+          "y": 368,
+          "z": 200
+        },
+        {
+          "x": 432,
+          "y": 368,
+          "z": 200
+        }
+      ]
+    }
+  ],
+  "hinges": [
+    {
+      "count": 2,
+      "displayId": "HG001",
+      "hardware": {
+        "brand": "Blum",
+        "cupDepthMm": 13,
+        "cupDiameterMm": 35,
+        "edgeDistanceMm": {
+          "default": 5,
+          "max": 6,
+          "min": 3
+        },
+        "id": "blum-clip-top-blumotion-110",
+        "maxDoorThicknessMm": 24,
+        "minDoorThicknessMm": 16,
+        "openingDeg": 110,
+        "screwPatternMm": 45,
+        "series": "CLIP top BLUMOTION"
+      },
+      "kind": "hinge",
+      "panelA": "panel-9",
+      "panelACode": "PA0001",
+      "panelAName": "Door",
+      "panelB": "panel-1",
+      "panelBCode": "LE0001",
+      "panelBName": "Left",
+      "positions": [
+        {
+          "x": 18,
+          "y": 98,
+          "z": 209
+        },
+        {
+          "x": 18,
+          "y": 638,
+          "z": 209
+        }
+      ],
+      "side": "left"
+    }
+  ],
+  "runners": [],
+  "summary": {
+    "fastenerJointCount": 16,
+    "hingeCount": 1,
+    "runnerCount": 0,
+    "totalFastenerCount": 66,
+    "totalHingeUnits": 2,
+    "unmatchedCount": 0
+  },
+  "unmatched": []
+}

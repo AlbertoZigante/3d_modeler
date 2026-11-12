@@ -1,0 +1,14 @@
+{
+  "fasteners": [],
+  "hinges": [],
+  "runners": [],
+  "summary": {
+    "fastenerJointCount": 0,
+    "hingeCount": 0,
+    "runnerCount": 0,
+    "totalFastenerCount": 0,
+    "totalHingeUnits": 0,
+    "unmatchedCount": 0
+  },
+  "unmatched": []
+}

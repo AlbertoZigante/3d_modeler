@@ -85,3 +85,28 @@ export function postBom(panels, options) {
 export function postNesting(panels, nestingOptions = {}, options) {
   return request('/v1/nesting', { method: 'POST', body: { panels, options: nestingOptions }, ...options });
 }
+
+/** GET /v1/version -> { apiVersion, rulesVersion, contractVersion } */
+export function getVersion(options) {
+  return request('/v1/version', options);
+}
+
+/**
+ * Rules chain — RAW panel graph in (see payload.js toRawPayload), the server
+ * resolves it itself. Until the Python port lands these answer 501
+ * (ApiError.code === 'not_implemented').
+ */
+/** POST /v1/joints  { panels } -> { joints, collisions, featureJoints } */
+export function postJoints(rawPanels, options) {
+  return request('/v1/joints', { method: 'POST', body: { panels: rawPanels }, ...options });
+}
+
+/** POST /v1/hardware-plan  { panels } -> { summary, hinges, runners, fasteners, unmatched } */
+export function postHardwarePlan(rawPanels, options) {
+  return request('/v1/hardware-plan', { method: 'POST', body: { panels: rawPanels }, ...options });
+}
+
+/** POST /v1/assembly  { panels } -> { steps, clusters, toolsSummary } */
+export function postAssembly(rawPanels, options) {
+  return request('/v1/assembly', { method: 'POST', body: { panels: rawPanels }, ...options });
+}

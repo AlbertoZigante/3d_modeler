@@ -7,9 +7,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "golden:dump": "node scripts/golden/dump-golden.mjs",
+    "golden:check": "node scripts/golden/check-golden.mjs",
+    "api:types": "node scripts/api/sync-contract.mjs --api ../api/openapi.json",
+    "api:types:check": "node scripts/api/sync-contract.mjs --check"
   },
   "devDependencies": {
+    "openapi-typescript": "^7.13.0",
     "vite": "^8.1.1"
   },
   "dependencies": {

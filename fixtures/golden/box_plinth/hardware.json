@@ -1,0 +1,774 @@
+{
+  "fasteners": [
+    {
+      "displayId": "FS001",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-1:panel-3:y",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-1",
+      "panelACode": "LE0001",
+      "panelAName": "Left",
+      "panelB": "panel-3",
+      "panelBCode": "TO0001",
+      "panelBName": "Top",
+      "positions": [
+        {
+          "x": 9,
+          "y": 778,
+          "z": -150
+        },
+        {
+          "x": 9,
+          "y": 778,
+          "z": 0
+        },
+        {
+          "x": 9,
+          "y": 778,
+          "z": 150
+        }
+      ]
+    },
+    {
+      "displayId": "FS002",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-1:panel-4:y",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-1",
+      "panelACode": "LE0001",
+      "panelAName": "Left",
+      "panelB": "panel-4",
+      "panelBCode": "BO0001",
+      "panelBName": "Bottom",
+      "positions": [
+        {
+          "x": 9,
+          "y": 78,
+          "z": -150
+        },
+        {
+          "x": 9,
+          "y": 78,
+          "z": 0
+        },
+        {
+          "x": 9,
+          "y": 78,
+          "z": 150
+        }
+      ]
+    },
+    {
+      "displayId": "FS003",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-1:panel-5:z",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-1",
+      "panelACode": "LE0001",
+      "panelAName": "Left",
+      "panelB": "panel-5",
+      "panelBCode": "BA0001",
+      "panelBName": "Back",
+      "positions": [
+        {
+          "x": 9,
+          "y": 128,
+          "z": -200
+        },
+        {
+          "x": 9,
+          "y": 278,
+          "z": -200
+        },
+        {
+          "x": 9,
+          "y": 428,
+          "z": -200
+        },
+        {
+          "x": 9,
+          "y": 578,
+          "z": -200
+        },
+        {
+          "x": 9,
+          "y": 728,
+          "z": -200
+        }
+      ]
+    },
+    {
+      "displayId": "FS004",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-2:panel-3:y",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-2",
+      "panelACode": "RI0001",
+      "panelAName": "Right",
+      "panelB": "panel-3",
+      "panelBCode": "TO0001",
+      "panelBName": "Top",
+      "positions": [
+        {
+          "x": 491,
+          "y": 778,
+          "z": -150
+        },
+        {
+          "x": 491,
+          "y": 778,
+          "z": 0
+        },
+        {
+          "x": 491,
+          "y": 778,
+          "z": 150
+        }
+      ]
+    },
+    {
+      "displayId": "FS005",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-2:panel-4:y",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-2",
+      "panelACode": "RI0001",
+      "panelAName": "Right",
+      "panelB": "panel-4",
+      "panelBCode": "BO0001",
+      "panelBName": "Bottom",
+      "positions": [
+        {
+          "x": 491,
+          "y": 78,
+          "z": -150
+        },
+        {
+          "x": 491,
+          "y": 78,
+          "z": 0
+        },
+        {
+          "x": 491,
+          "y": 78,
+          "z": 150
+        }
+      ]
+    },
+    {
+      "displayId": "FS006",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-2:panel-5:z",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-2",
+      "panelACode": "RI0001",
+      "panelAName": "Right",
+      "panelB": "panel-5",
+      "panelBCode": "BA0001",
+      "panelBName": "Back",
+      "positions": [
+        {
+          "x": 491,
+          "y": 128,
+          "z": -200
+        },
+        {
+          "x": 491,
+          "y": 278,
+          "z": -200
+        },
+        {
+          "x": 491,
+          "y": 428,
+          "z": -200
+        },
+        {
+          "x": 491,
+          "y": 578,
+          "z": -200
+        },
+        {
+          "x": 491,
+          "y": 728,
+          "z": -200
+        }
+      ]
+    },
+    {
+      "displayId": "FS007",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-3:panel-5:z",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-3",
+      "panelACode": "TO0001",
+      "panelAName": "Top",
+      "panelB": "panel-5",
+      "panelBCode": "BA0001",
+      "panelBName": "Back",
+      "positions": [
+        {
+          "x": 50,
+          "y": 787,
+          "z": -200
+        },
+        {
+          "x": 183.333,
+          "y": 787,
+          "z": -200
+        },
+        {
+          "x": 316.667,
+          "y": 787,
+          "z": -200
+        },
+        {
+          "x": 450,
+          "y": 787,
+          "z": -200
+        }
+      ]
+    },
+    {
+      "displayId": "FS008",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-4:panel-5:z",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-4",
+      "panelACode": "BO0001",
+      "panelAName": "Bottom",
+      "panelB": "panel-5",
+      "panelBCode": "BA0001",
+      "panelBName": "Back",
+      "positions": [
+        {
+          "x": 50,
+          "y": 69,
+          "z": -200
+        },
+        {
+          "x": 183.333,
+          "y": 69,
+          "z": -200
+        },
+        {
+          "x": 316.667,
+          "y": 69,
+          "z": -200
+        },
+        {
+          "x": 450,
+          "y": 69,
+          "z": -200
+        }
+      ]
+    },
+    {
+      "displayId": "FS009",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-4:panel-8:y",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-4",
+      "panelACode": "BO0001",
+      "panelAName": "Bottom",
+      "panelB": "panel-8",
+      "panelBCode": "LE0002",
+      "panelBName": "Plinth Left",
+      "positions": [
+        {
+          "x": 9,
+          "y": 60,
+          "z": -132
+        },
+        {
+          "x": 9,
+          "y": 60,
+          "z": 0
+        },
+        {
+          "x": 9,
+          "y": 60,
+          "z": 132
+        }
+      ]
+    },
+    {
+      "displayId": "FS010",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-4:panel-9:y",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-4",
+      "panelACode": "BO0001",
+      "panelAName": "Bottom",
+      "panelB": "panel-9",
+      "panelBCode": "RI0002",
+      "panelBName": "Plinth Right",
+      "positions": [
+        {
+          "x": 491,
+          "y": 60,
+          "z": -132
+        },
+        {
+          "x": 491,
+          "y": 60,
+          "z": 0
+        },
+        {
+          "x": 491,
+          "y": 60,
+          "z": 132
+        }
+      ]
+    },
+    {
+      "displayId": "FS011",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-4:panel-10:y",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-4",
+      "panelACode": "BO0001",
+      "panelAName": "Bottom",
+      "panelB": "panel-10",
+      "panelBCode": "BA0002",
+      "panelBName": "Plinth Back",
+      "positions": [
+        {
+          "x": 50,
+          "y": 60,
+          "z": -191
+        },
+        {
+          "x": 183.333,
+          "y": 60,
+          "z": -191
+        },
+        {
+          "x": 316.667,
+          "y": 60,
+          "z": -191
+        },
+        {
+          "x": 450,
+          "y": 60,
+          "z": -191
+        }
+      ]
+    },
+    {
+      "displayId": "FS012",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-4:panel-11:y",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-4",
+      "panelACode": "BO0001",
+      "panelAName": "Bottom",
+      "panelB": "panel-11",
+      "panelBCode": "FR0002",
+      "panelBName": "Plinth Front",
+      "positions": [
+        {
+          "x": 50,
+          "y": 60,
+          "z": 191
+        },
+        {
+          "x": 183.333,
+          "y": 60,
+          "z": 191
+        },
+        {
+          "x": 316.667,
+          "y": 60,
+          "z": 191
+        },
+        {
+          "x": 450,
+          "y": 60,
+          "z": 191
+        }
+      ]
+    },
+    {
+      "displayId": "FS013",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-4:panel-12:y",
+      "jointType": "t_butt",
+      "kind": "fastener",
+      "panelA": "panel-4",
+      "panelACode": "BO0001",
+      "panelAName": "Bottom",
+      "panelB": "panel-12",
+      "panelBCode": "PA0001",
+      "panelBName": "Plinth Rib y-1-1",
+      "positions": [
+        {
+          "x": 250,
+          "y": 60,
+          "z": -132
+        },
+        {
+          "x": 250,
+          "y": 60,
+          "z": 0
+        },
+        {
+          "x": 250,
+          "y": 60,
+          "z": 132
+        }
+      ]
+    },
+    {
+      "displayId": "FS014",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-8:panel-10:z",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-8",
+      "panelACode": "LE0002",
+      "panelAName": "Plinth Left",
+      "panelB": "panel-10",
+      "panelBCode": "BA0002",
+      "panelBName": "Plinth Back",
+      "positions": [
+        {
+          "x": 9,
+          "y": 30,
+          "z": -182
+        }
+      ]
+    },
+    {
+      "displayId": "FS015",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-8:panel-11:z",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-8",
+      "panelACode": "LE0002",
+      "panelAName": "Plinth Left",
+      "panelB": "panel-11",
+      "panelBCode": "FR0002",
+      "panelBName": "Plinth Front",
+      "positions": [
+        {
+          "x": 9,
+          "y": 30,
+          "z": 182
+        }
+      ]
+    },
+    {
+      "displayId": "FS016",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-9:panel-10:z",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-9",
+      "panelACode": "RI0002",
+      "panelAName": "Plinth Right",
+      "panelB": "panel-10",
+      "panelBCode": "BA0002",
+      "panelBName": "Plinth Back",
+      "positions": [
+        {
+          "x": 491,
+          "y": 30,
+          "z": -182
+        }
+      ]
+    },
+    {
+      "displayId": "FS017",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-9:panel-11:z",
+      "jointType": "corner_butt",
+      "kind": "fastener",
+      "panelA": "panel-9",
+      "panelACode": "RI0002",
+      "panelAName": "Plinth Right",
+      "panelB": "panel-11",
+      "panelBCode": "FR0002",
+      "panelBName": "Plinth Front",
+      "positions": [
+        {
+          "x": 491,
+          "y": 30,
+          "z": 182
+        }
+      ]
+    },
+    {
+      "displayId": "FS018",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-10:panel-12:z",
+      "jointType": "t_butt",
+      "kind": "fastener",
+      "panelA": "panel-10",
+      "panelACode": "BA0002",
+      "panelAName": "Plinth Back",
+      "panelB": "panel-12",
+      "panelBCode": "PA0001",
+      "panelBName": "Plinth Rib y-1-1",
+      "positions": [
+        {
+          "x": 250,
+          "y": 30,
+          "z": -182
+        }
+      ]
+    },
+    {
+      "displayId": "FS019",
+      "hardware": {
+        "brand": null,
+        "clearanceHoleDiameterMm": 7,
+        "diameterMm": 7,
+        "edgeOffsetMm": 50,
+        "id": "generic-confirmat-7x50",
+        "kind": "confirmat_screw",
+        "lengthMm": 50,
+        "maxSpacingMm": 150,
+        "minPanelThicknessMm": 16,
+        "pilotHoleDiameterMm": 4.5
+      },
+      "jointId": "panel-11:panel-12:z",
+      "jointType": "t_butt",
+      "kind": "fastener",
+      "panelA": "panel-11",
+      "panelACode": "FR0002",
+      "panelAName": "Plinth Front",
+      "panelB": "panel-12",
+      "panelBCode": "PA0001",
+      "panelBName": "Plinth Rib y-1-1",
+      "positions": [
+        {
+          "x": 250,
+          "y": 30,
+          "z": 182
+        }
+      ]
+    }
+  ],
+  "hinges": [],
+  "runners": [],
+  "summary": {
+    "fastenerJointCount": 19,
+    "hingeCount": 0,
+    "runnerCount": 0,
+    "totalFastenerCount": 53,
+    "totalHingeUnits": 0,
+    "unmatchedCount": 0
+  },
+  "unmatched": []
+}

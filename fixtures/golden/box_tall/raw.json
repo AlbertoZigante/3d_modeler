@@ -1,0 +1,302 @@
+[
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 250,
+      "y": 368,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": "panel-1",
+    "height": 1800,
+    "hidden": false,
+    "id": "panel-1",
+    "isBoxPanel": true,
+    "isBoxWall": true,
+    "lockedFields": {
+      "positionY": true,
+      "positionZ": true
+    },
+    "lockedMoveAxes": [
+      "y",
+      "z"
+    ],
+    "lockedResizeAxes": [
+      "x",
+      "y",
+      "z"
+    ],
+    "material": "Melamine White 18mm",
+    "name": "Left",
+    "offset": {
+      "x": -241,
+      "y": 550,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "box-wall",
+    "pieceCode": "LE0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 250,
+      "y": 368,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": "panel-1",
+    "height": 1800,
+    "hidden": false,
+    "id": "panel-2",
+    "isBoxPanel": true,
+    "isBoxWall": true,
+    "lockedFields": {
+      "positionY": true,
+      "positionZ": true
+    },
+    "lockedMoveAxes": [
+      "y",
+      "z"
+    ],
+    "lockedResizeAxes": [
+      "x",
+      "y",
+      "z"
+    ],
+    "material": "Melamine White 18mm",
+    "name": "Right",
+    "offset": {
+      "x": 241,
+      "y": 550,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "box-wall",
+    "pieceCode": "RI0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 250,
+      "y": 368,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": "panel-1",
+    "height": 418,
+    "hidden": false,
+    "id": "panel-3",
+    "isBoxPanel": true,
+    "isBoxWall": true,
+    "lockedFields": {
+      "positionX": true,
+      "positionZ": true
+    },
+    "lockedMoveAxes": [
+      "x",
+      "z"
+    ],
+    "lockedResizeAxes": [
+      "x",
+      "y",
+      "z"
+    ],
+    "material": "Melamine White 18mm",
+    "name": "Top",
+    "offset": {
+      "x": 0,
+      "y": 1459,
+      "z": 9
+    },
+    "ownership": "system",
+    "ownershipReason": "box-wall",
+    "pieceCode": "TO0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 90,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "y",
+    "type": "panel",
+    "width": 500
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 250,
+      "y": 368,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": "panel-1",
+    "height": 400,
+    "hidden": false,
+    "id": "panel-4",
+    "isBoxPanel": true,
+    "isBoxWall": true,
+    "lockedFields": {
+      "positionX": true,
+      "positionZ": true
+    },
+    "lockedMoveAxes": [
+      "x",
+      "z"
+    ],
+    "lockedResizeAxes": [
+      "x",
+      "y",
+      "z"
+    ],
+    "material": "Melamine White 18mm",
+    "name": "Bottom",
+    "offset": {
+      "x": 0,
+      "y": -359,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "box-wall",
+    "pieceCode": "BO0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 90,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "y",
+    "type": "panel",
+    "width": 500
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 250,
+      "y": 368,
+      "z": 0
+    },
+    "constraints": [],
+    "edgeFit": {
+      "bottom": "out",
+      "left": "out",
+      "right": "out",
+      "top": "out"
+    },
+    "groupId": "panel-1",
+    "height": 1836,
+    "hidden": false,
+    "id": "panel-5",
+    "isBoxPanel": true,
+    "isBoxWall": true,
+    "lockedFields": {
+      "positionX": true,
+      "positionY": true
+    },
+    "lockedMoveAxes": [
+      "x",
+      "y"
+    ],
+    "lockedResizeAxes": [
+      "x",
+      "y",
+      "z"
+    ],
+    "material": "Melamine White 18mm",
+    "name": "Back",
+    "offset": {
+      "x": 0,
+      "y": 550,
+      "z": -209
+    },
+    "ownership": "system",
+    "ownershipReason": "box-wall",
+    "pieceCode": "BA0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 500
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 250,
+      "y": 368,
+      "z": 0
+    },
+    "constraints": [],
+    "edgeFit": {
+      "bottom": "out",
+      "left": "out",
+      "right": "out",
+      "top": "in"
+    },
+    "groupId": "panel-1",
+    "height": 1818,
+    "hidden": true,
+    "id": "panel-6",
+    "isBoxPanel": true,
+    "isBoxWall": true,
+    "lockedFields": {
+      "positionX": true,
+      "positionY": true
+    },
+    "lockedMoveAxes": [
+      "x",
+      "y"
+    ],
+    "lockedResizeAxes": [
+      "x",
+      "y",
+      "z"
+    ],
+    "material": "Melamine White 18mm",
+    "name": "Front",
+    "offset": {
+      "x": 0,
+      "y": 541,
+      "z": 209
+    },
+    "ownership": "system",
+    "ownershipReason": "box-wall",
+    "pieceCode": "FR0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 500
+  }
+]

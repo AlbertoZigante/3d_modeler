@@ -1,0 +1,810 @@
+{
+  "collisions": [],
+  "joints": [
+    {
+      "contactAxis": "y",
+      "contactPosition": 778,
+      "faceA": "top",
+      "faceB": "front",
+      "gap": 0,
+      "id": "panel-1:panel-3:y",
+      "overlap": {
+        "x": [
+          0,
+          18
+        ],
+        "z": [
+          -200,
+          200
+        ]
+      },
+      "panelA": "panel-1",
+      "panelB": "panel-3",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "y",
+      "contactPosition": 78,
+      "faceA": "bottom",
+      "faceB": "back",
+      "gap": 0,
+      "id": "panel-1:panel-4:y",
+      "overlap": {
+        "x": [
+          0,
+          18
+        ],
+        "z": [
+          -200,
+          200
+        ]
+      },
+      "panelA": "panel-1",
+      "panelB": "panel-4",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": -200,
+      "faceA": "right",
+      "faceB": "front",
+      "gap": 0,
+      "id": "panel-1:panel-5:z",
+      "overlap": {
+        "x": [
+          0,
+          18
+        ],
+        "y": [
+          78,
+          778
+        ]
+      },
+      "panelA": "panel-1",
+      "panelB": "panel-5",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "y",
+      "contactPosition": 778,
+      "faceA": "top",
+      "faceB": "front",
+      "gap": 0,
+      "id": "panel-2:panel-3:y",
+      "overlap": {
+        "x": [
+          482,
+          500
+        ],
+        "z": [
+          -200,
+          200
+        ]
+      },
+      "panelA": "panel-2",
+      "panelB": "panel-3",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "y",
+      "contactPosition": 78,
+      "faceA": "bottom",
+      "faceB": "back",
+      "gap": 0,
+      "id": "panel-2:panel-4:y",
+      "overlap": {
+        "x": [
+          482,
+          500
+        ],
+        "z": [
+          -200,
+          200
+        ]
+      },
+      "panelA": "panel-2",
+      "panelB": "panel-4",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": -200,
+      "faceA": "right",
+      "faceB": "front",
+      "gap": 0,
+      "id": "panel-2:panel-5:z",
+      "overlap": {
+        "x": [
+          482,
+          500
+        ],
+        "y": [
+          78,
+          778
+        ]
+      },
+      "panelA": "panel-2",
+      "panelB": "panel-5",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": -200,
+      "faceA": "bottom",
+      "faceB": "front",
+      "gap": 0,
+      "id": "panel-3:panel-5:z",
+      "overlap": {
+        "x": [
+          0,
+          500
+        ],
+        "y": [
+          778,
+          796
+        ]
+      },
+      "panelA": "panel-3",
+      "panelB": "panel-5",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "y",
+      "contactPosition": 778,
+      "faceA": "front",
+      "faceB": "top",
+      "gap": 0,
+      "id": "panel-3:panel-9:y",
+      "overlap": {
+        "x": [
+          18,
+          482
+        ],
+        "z": [
+          200,
+          218
+        ]
+      },
+      "panelA": "panel-3",
+      "panelB": "panel-9",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": -200,
+      "faceA": "bottom",
+      "faceB": "front",
+      "gap": 0,
+      "id": "panel-4:panel-5:z",
+      "overlap": {
+        "x": [
+          0,
+          500
+        ],
+        "y": [
+          60,
+          78
+        ]
+      },
+      "panelA": "panel-4",
+      "panelB": "panel-5",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "y",
+      "contactPosition": 60,
+      "faceA": "front",
+      "faceB": "top",
+      "gap": 0,
+      "id": "panel-4:panel-19:y",
+      "overlap": {
+        "x": [
+          0,
+          18
+        ],
+        "z": [
+          -182,
+          182
+        ]
+      },
+      "panelA": "panel-4",
+      "panelB": "panel-19",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "y",
+      "contactPosition": 60,
+      "faceA": "front",
+      "faceB": "top",
+      "gap": 0,
+      "id": "panel-4:panel-20:y",
+      "overlap": {
+        "x": [
+          482,
+          500
+        ],
+        "z": [
+          -182,
+          182
+        ]
+      },
+      "panelA": "panel-4",
+      "panelB": "panel-20",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "y",
+      "contactPosition": 60,
+      "faceA": "front",
+      "faceB": "top",
+      "gap": 0,
+      "id": "panel-4:panel-21:y",
+      "overlap": {
+        "x": [
+          0,
+          500
+        ],
+        "z": [
+          -200,
+          -182
+        ]
+      },
+      "panelA": "panel-4",
+      "panelB": "panel-21",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "y",
+      "contactPosition": 60,
+      "faceA": "front",
+      "faceB": "top",
+      "gap": 0,
+      "id": "panel-4:panel-22:y",
+      "overlap": {
+        "x": [
+          0,
+          500
+        ],
+        "z": [
+          182,
+          200
+        ]
+      },
+      "panelA": "panel-4",
+      "panelB": "panel-22",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "y",
+      "contactPosition": 60,
+      "faceA": "front",
+      "faceB": "top",
+      "gap": 0,
+      "id": "panel-4:panel-23:y",
+      "overlap": {
+        "x": [
+          241,
+          259
+        ],
+        "z": [
+          -182,
+          182
+        ]
+      },
+      "panelA": "panel-4",
+      "panelB": "panel-23",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "t_butt"
+    },
+    {
+      "contactAxis": "y",
+      "contactPosition": 428,
+      "faceA": "top",
+      "faceB": "bottom",
+      "gap": 0,
+      "id": "panel-8:panel-9:y",
+      "overlap": {
+        "x": [
+          18,
+          482
+        ],
+        "z": [
+          200,
+          218
+        ]
+      },
+      "panelA": "panel-8",
+      "panelB": "panel-9",
+      "sameGroup": true,
+      "status": "unhandled",
+      "type": "edge_to_edge"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 200,
+      "faceA": "back",
+      "faceB": "left",
+      "gap": 0,
+      "id": "panel-8:panel-10:z",
+      "overlap": {
+        "x": [
+          39,
+          57
+        ],
+        "y": [
+          98,
+          408
+        ]
+      },
+      "panelA": "panel-8",
+      "panelB": "panel-10",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "t_butt"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 200,
+      "faceA": "back",
+      "faceB": "left",
+      "gap": 0,
+      "id": "panel-8:panel-11:z",
+      "overlap": {
+        "x": [
+          443,
+          461
+        ],
+        "y": [
+          98,
+          408
+        ]
+      },
+      "panelA": "panel-8",
+      "panelB": "panel-11",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "t_butt"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 200,
+      "faceA": "back",
+      "faceB": "top",
+      "gap": 0,
+      "id": "panel-8:panel-12:z",
+      "overlap": {
+        "x": [
+          57,
+          443
+        ],
+        "y": [
+          98,
+          116
+        ]
+      },
+      "panelA": "panel-8",
+      "panelB": "panel-12",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "t_butt"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 200,
+      "faceA": "back",
+      "faceB": "left",
+      "gap": 0,
+      "id": "panel-9:panel-14:z",
+      "overlap": {
+        "x": [
+          39,
+          57
+        ],
+        "y": [
+          448,
+          758
+        ]
+      },
+      "panelA": "panel-9",
+      "panelB": "panel-14",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "t_butt"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 200,
+      "faceA": "back",
+      "faceB": "left",
+      "gap": 0,
+      "id": "panel-9:panel-15:z",
+      "overlap": {
+        "x": [
+          443,
+          461
+        ],
+        "y": [
+          448,
+          758
+        ]
+      },
+      "panelA": "panel-9",
+      "panelB": "panel-15",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "t_butt"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 200,
+      "faceA": "back",
+      "faceB": "top",
+      "gap": 0,
+      "id": "panel-9:panel-16:z",
+      "overlap": {
+        "x": [
+          57,
+          443
+        ],
+        "y": [
+          448,
+          466
+        ]
+      },
+      "panelA": "panel-9",
+      "panelB": "panel-16",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "t_butt"
+    },
+    {
+      "contactAxis": "x",
+      "contactPosition": 57,
+      "faceA": "front",
+      "faceB": "left",
+      "gap": 0,
+      "id": "panel-10:panel-12:x",
+      "overlap": {
+        "y": [
+          98,
+          116
+        ],
+        "z": [
+          -162,
+          200
+        ]
+      },
+      "panelA": "panel-10",
+      "panelB": "panel-12",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "x",
+      "contactPosition": 57,
+      "faceA": "front",
+      "faceB": "left",
+      "gap": 0,
+      "id": "panel-10:panel-13:x",
+      "overlap": {
+        "y": [
+          116,
+          408
+        ],
+        "z": [
+          -180,
+          -162
+        ]
+      },
+      "panelA": "panel-10",
+      "panelB": "panel-13",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "x",
+      "contactPosition": 443,
+      "faceA": "back",
+      "faceB": "right",
+      "gap": 0,
+      "id": "panel-11:panel-12:x",
+      "overlap": {
+        "y": [
+          98,
+          116
+        ],
+        "z": [
+          -162,
+          200
+        ]
+      },
+      "panelA": "panel-11",
+      "panelB": "panel-12",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "x",
+      "contactPosition": 443,
+      "faceA": "back",
+      "faceB": "right",
+      "gap": 0,
+      "id": "panel-11:panel-13:x",
+      "overlap": {
+        "y": [
+          116,
+          408
+        ],
+        "z": [
+          -180,
+          -162
+        ]
+      },
+      "panelA": "panel-11",
+      "panelB": "panel-13",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "x",
+      "contactPosition": 57,
+      "faceA": "front",
+      "faceB": "left",
+      "gap": 0,
+      "id": "panel-14:panel-16:x",
+      "overlap": {
+        "y": [
+          448,
+          466
+        ],
+        "z": [
+          -162,
+          200
+        ]
+      },
+      "panelA": "panel-14",
+      "panelB": "panel-16",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "x",
+      "contactPosition": 57,
+      "faceA": "front",
+      "faceB": "left",
+      "gap": 0,
+      "id": "panel-14:panel-17:x",
+      "overlap": {
+        "y": [
+          466,
+          758
+        ],
+        "z": [
+          -180,
+          -162
+        ]
+      },
+      "panelA": "panel-14",
+      "panelB": "panel-17",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "x",
+      "contactPosition": 443,
+      "faceA": "back",
+      "faceB": "right",
+      "gap": 0,
+      "id": "panel-15:panel-16:x",
+      "overlap": {
+        "y": [
+          448,
+          466
+        ],
+        "z": [
+          -162,
+          200
+        ]
+      },
+      "panelA": "panel-15",
+      "panelB": "panel-16",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "x",
+      "contactPosition": 443,
+      "faceA": "back",
+      "faceB": "right",
+      "gap": 0,
+      "id": "panel-15:panel-17:x",
+      "overlap": {
+        "y": [
+          466,
+          758
+        ],
+        "z": [
+          -180,
+          -162
+        ]
+      },
+      "panelA": "panel-15",
+      "panelB": "panel-17",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": -182,
+      "faceA": "right",
+      "faceB": "front",
+      "gap": 0,
+      "id": "panel-19:panel-21:z",
+      "overlap": {
+        "x": [
+          0,
+          18
+        ],
+        "y": [
+          0,
+          60
+        ]
+      },
+      "panelA": "panel-19",
+      "panelB": "panel-21",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 182,
+      "faceA": "left",
+      "faceB": "back",
+      "gap": 0,
+      "id": "panel-19:panel-22:z",
+      "overlap": {
+        "x": [
+          0,
+          18
+        ],
+        "y": [
+          0,
+          60
+        ]
+      },
+      "panelA": "panel-19",
+      "panelB": "panel-22",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": -182,
+      "faceA": "right",
+      "faceB": "front",
+      "gap": 0,
+      "id": "panel-20:panel-21:z",
+      "overlap": {
+        "x": [
+          482,
+          500
+        ],
+        "y": [
+          0,
+          60
+        ]
+      },
+      "panelA": "panel-20",
+      "panelB": "panel-21",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 182,
+      "faceA": "left",
+      "faceB": "back",
+      "gap": 0,
+      "id": "panel-20:panel-22:z",
+      "overlap": {
+        "x": [
+          482,
+          500
+        ],
+        "y": [
+          0,
+          60
+        ]
+      },
+      "panelA": "panel-20",
+      "panelB": "panel-22",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "corner_butt"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": -182,
+      "faceA": "front",
+      "faceB": "right",
+      "gap": 0,
+      "id": "panel-21:panel-23:z",
+      "overlap": {
+        "x": [
+          241,
+          259
+        ],
+        "y": [
+          0,
+          60
+        ]
+      },
+      "panelA": "panel-21",
+      "panelB": "panel-23",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "t_butt"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 182,
+      "faceA": "back",
+      "faceB": "left",
+      "gap": 0,
+      "id": "panel-22:panel-23:z",
+      "overlap": {
+        "x": [
+          241,
+          259
+        ],
+        "y": [
+          0,
+          60
+        ]
+      },
+      "panelA": "panel-22",
+      "panelB": "panel-23",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "t_butt"
+    }
+  ]
+}

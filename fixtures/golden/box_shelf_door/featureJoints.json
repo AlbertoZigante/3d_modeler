@@ -1,0 +1,21 @@
+[
+  {
+    "axis": "z",
+    "id": "panel-9:hinge",
+    "kind": "door_hinge",
+    "lengthMm": 700,
+    "p1": {
+      "x": 18,
+      "y": 18,
+      "z": 209
+    },
+    "p2": {
+      "x": 18,
+      "y": 718,
+      "z": 209
+    },
+    "panelA": "panel-9",
+    "panelB": "panel-1",
+    "side": "left"
+  }
+]

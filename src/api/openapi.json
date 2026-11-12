@@ -1,0 +1,3257 @@
+{
+  "components": {
+    "schemas": {
+      "AssemblyCluster": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "panelIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Panelids",
+            "type": "array"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "role",
+          "panelIds"
+        ],
+        "title": "AssemblyCluster",
+        "type": "object"
+      },
+      "AssemblyResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "clusters": {
+            "items": {
+              "$ref": "#/components/schemas/AssemblyCluster"
+            },
+            "title": "Clusters",
+            "type": "array"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/AssemblyStep"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "toolsSummary": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Toolssummary",
+            "type": "array"
+          }
+        },
+        "required": [
+          "steps",
+          "clusters",
+          "toolsSummary"
+        ],
+        "title": "AssemblyResponse",
+        "type": "object"
+      },
+      "AssemblyStep": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "clusterKind": {
+            "title": "Clusterkind",
+            "type": "string"
+          },
+          "completionInstruction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completioninstruction"
+          },
+          "componentKind": {
+            "title": "Componentkind",
+            "type": "string"
+          },
+          "componentSubtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Componentsubtitle"
+          },
+          "componentTitle": {
+            "title": "Componenttitle",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "ergonomic": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Ergonomic",
+            "type": "object"
+          },
+          "ergonomics": {
+            "additionalProperties": true,
+            "title": "Ergonomics",
+            "type": "object"
+          },
+          "hardware": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Hardware",
+            "type": "array"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "instruction": {
+            "title": "Instruction",
+            "type": "string"
+          },
+          "integrationSubassemblyIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Integrationsubassemblyids"
+          },
+          "jointIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Jointids",
+            "type": "array"
+          },
+          "jointObjects": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jointobjects"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "kind": {
+            "enum": [
+              "pre_install",
+              "fit_handle",
+              "join",
+              "integrate",
+              "unattached"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "orientation": {
+            "title": "Orientation",
+            "type": "string"
+          },
+          "orientationInstruction": {
+            "title": "Orientationinstruction",
+            "type": "string"
+          },
+          "otherPanelIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Otherpanelids",
+            "type": "array"
+          },
+          "panelCodes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Panelcodes",
+            "type": "array"
+          },
+          "panelIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Panelids",
+            "type": "array"
+          },
+          "panelNames": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Panelnames",
+            "type": "array"
+          },
+          "phase": {
+            "enum": [
+              "prepare",
+              "subassembly",
+              "internal",
+              "closure",
+              "integration",
+              "unattached"
+            ],
+            "title": "Phase",
+            "type": "string"
+          },
+          "prerequisiteStepIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Prerequisitestepids",
+            "type": "array"
+          },
+          "repeatCount": {
+            "title": "Repeatcount",
+            "type": "integer"
+          },
+          "repeatHardware": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repeathardware"
+          },
+          "repeatLabels": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repeatlabels"
+          },
+          "repositionCost": {
+            "title": "Repositioncost",
+            "type": "number"
+          },
+          "requiresReposition": {
+            "title": "Requiresreposition",
+            "type": "boolean"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "stage": {
+            "enum": [
+              "doors",
+              "drawers",
+              "guides",
+              "plinth",
+              "carcass",
+              "integration"
+            ],
+            "title": "Stage",
+            "type": "string"
+          },
+          "stepId": {
+            "title": "Stepid",
+            "type": "string"
+          },
+          "subassemblyComplete": {
+            "title": "Subassemblycomplete",
+            "type": "boolean"
+          },
+          "subassemblyId": {
+            "title": "Subassemblyid",
+            "type": "string"
+          },
+          "subassemblyName": {
+            "title": "Subassemblyname",
+            "type": "string"
+          },
+          "toolNotes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Toolnotes",
+            "type": "array"
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tools",
+            "type": "array"
+          },
+          "unitPanelIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unitpanelids"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "index",
+          "stepId",
+          "stage",
+          "kind",
+          "phase",
+          "action",
+          "role",
+          "orientation",
+          "requiresReposition",
+          "repositionCost",
+          "panelIds",
+          "otherPanelIds",
+          "panelNames",
+          "panelCodes",
+          "jointIds",
+          "prerequisiteStepIds",
+          "subassemblyId",
+          "subassemblyName",
+          "subassemblyComplete",
+          "clusterKind",
+          "componentKind",
+          "componentTitle",
+          "repeatCount",
+          "hardware",
+          "tools",
+          "toolNotes",
+          "ergonomic",
+          "ergonomics",
+          "description",
+          "instruction",
+          "orientationInstruction",
+          "warnings"
+        ],
+        "title": "AssemblyStep",
+        "type": "object"
+      },
+      "BomRequest": {
+        "properties": {
+          "panels": {
+            "items": {
+              "$ref": "#/components/schemas/Panel"
+            },
+            "maxItems": 500,
+            "title": "Panels",
+            "type": "array"
+          }
+        },
+        "required": [
+          "panels"
+        ],
+        "title": "BomRequest",
+        "type": "object"
+      },
+      "BomResponse": {
+        "properties": {
+          "materialSummary": {
+            "items": {
+              "$ref": "#/components/schemas/MaterialSummaryRow"
+            },
+            "title": "Materialsummary",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/BomRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows",
+          "materialSummary"
+        ],
+        "title": "BomResponse",
+        "type": "object"
+      },
+      "BomRow": {
+        "properties": {
+          "areaM2": {
+            "title": "Aream2",
+            "type": "number"
+          },
+          "assembly": {
+            "title": "Assembly",
+            "type": "string"
+          },
+          "bandedEdges": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Bandededges",
+            "type": "array"
+          },
+          "bandedEdgesLabel": {
+            "title": "Bandededgeslabel",
+            "type": "string"
+          },
+          "bandingCost": {
+            "title": "Bandingcost",
+            "type": "number"
+          },
+          "bandingLengthM": {
+            "title": "Bandinglengthm",
+            "type": "number"
+          },
+          "grainInterchangeable": {
+            "title": "Graininterchangeable",
+            "type": "boolean"
+          },
+          "heightMm": {
+            "title": "Heightmm",
+            "type": "number"
+          },
+          "isHardware": {
+            "title": "Ishardware",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "material": {
+            "title": "Material",
+            "type": "string"
+          },
+          "pieceCodes": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Piececodes",
+            "type": "array"
+          },
+          "pieceNames": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Piecenames",
+            "type": "array"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "thicknessMm": {
+            "title": "Thicknessmm",
+            "type": "number"
+          },
+          "unitAreaM2": {
+            "title": "Unitaream2",
+            "type": "number"
+          },
+          "unitBandingLengthM": {
+            "title": "Unitbandinglengthm",
+            "type": "number"
+          },
+          "widthMm": {
+            "title": "Widthmm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "label",
+          "pieceNames",
+          "pieceCodes",
+          "assembly",
+          "widthMm",
+          "heightMm",
+          "thicknessMm",
+          "material",
+          "grainInterchangeable",
+          "bandedEdges",
+          "bandedEdgesLabel",
+          "unitBandingLengthM",
+          "quantity",
+          "unitAreaM2",
+          "isHardware",
+          "areaM2",
+          "bandingLengthM",
+          "bandingCost"
+        ],
+        "title": "BomRow",
+        "type": "object"
+      },
+      "Collision": {
+        "additionalProperties": false,
+        "properties": {
+          "overlapMm": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Overlapmm",
+            "type": "object"
+          },
+          "panelA": {
+            "title": "Panela",
+            "type": "string"
+          },
+          "panelB": {
+            "title": "Panelb",
+            "type": "string"
+          }
+        },
+        "required": [
+          "panelA",
+          "panelB",
+          "overlapMm"
+        ],
+        "title": "Collision",
+        "type": "object"
+      },
+      "Constraint": {
+        "properties": {
+          "field": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConstraintEnd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "overridden": {
+            "default": false,
+            "title": "Overridden",
+            "type": "boolean"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConstraintEnd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "maxLength": 200,
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "Constraint",
+        "type": "object"
+      },
+      "ConstraintEnd": {
+        "properties": {
+          "face": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Face"
+          },
+          "node": {
+            "maxLength": 200,
+            "title": "Node",
+            "type": "string"
+          },
+          "offset": {
+            "default": 0,
+            "maximum": 10000.0,
+            "minimum": -10000.0,
+            "title": "Offset",
+            "type": "number"
+          }
+        },
+        "required": [
+          "node"
+        ],
+        "title": "ConstraintEnd",
+        "type": "object"
+      },
+      "DrawerBoxSpec": {
+        "properties": {
+          "bottomMarginMm": {
+            "anyOf": [
+              {
+                "maximum": 5000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottommarginmm"
+          },
+          "depthMarginMm": {
+            "anyOf": [
+              {
+                "maximum": 5000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depthmarginmm"
+          },
+          "material": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material"
+          },
+          "thicknessMm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 100.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thicknessmm"
+          },
+          "topMarginMm": {
+            "anyOf": [
+              {
+                "maximum": 5000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topmarginmm"
+          },
+          "widthMarginMm": {
+            "anyOf": [
+              {
+                "maximum": 5000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widthmarginmm"
+          }
+        },
+        "title": "DrawerBoxSpec",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "description": "Error envelope documented in the OpenAPI contract (what clients actually receive).",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail"
+          }
+        },
+        "required": [
+          "code",
+          "detail"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "Fastener": {
+        "additionalProperties": false,
+        "properties": {
+          "displayId": {
+            "title": "Displayid",
+            "type": "string"
+          },
+          "hardware": {
+            "additionalProperties": true,
+            "title": "Hardware",
+            "type": "object"
+          },
+          "jointId": {
+            "title": "Jointid",
+            "type": "string"
+          },
+          "jointType": {
+            "enum": [
+              "face_to_face",
+              "corner_butt",
+              "t_butt",
+              "edge_to_edge",
+              "near_contact"
+            ],
+            "title": "Jointtype",
+            "type": "string"
+          },
+          "kind": {
+            "const": "fastener",
+            "title": "Kind",
+            "type": "string"
+          },
+          "panelA": {
+            "title": "Panela",
+            "type": "string"
+          },
+          "panelACode": {
+            "title": "Panelacode",
+            "type": "string"
+          },
+          "panelAName": {
+            "title": "Panelaname",
+            "type": "string"
+          },
+          "panelB": {
+            "title": "Panelb",
+            "type": "string"
+          },
+          "panelBCode": {
+            "title": "Panelbcode",
+            "type": "string"
+          },
+          "panelBName": {
+            "title": "Panelbname",
+            "type": "string"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/Point3"
+            },
+            "title": "Positions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "displayId",
+          "panelA",
+          "panelB",
+          "panelAName",
+          "panelBName",
+          "panelACode",
+          "panelBCode",
+          "hardware",
+          "kind",
+          "jointId",
+          "jointType",
+          "positions"
+        ],
+        "title": "Fastener",
+        "type": "object"
+      },
+      "FeatureJoint": {
+        "additionalProperties": false,
+        "properties": {
+          "axis": {
+            "title": "Axis",
+            "type": "string"
+          },
+          "clearanceMm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clearancemm"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "door_hinge",
+              "drawer_slide"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "lengthMm": {
+            "title": "Lengthmm",
+            "type": "number"
+          },
+          "p1": {
+            "$ref": "#/components/schemas/Point3"
+          },
+          "p2": {
+            "$ref": "#/components/schemas/Point3"
+          },
+          "panelA": {
+            "title": "Panela",
+            "type": "string"
+          },
+          "panelB": {
+            "title": "Panelb",
+            "type": "string"
+          },
+          "side": {
+            "title": "Side",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "panelA",
+          "panelB",
+          "side",
+          "axis",
+          "lengthMm",
+          "p1",
+          "p2"
+        ],
+        "title": "FeatureJoint",
+        "type": "object"
+      },
+      "HardwarePlanResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "fasteners": {
+            "items": {
+              "$ref": "#/components/schemas/Fastener"
+            },
+            "title": "Fasteners",
+            "type": "array"
+          },
+          "hinges": {
+            "items": {
+              "$ref": "#/components/schemas/Hinge"
+            },
+            "title": "Hinges",
+            "type": "array"
+          },
+          "runners": {
+            "items": {
+              "$ref": "#/components/schemas/Runner"
+            },
+            "title": "Runners",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/HardwareSummary"
+          },
+          "unmatched": {
+            "items": {
+              "$ref": "#/components/schemas/Unmatched"
+            },
+            "title": "Unmatched",
+            "type": "array"
+          }
+        },
+        "required": [
+          "summary",
+          "hinges",
+          "runners",
+          "fasteners",
+          "unmatched"
+        ],
+        "title": "HardwarePlanResponse",
+        "type": "object"
+      },
+      "HardwareSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "fastenerJointCount": {
+            "title": "Fastenerjointcount",
+            "type": "integer"
+          },
+          "hingeCount": {
+            "title": "Hingecount",
+            "type": "integer"
+          },
+          "runnerCount": {
+            "title": "Runnercount",
+            "type": "integer"
+          },
+          "totalFastenerCount": {
+            "title": "Totalfastenercount",
+            "type": "integer"
+          },
+          "totalHingeUnits": {
+            "title": "Totalhingeunits",
+            "type": "integer"
+          },
+          "unmatchedCount": {
+            "title": "Unmatchedcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hingeCount",
+          "totalHingeUnits",
+          "runnerCount",
+          "fastenerJointCount",
+          "totalFastenerCount",
+          "unmatchedCount"
+        ],
+        "title": "HardwareSummary",
+        "type": "object"
+      },
+      "Hinge": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "displayId": {
+            "title": "Displayid",
+            "type": "string"
+          },
+          "hardware": {
+            "additionalProperties": true,
+            "title": "Hardware",
+            "type": "object"
+          },
+          "kind": {
+            "const": "hinge",
+            "title": "Kind",
+            "type": "string"
+          },
+          "panelA": {
+            "title": "Panela",
+            "type": "string"
+          },
+          "panelACode": {
+            "title": "Panelacode",
+            "type": "string"
+          },
+          "panelAName": {
+            "title": "Panelaname",
+            "type": "string"
+          },
+          "panelB": {
+            "title": "Panelb",
+            "type": "string"
+          },
+          "panelBCode": {
+            "title": "Panelbcode",
+            "type": "string"
+          },
+          "panelBName": {
+            "title": "Panelbname",
+            "type": "string"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/Point3"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "side": {
+            "title": "Side",
+            "type": "string"
+          }
+        },
+        "required": [
+          "displayId",
+          "panelA",
+          "panelB",
+          "panelAName",
+          "panelBName",
+          "panelACode",
+          "panelBCode",
+          "hardware",
+          "kind",
+          "side",
+          "count",
+          "positions"
+        ],
+        "title": "Hinge",
+        "type": "object"
+      },
+      "Joint": {
+        "additionalProperties": false,
+        "properties": {
+          "contactAxis": {
+            "title": "Contactaxis",
+            "type": "string"
+          },
+          "contactPosition": {
+            "title": "Contactposition",
+            "type": "number"
+          },
+          "faceA": {
+            "title": "Facea",
+            "type": "string"
+          },
+          "faceB": {
+            "title": "Faceb",
+            "type": "string"
+          },
+          "gap": {
+            "title": "Gap",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "overlap": {
+            "additionalProperties": {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "title": "Overlap",
+            "type": "object"
+          },
+          "panelA": {
+            "title": "Panela",
+            "type": "string"
+          },
+          "panelB": {
+            "title": "Panelb",
+            "type": "string"
+          },
+          "sameGroup": {
+            "title": "Samegroup",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "face_to_face",
+              "corner_butt",
+              "t_butt",
+              "edge_to_edge",
+              "near_contact"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "panelA",
+          "panelB",
+          "faceA",
+          "faceB",
+          "contactAxis",
+          "contactPosition",
+          "gap",
+          "overlap",
+          "sameGroup",
+          "status"
+        ],
+        "title": "Joint",
+        "type": "object"
+      },
+      "JointsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "collisions": {
+            "items": {
+              "$ref": "#/components/schemas/Collision"
+            },
+            "title": "Collisions",
+            "type": "array"
+          },
+          "featureJoints": {
+            "items": {
+              "$ref": "#/components/schemas/FeatureJoint"
+            },
+            "title": "Featurejoints",
+            "type": "array"
+          },
+          "joints": {
+            "items": {
+              "$ref": "#/components/schemas/Joint"
+            },
+            "title": "Joints",
+            "type": "array"
+          }
+        },
+        "required": [
+          "joints",
+          "collisions",
+          "featureJoints"
+        ],
+        "title": "JointsResponse",
+        "type": "object"
+      },
+      "Material": {
+        "properties": {
+          "edgeBandingPricePerM": {
+            "default": 0,
+            "title": "Edgebandingpriceperm",
+            "type": "number"
+          },
+          "grainInterchangeable": {
+            "default": false,
+            "title": "Graininterchangeable",
+            "type": "boolean"
+          },
+          "kerfMm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kerfmm"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pricePerSheet": {
+            "default": 0,
+            "title": "Pricepersheet",
+            "type": "number"
+          },
+          "sheetHeightMm": {
+            "default": 0,
+            "title": "Sheetheightmm",
+            "type": "number"
+          },
+          "sheetWidthMm": {
+            "default": 0,
+            "title": "Sheetwidthmm",
+            "type": "number"
+          },
+          "thicknessMm": {
+            "title": "Thicknessmm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "thicknessMm"
+        ],
+        "title": "Material",
+        "type": "object"
+      },
+      "MaterialNestSummary": {
+        "properties": {
+          "material": {
+            "title": "Material",
+            "type": "string"
+          },
+          "pricePerSheet": {
+            "title": "Pricepersheet",
+            "type": "number"
+          },
+          "sheetsUsed": {
+            "title": "Sheetsused",
+            "type": "integer"
+          },
+          "thicknessMm": {
+            "title": "Thicknessmm",
+            "type": "number"
+          },
+          "totalAreaM2": {
+            "title": "Totalaream2",
+            "type": "number"
+          },
+          "totalCost": {
+            "title": "Totalcost",
+            "type": "number"
+          },
+          "unplacedAreaM2": {
+            "title": "Unplacedaream2",
+            "type": "number"
+          },
+          "unplacedCount": {
+            "title": "Unplacedcount",
+            "type": "integer"
+          },
+          "unplacedLabels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unplacedlabels",
+            "type": "array"
+          },
+          "usedAreaM2": {
+            "title": "Usedaream2",
+            "type": "number"
+          },
+          "utilization": {
+            "title": "Utilization",
+            "type": "number"
+          },
+          "wasteAreaM2": {
+            "title": "Wasteaream2",
+            "type": "number"
+          }
+        },
+        "required": [
+          "material",
+          "thicknessMm",
+          "sheetsUsed",
+          "pricePerSheet",
+          "totalCost",
+          "totalAreaM2",
+          "usedAreaM2",
+          "wasteAreaM2",
+          "utilization",
+          "unplacedCount",
+          "unplacedAreaM2",
+          "unplacedLabels"
+        ],
+        "title": "MaterialNestSummary",
+        "type": "object"
+      },
+      "MaterialSummaryRow": {
+        "properties": {
+          "areaM2": {
+            "title": "Aream2",
+            "type": "number"
+          },
+          "material": {
+            "title": "Material",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "thickness": {
+            "title": "Thickness",
+            "type": "number"
+          }
+        },
+        "required": [
+          "material",
+          "thickness",
+          "quantity",
+          "areaM2"
+        ],
+        "title": "MaterialSummaryRow",
+        "type": "object"
+      },
+      "NestResult": {
+        "properties": {
+          "material": {
+            "title": "Material",
+            "type": "string"
+          },
+          "sheets": {
+            "items": {
+              "$ref": "#/components/schemas/Sheet"
+            },
+            "title": "Sheets",
+            "type": "array"
+          },
+          "stockSheet": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StockSheet"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thicknessMm": {
+            "title": "Thicknessmm",
+            "type": "number"
+          },
+          "unplaced": {
+            "items": {
+              "$ref": "#/components/schemas/Piece"
+            },
+            "title": "Unplaced",
+            "type": "array"
+          }
+        },
+        "required": [
+          "material",
+          "thicknessMm",
+          "stockSheet",
+          "sheets",
+          "unplaced"
+        ],
+        "title": "NestResult",
+        "type": "object"
+      },
+      "NestSummary": {
+        "properties": {
+          "perMaterial": {
+            "items": {
+              "$ref": "#/components/schemas/MaterialNestSummary"
+            },
+            "title": "Permaterial",
+            "type": "array"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/NestTotals"
+          }
+        },
+        "required": [
+          "perMaterial",
+          "totals"
+        ],
+        "title": "NestSummary",
+        "type": "object"
+      },
+      "NestTotals": {
+        "properties": {
+          "sheetsUsed": {
+            "title": "Sheetsused",
+            "type": "integer"
+          },
+          "totalAreaM2": {
+            "title": "Totalaream2",
+            "type": "number"
+          },
+          "totalCost": {
+            "title": "Totalcost",
+            "type": "number"
+          },
+          "unplacedAreaM2": {
+            "title": "Unplacedaream2",
+            "type": "number"
+          },
+          "unplacedCount": {
+            "title": "Unplacedcount",
+            "type": "integer"
+          },
+          "usedAreaM2": {
+            "title": "Usedaream2",
+            "type": "number"
+          },
+          "utilization": {
+            "title": "Utilization",
+            "type": "number"
+          },
+          "wasteAreaM2": {
+            "title": "Wasteaream2",
+            "type": "number"
+          }
+        },
+        "required": [
+          "sheetsUsed",
+          "totalCost",
+          "totalAreaM2",
+          "usedAreaM2",
+          "wasteAreaM2",
+          "unplacedCount",
+          "unplacedAreaM2",
+          "utilization"
+        ],
+        "title": "NestTotals",
+        "type": "object"
+      },
+      "NestingOptions": {
+        "properties": {
+          "edgeBandingMarginMm": {
+            "default": 1,
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Edgebandingmarginmm",
+            "type": "number"
+          },
+          "kerfMm": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kerfmm"
+          }
+        },
+        "title": "NestingOptions",
+        "type": "object"
+      },
+      "NestingRequest": {
+        "properties": {
+          "options": {
+            "$ref": "#/components/schemas/NestingOptions",
+            "default": {
+              "edgeBandingMarginMm": 1.0
+            }
+          },
+          "panels": {
+            "items": {
+              "$ref": "#/components/schemas/Panel"
+            },
+            "maxItems": 500,
+            "title": "Panels",
+            "type": "array"
+          }
+        },
+        "required": [
+          "panels"
+        ],
+        "title": "NestingRequest",
+        "type": "object"
+      },
+      "NestingResponse": {
+        "properties": {
+          "bom": {
+            "$ref": "#/components/schemas/BomResponse"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/NestResult"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/NestSummary"
+          }
+        },
+        "required": [
+          "bom",
+          "results",
+          "summary"
+        ],
+        "title": "NestingResponse",
+        "type": "object"
+      },
+      "Panel": {
+        "description": "A RESOLVED panel (output of the modeller's resolveConstraints).",
+        "properties": {
+          "bandedEdges": {
+            "default": [],
+            "items": {
+              "maxLength": 200,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Bandededges",
+            "type": "array"
+          },
+          "boxGroupId": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Boxgroupid"
+          },
+          "groupId": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Groupid"
+          },
+          "height": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 5000.0,
+            "title": "Height",
+            "type": "number"
+          },
+          "id": {
+            "maxLength": 200,
+            "title": "Id",
+            "type": "string"
+          },
+          "isBoxPanel": {
+            "default": false,
+            "title": "Isboxpanel",
+            "type": "boolean"
+          },
+          "isDoor": {
+            "default": false,
+            "title": "Isdoor",
+            "type": "boolean"
+          },
+          "isDrawerBoxPanel": {
+            "default": false,
+            "title": "Isdrawerboxpanel",
+            "type": "boolean"
+          },
+          "isDrawerFront": {
+            "default": false,
+            "title": "Isdrawerfront",
+            "type": "boolean"
+          },
+          "isLeg": {
+            "default": false,
+            "title": "Isleg",
+            "type": "boolean"
+          },
+          "isPlinthPanel": {
+            "default": false,
+            "title": "Isplinthpanel",
+            "type": "boolean"
+          },
+          "material": {
+            "maxLength": 200,
+            "title": "Material",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "pieceCode": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Piececode"
+          },
+          "thickness": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Thickness",
+            "type": "number"
+          },
+          "width": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 5000.0,
+            "title": "Width",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "width",
+          "height",
+          "thickness",
+          "material"
+        ],
+        "title": "Panel",
+        "type": "object"
+      },
+      "PanelSet": {
+        "description": "Request body of POST /v1/joints, /v1/hardware-plan and /v1/assembly.",
+        "properties": {
+          "panels": {
+            "items": {
+              "$ref": "#/components/schemas/RawPanelNode"
+            },
+            "maxItems": 500,
+            "title": "Panels",
+            "type": "array"
+          }
+        },
+        "required": [
+          "panels"
+        ],
+        "title": "PanelSet",
+        "type": "object"
+      },
+      "Piece": {
+        "properties": {
+          "finishedHeightMm": {
+            "title": "Finishedheightmm",
+            "type": "number"
+          },
+          "finishedWidthMm": {
+            "title": "Finishedwidthmm",
+            "type": "number"
+          },
+          "heightMm": {
+            "title": "Heightmm",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "rotatable": {
+            "title": "Rotatable",
+            "type": "boolean"
+          },
+          "widthMm": {
+            "title": "Widthmm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "widthMm",
+          "heightMm",
+          "rotatable",
+          "finishedWidthMm",
+          "finishedHeightMm"
+        ],
+        "title": "Piece",
+        "type": "object"
+      },
+      "Placement": {
+        "properties": {
+          "finishedHeightMm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishedheightmm"
+          },
+          "finishedWidthMm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishedwidthmm"
+          },
+          "heightMm": {
+            "title": "Heightmm",
+            "type": "number"
+          },
+          "pieceId": {
+            "title": "Pieceid",
+            "type": "string"
+          },
+          "rotated": {
+            "title": "Rotated",
+            "type": "boolean"
+          },
+          "widthMm": {
+            "title": "Widthmm",
+            "type": "number"
+          },
+          "xMm": {
+            "title": "Xmm",
+            "type": "number"
+          },
+          "yMm": {
+            "title": "Ymm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "pieceId",
+          "xMm",
+          "yMm",
+          "widthMm",
+          "heightMm",
+          "rotated"
+        ],
+        "title": "Placement",
+        "type": "object"
+      },
+      "PlinthEdge": {
+        "properties": {
+          "fit": {
+            "maxLength": 200,
+            "title": "Fit",
+            "type": "string"
+          },
+          "insetMm": {
+            "default": 0,
+            "maximum": 5000.0,
+            "minimum": 0.0,
+            "title": "Insetmm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "fit"
+        ],
+        "title": "PlinthEdge",
+        "type": "object"
+      },
+      "Point3": {
+        "additionalProperties": false,
+        "properties": {
+          "x": {
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "title": "Y",
+            "type": "number"
+          },
+          "z": {
+            "title": "Z",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "z"
+        ],
+        "title": "Point3",
+        "type": "object"
+      },
+      "RawPanelNode": {
+        "properties": {
+          "axisA": {
+            "anyOf": [
+              {
+                "enum": [
+                  "x",
+                  "y",
+                  "z"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Axisa"
+          },
+          "axisB": {
+            "anyOf": [
+              {
+                "enum": [
+                  "x",
+                  "y",
+                  "z"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Axisb"
+          },
+          "bandedEdges": {
+            "default": [],
+            "items": {
+              "maxLength": 200,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Bandededges",
+            "type": "array"
+          },
+          "basePosition": {
+            "$ref": "#/components/schemas/Vec3",
+            "default": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            }
+          },
+          "boundaryIds": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                "maxProperties": 64,
+                "propertyNames": {
+                  "maxLength": 200
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Boundaryids"
+          },
+          "boxGroupId": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Boxgroupid"
+          },
+          "constraints": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Constraint"
+            },
+            "maxItems": 64,
+            "title": "Constraints",
+            "type": "array"
+          },
+          "displayColor": {
+            "anyOf": [
+              {
+                "maximum": 16777215.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displaycolor"
+          },
+          "doorOpen": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dooropen"
+          },
+          "doorSign": {
+            "anyOf": [
+              {
+                "enum": [
+                  -1,
+                  1
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doorsign"
+          },
+          "drawerBoxFrontId": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawerboxfrontid"
+          },
+          "drawerBoxRole": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawerboxrole"
+          },
+          "drawerBoxSpec": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DrawerBoxSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "drawerCount": {
+            "anyOf": [
+              {
+                "maximum": 64.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawercount"
+          },
+          "drawerHeights": {
+            "anyOf": [
+              {
+                "items": {
+                  "exclusiveMinimum": 0.0,
+                  "maximum": 5000.0,
+                  "type": "number"
+                },
+                "maxItems": 64,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawerheights"
+          },
+          "drawerIndex": {
+            "anyOf": [
+              {
+                "maximum": 64.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawerindex"
+          },
+          "drawerLayoutMode": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawerlayoutmode"
+          },
+          "drawerStackId": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawerstackid"
+          },
+          "edgeFit": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                "maxProperties": 64,
+                "propertyNames": {
+                  "maxLength": 200
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edgefit"
+          },
+          "groupId": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Groupid"
+          },
+          "height": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 5000.0,
+            "title": "Height",
+            "type": "number"
+          },
+          "hidden": {
+            "default": false,
+            "title": "Hidden",
+            "type": "boolean"
+          },
+          "hinge": {
+            "anyOf": [
+              {
+                "enum": [
+                  "left",
+                  "right"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hinge"
+          },
+          "id": {
+            "maxLength": 200,
+            "title": "Id",
+            "type": "string"
+          },
+          "isBoxPanel": {
+            "default": false,
+            "title": "Isboxpanel",
+            "type": "boolean"
+          },
+          "isBoxWall": {
+            "default": false,
+            "title": "Isboxwall",
+            "type": "boolean"
+          },
+          "isDoor": {
+            "default": false,
+            "title": "Isdoor",
+            "type": "boolean"
+          },
+          "isDrawerBoxPanel": {
+            "default": false,
+            "title": "Isdrawerboxpanel",
+            "type": "boolean"
+          },
+          "isDrawerFront": {
+            "default": false,
+            "title": "Isdrawerfront",
+            "type": "boolean"
+          },
+          "isLeg": {
+            "default": false,
+            "title": "Isleg",
+            "type": "boolean"
+          },
+          "isPlinthPanel": {
+            "default": false,
+            "title": "Isplinthpanel",
+            "type": "boolean"
+          },
+          "isPlinthRib": {
+            "default": false,
+            "title": "Isplinthrib",
+            "type": "boolean"
+          },
+          "legRole": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legrole"
+          },
+          "lockedFields": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "default": {},
+            "maxProperties": 64,
+            "propertyNames": {
+              "maxLength": 200
+            },
+            "title": "Lockedfields",
+            "type": "object"
+          },
+          "lockedMoveAxes": {
+            "default": [],
+            "items": {
+              "maxLength": 200,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Lockedmoveaxes",
+            "type": "array"
+          },
+          "lockedResizeAxes": {
+            "default": [],
+            "items": {
+              "maxLength": 200,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Lockedresizeaxes",
+            "type": "array"
+          },
+          "material": {
+            "maxLength": 200,
+            "title": "Material",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "title": "Name",
+            "type": "string"
+          },
+          "normalAxis": {
+            "anyOf": [
+              {
+                "enum": [
+                  "x",
+                  "y",
+                  "z"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalaxis"
+          },
+          "offset": {
+            "$ref": "#/components/schemas/Vec3",
+            "default": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            }
+          },
+          "ownership": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ownership"
+          },
+          "ownershipReason": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ownershipreason"
+          },
+          "pieceCode": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Piececode"
+          },
+          "plinthEdgeFit": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/PlinthEdge"
+                },
+                "maxProperties": 64,
+                "propertyNames": {
+                  "maxLength": 200
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plinthedgefit"
+          },
+          "plinthRole": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plinthrole"
+          },
+          "quantity": {
+            "default": 1,
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "rotation": {
+            "$ref": "#/components/schemas/Rotation3",
+            "default": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            }
+          },
+          "sign": {
+            "anyOf": [
+              {
+                "enum": [
+                  -1,
+                  1
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sign"
+          },
+          "thickness": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Thickness",
+            "type": "number"
+          },
+          "thicknessAxis": {
+            "default": "z",
+            "enum": [
+              "x",
+              "y",
+              "z"
+            ],
+            "title": "Thicknessaxis",
+            "type": "string"
+          },
+          "type": {
+            "const": "panel",
+            "default": "panel",
+            "title": "Type",
+            "type": "string"
+          },
+          "width": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 5000.0,
+            "title": "Width",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "material",
+          "width",
+          "height",
+          "thickness"
+        ],
+        "title": "RawPanelNode",
+        "type": "object"
+      },
+      "Rotation3": {
+        "properties": {
+          "x": {
+            "default": 0,
+            "maximum": 1000.0,
+            "minimum": -1000.0,
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "default": 0,
+            "maximum": 1000.0,
+            "minimum": -1000.0,
+            "title": "Y",
+            "type": "number"
+          },
+          "z": {
+            "default": 0,
+            "maximum": 1000.0,
+            "minimum": -1000.0,
+            "title": "Z",
+            "type": "number"
+          }
+        },
+        "title": "Rotation3",
+        "type": "object"
+      },
+      "Runner": {
+        "additionalProperties": false,
+        "properties": {
+          "displayId": {
+            "title": "Displayid",
+            "type": "string"
+          },
+          "hardware": {
+            "additionalProperties": true,
+            "title": "Hardware",
+            "type": "object"
+          },
+          "kind": {
+            "const": "runner",
+            "title": "Kind",
+            "type": "string"
+          },
+          "nominalLengthMm": {
+            "title": "Nominallengthmm",
+            "type": "number"
+          },
+          "panelA": {
+            "title": "Panela",
+            "type": "string"
+          },
+          "panelACode": {
+            "title": "Panelacode",
+            "type": "string"
+          },
+          "panelAName": {
+            "title": "Panelaname",
+            "type": "string"
+          },
+          "panelB": {
+            "title": "Panelb",
+            "type": "string"
+          },
+          "panelBCode": {
+            "title": "Panelbcode",
+            "type": "string"
+          },
+          "panelBName": {
+            "title": "Panelbname",
+            "type": "string"
+          },
+          "side": {
+            "title": "Side",
+            "type": "string"
+          }
+        },
+        "required": [
+          "displayId",
+          "panelA",
+          "panelB",
+          "panelAName",
+          "panelBName",
+          "panelACode",
+          "panelBCode",
+          "hardware",
+          "kind",
+          "side",
+          "nominalLengthMm"
+        ],
+        "title": "Runner",
+        "type": "object"
+      },
+      "Sheet": {
+        "properties": {
+          "heightMm": {
+            "title": "Heightmm",
+            "type": "number"
+          },
+          "placements": {
+            "items": {
+              "$ref": "#/components/schemas/Placement"
+            },
+            "title": "Placements",
+            "type": "array"
+          },
+          "sheetIndex": {
+            "title": "Sheetindex",
+            "type": "integer"
+          },
+          "totalAreaM2": {
+            "title": "Totalaream2",
+            "type": "number"
+          },
+          "usedAreaM2": {
+            "title": "Usedaream2",
+            "type": "number"
+          },
+          "utilization": {
+            "title": "Utilization",
+            "type": "number"
+          },
+          "widthMm": {
+            "title": "Widthmm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "sheetIndex",
+          "widthMm",
+          "heightMm",
+          "placements",
+          "usedAreaM2",
+          "totalAreaM2",
+          "utilization"
+        ],
+        "title": "Sheet",
+        "type": "object"
+      },
+      "StockSheet": {
+        "properties": {
+          "heightMm": {
+            "title": "Heightmm",
+            "type": "number"
+          },
+          "widthMm": {
+            "title": "Widthmm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "widthMm",
+          "heightMm"
+        ],
+        "title": "StockSheet",
+        "type": "object"
+      },
+      "Unmatched": {
+        "additionalProperties": false,
+        "properties": {
+          "jointId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jointid"
+          },
+          "jointType": {
+            "anyOf": [
+              {
+                "enum": [
+                  "face_to_face",
+                  "corner_butt",
+                  "t_butt",
+                  "edge_to_edge",
+                  "near_contact"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jointtype"
+          },
+          "kind": {
+            "enum": [
+              "hinge",
+              "runner",
+              "fastener"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "panelA": {
+            "title": "Panela",
+            "type": "string"
+          },
+          "panelACode": {
+            "title": "Panelacode",
+            "type": "string"
+          },
+          "panelAName": {
+            "title": "Panelaname",
+            "type": "string"
+          },
+          "panelB": {
+            "title": "Panelb",
+            "type": "string"
+          },
+          "panelBCode": {
+            "title": "Panelbcode",
+            "type": "string"
+          },
+          "panelBName": {
+            "title": "Panelbname",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "panelA",
+          "panelB",
+          "panelAName",
+          "panelBName",
+          "panelACode",
+          "panelBCode"
+        ],
+        "title": "Unmatched",
+        "type": "object"
+      },
+      "Vec3": {
+        "properties": {
+          "x": {
+            "default": 0,
+            "maximum": 10000.0,
+            "minimum": -10000.0,
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "default": 0,
+            "maximum": 10000.0,
+            "minimum": -10000.0,
+            "title": "Y",
+            "type": "number"
+          },
+          "z": {
+            "default": 0,
+            "maximum": 10000.0,
+            "minimum": -10000.0,
+            "title": "Z",
+            "type": "number"
+          }
+        },
+        "title": "Vec3",
+        "type": "object"
+      },
+      "VersionInfo": {
+        "properties": {
+          "apiVersion": {
+            "title": "Apiversion",
+            "type": "string"
+          },
+          "contractVersion": {
+            "title": "Contractversion",
+            "type": "string"
+          },
+          "rulesVersion": {
+            "title": "Rulesversion",
+            "type": "string"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "rulesVersion",
+          "contractVersion"
+        ],
+        "title": "VersionInfo",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "DIY Furnitures API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=invalid_api_key"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=payload_too_large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=validation_error"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/v1/assembly": {
+      "post": {
+        "operationId": "assembly_v1_assembly_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PanelSet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssemblyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=invalid_api_key"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=payload_too_large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=validation_error"
+          },
+          "501": {
+            "description": "Not implemented yet (contract only)"
+          }
+        },
+        "summary": "Assembly",
+        "tags": [
+          "rules-chain"
+        ]
+      }
+    },
+    "/v1/bom": {
+      "post": {
+        "operationId": "bom_v1_bom_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BomRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BomResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=invalid_api_key"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=payload_too_large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=validation_error"
+          }
+        },
+        "summary": "Bom",
+        "tags": [
+          "bom"
+        ]
+      }
+    },
+    "/v1/catalog/materials": {
+      "get": {
+        "operationId": "materials_v1_catalog_materials_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Material"
+                  },
+                  "title": "Response Materials V1 Catalog Materials Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=invalid_api_key"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=payload_too_large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=validation_error"
+          }
+        },
+        "summary": "Materials",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/v1/hardware-plan": {
+      "post": {
+        "operationId": "hardware_plan_v1_hardware_plan_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PanelSet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HardwarePlanResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=invalid_api_key"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=payload_too_large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=validation_error"
+          },
+          "501": {
+            "description": "Not implemented yet (contract only)"
+          }
+        },
+        "summary": "Hardware Plan",
+        "tags": [
+          "rules-chain"
+        ]
+      }
+    },
+    "/v1/joints": {
+      "post": {
+        "operationId": "joints_v1_joints_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PanelSet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JointsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=invalid_api_key"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=payload_too_large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=validation_error"
+          },
+          "501": {
+            "description": "Not implemented yet (contract only)"
+          }
+        },
+        "summary": "Joints",
+        "tags": [
+          "rules-chain"
+        ]
+      }
+    },
+    "/v1/nesting": {
+      "post": {
+        "operationId": "nesting_v1_nesting_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NestingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NestingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=invalid_api_key"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=payload_too_large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=validation_error"
+          }
+        },
+        "summary": "Nesting",
+        "tags": [
+          "nesting"
+        ]
+      }
+    },
+    "/v1/version": {
+      "get": {
+        "operationId": "version_v1_version_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=invalid_api_key"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=payload_too_large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=validation_error"
+          }
+        },
+        "summary": "Version",
+        "tags": [
+          "meta"
+        ]
+      }
+    }
+  }
+}

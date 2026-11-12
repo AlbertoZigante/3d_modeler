@@ -1,0 +1,82 @@
+[
+  {
+    "axis": "z",
+    "clearanceMm": 21,
+    "id": "panel-10:panel-1:slide",
+    "kind": "drawer_slide",
+    "lengthMm": 380,
+    "p1": {
+      "x": 48,
+      "y": 253,
+      "z": -180
+    },
+    "p2": {
+      "x": 48,
+      "y": 253,
+      "z": 200
+    },
+    "panelA": "panel-10",
+    "panelB": "panel-1",
+    "side": "left"
+  },
+  {
+    "axis": "z",
+    "clearanceMm": 21,
+    "id": "panel-11:panel-2:slide",
+    "kind": "drawer_slide",
+    "lengthMm": 380,
+    "p1": {
+      "x": 452,
+      "y": 253,
+      "z": -180
+    },
+    "p2": {
+      "x": 452,
+      "y": 253,
+      "z": 200
+    },
+    "panelA": "panel-11",
+    "panelB": "panel-2",
+    "side": "right"
+  },
+  {
+    "axis": "z",
+    "clearanceMm": 21,
+    "id": "panel-14:panel-1:slide",
+    "kind": "drawer_slide",
+    "lengthMm": 380,
+    "p1": {
+      "x": 48,
+      "y": 603,
+      "z": -180
+    },
+    "p2": {
+      "x": 48,
+      "y": 603,
+      "z": 200
+    },
+    "panelA": "panel-14",
+    "panelB": "panel-1",
+    "side": "left"
+  },
+  {
+    "axis": "z",
+    "clearanceMm": 21,
+    "id": "panel-15:panel-2:slide",
+    "kind": "drawer_slide",
+    "lengthMm": 380,
+    "p1": {
+      "x": 452,
+      "y": 603,
+      "z": -180
+    },
+    "p2": {
+      "x": 452,
+      "y": 603,
+      "z": 200
+    },
+    "panelA": "panel-15",
+    "panelB": "panel-2",
+    "side": "right"
+  }
+]
