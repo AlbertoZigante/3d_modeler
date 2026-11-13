@@ -11,7 +11,10 @@
     "golden:dump": "node scripts/golden/dump-golden.mjs",
     "golden:check": "node scripts/golden/check-golden.mjs",
     "api:types": "node scripts/api/sync-contract.mjs --api ../api/openapi.json",
-    "api:types:check": "node scripts/api/sync-contract.mjs --check"
+    "api:types:check": "node scripts/api/sync-contract.mjs --check",
+    "golden:legacy": "node scripts/golden/legacy-oracle.mjs",
+    "test:unit": "node tests/requester.test.mjs && node tests/http.test.mjs && node tests/contract.test.mjs && node tests/payload.test.mjs",
+    "test:e2e": "node tests/cutlist.integration.test.mjs"
   },
   "devDependencies": {
     "openapi-typescript": "^7.13.0",

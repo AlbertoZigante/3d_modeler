@@ -20,12 +20,18 @@ const tmp = mkdtempSync(join(tmpdir(), 'golden-'));
 const res = spawnSync(process.execPath, [join(here, 'dump-golden.mjs'), '--out', tmp], { encoding: 'utf8' });
 if (res.status !== 0) { console.error(res.stderr || res.stdout); process.exit(1); }
 
+// Legacy bom/nesting oracle, regenerated from the freshly dumped resolved panels + the committed catalog.
+const oracle = spawnSync(process.execPath,
+  [join(here, 'legacy-oracle.mjs'), '--in', tmp, '--out', tmp, '--catalog', join(goldenDir, 'catalog.json')], { encoding: 'utf8' });
+if (oracle.status !== 0) { console.error(oracle.stderr || oracle.stdout); process.exit(1); }
+
 const list = (dir) => readdirSync(dir).flatMap((f) => {
   const p = join(dir, f);
   return statSync(p).isDirectory() ? list(p).map((x) => join(f, x)) : [f];
 });
 
-const expected = new Set(list(goldenDir));
+// catalog.json is an INPUT (exported from the API), not generated here.
+const expected = new Set(list(goldenDir).filter((f) => f !== 'catalog.json'));
 const actual = new Set(list(tmp));
 const problems = [];
 for (const f of expected) {

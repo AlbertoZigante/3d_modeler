@@ -2922,6 +2922,9 @@
             },
             "description": "Successful Response"
           },
+          "304": {
+            "description": "Not modified (If-None-Match matched the ETag)"
+          },
           "401": {
             "content": {
               "application/json": {

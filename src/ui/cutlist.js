@@ -8,32 +8,35 @@
  *
  * BOM and nesting are computed by the BACKEND (repo: api — POST /v1/bom,
  * POST /v1/nesting). The modeller sends RESOLVED panels (the same
- * resolveConstraints output feeding the 3D/2D views); this file only
- * debounces/caches the calls and keeps the latest result for the PDF
- * exports and the nesting-staleness banner.
+ * resolveConstraints output feeding the 3D/2D views); this file keeps the
+ * latest result for the PDF exports and the nesting-staleness banner.
+ * Debounce / cache / abort-stale / error state live in api/requester.js
+ * (unit-tested); this file only wires it to the DOM.
+ *
+ * There is deliberately NO local JS fallback: the original BOM/nesting engines
+ * are kept only as test oracles (scripts/golden/legacy). If the API is down the
+ * cut list shows a visible error state and exports retry on demand.
  *
  * modeller-main.js calls requestBom(visiblePanels) once per renderAll().
  * Nothing here blocks rendering: the cut list is only consumed by the
  * export buttons and the nesting banner, so a ~300ms lag is invisible.
  */
 import { exportCutListPdf, exportNestingPdf } from '../engine/pdfExport-bom.js';
-import { postBom, postNesting } from '../api/client.js';
+import { onRulesVersionChange, postBom, postNesting } from '../api/client.js';
 import { toPayload } from '../api/payload.js';
+import { createLatestRequester } from '../api/requester.js';
 import { escapeHtmlLocal, showToast } from './toast.js';
 
 const nestingSummaryEl = document.getElementById('nesting-summary');
 const BOM_DEBOUNCE_MS = 300;
 
-// Last BOM rows returned by the API for `appliedKey`. Read by the export
-// buttons and by the nesting staleness check.
-let lastBomRows = [];
-let appliedKey = null;
-
-// Newest design seen by requestBom() — what an export acts on.
-let latest = { payload: [], key: '[]' };
-let debounceTimer = null;
-let inflight = null; // { key, promise }
-let bomSeq = 0; // ignores out-of-order responses
+// BOM: "latest design wins" requester (debounce, LRU cache, abort of superseded calls, error state).
+const bom = createLatestRequester({
+  call: (payload, { signal }) => postBom(payload, { signal }),
+  emptyResult: { rows: [] },
+  debounceMs: BOM_DEBOUNCE_MS,
+  onChange: onBomStateChange,
+});
 let errorShown = false;
 
 // Cached from the most recent "Nest Cut List" run — kept around so
@@ -51,57 +54,42 @@ function reportApiError(err) {
   showToast('Backend unavailable — cut list and nesting need the API.');
 }
 
+// Reflects the BOM request state on <html data-bom-status="idle|loading|ready|error"> (CSS/tests can hook it)
+// and in the sidebar summary box.
+function onBomStateChange(state) {
+  document.documentElement.dataset.bomStatus = state.status;
+  if (state.status === 'error') reportApiError(state.error);
+  if (state.status === 'ready') errorShown = false;
+  if (state.status === 'ready' || state.status === 'error') renderNestingSummary();
+}
+
 // Called from renderAll(). Cheap and synchronous; the network call is debounced.
 export function requestBom(panels) {
-  const payload = toPayload(panels);
-  const key = JSON.stringify(payload);
-  if (key === latest.key) return;
-  latest = { payload, key };
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(flushBom, BOM_DEBOUNCE_MS);
+  bom.request(toPayload(panels));
 }
 
-function flushBom() {
-  clearTimeout(debounceTimer);
-  const { payload, key } = latest;
-  if (key === appliedKey) return Promise.resolve();
-  if (inflight && inflight.key === key) return inflight.promise;
-  if (payload.length === 0) {
-    lastBomRows = [];
-    appliedKey = key;
-    renderNestingSummary();
-    return Promise.resolve();
-  }
+const flushBom = () => bom.flush();
 
-  const seq = ++bomSeq;
-  const promise = postBom(payload)
-    .then(({ rows }) => {
-      if (seq !== bomSeq) return; // a newer request superseded this one
-      lastBomRows = rows;
-      appliedKey = key;
-      errorShown = false;
-      renderNestingSummary();
-    })
-    .catch((err) => {
-      if (seq === bomSeq) reportApiError(err);
-    })
-    .finally(() => {
-      if (inflight && inflight.promise === promise) inflight = null;
-    });
-  inflight = { key, promise };
-  return promise;
+// The API's rules changed under a running session (deploy): results computed before are stale.
+onRulesVersionChange(() => {
+  bom.invalidate();
+  flushBom();
+});
+
+export function getBomStatus() {
+  return bom.getState().status;
 }
 
-const isBomFresh = () => appliedKey === latest.key;
+const isBomFresh = () => bom.isFresh();
 
 export function getLastBomRows() {
-  return lastBomRows;
+  return bom.getState().result?.rows ?? [];
 }
 
 // Resolves once lastBomRows matches the design on screen (or the API failed).
 export async function ensureFreshBom() {
   await flushBom();
-  return lastBomRows;
+  return getLastBomRows();
 }
 
 // A tab opened synchronously inside the click handler, BEFORE any await,
@@ -131,20 +119,16 @@ export async function exportBomPdf() {
 }
 
 export async function openNestingPlan(newWindow = false) {
-  clearTimeout(debounceTimer);
-  const { payload, key } = latest;
-  if (payload.length === 0) return;
+  const { payload } = bom.peek();
+  if (!payload || payload.length === 0) return;
 
   const targetWindow = openPlaceholderWindow();
   try {
-    const { bom, results, summary } = await postNesting(payload);
+    const { bom: nestedBom, results, summary } = await postNesting(payload);
     // The nesting response carries the BOM of the same payload — keep both in sync.
-    if (latest.key === key) {
-      lastBomRows = bom.rows;
-      appliedKey = key;
-    }
+    bom.seed(payload, { rows: nestedBom.rows });
     errorShown = false;
-    lastNestingResult = { nestResults: results, summary, signature: bomRowsSignature(bom.rows) };
+    lastNestingResult = { nestResults: results, summary, signature: bomRowsSignature(nestedBom.rows) };
     renderNestingSummary();
     exportNestingPdf(results, summary, { projectName: 'Nesting Plan', mode: 'open', newWindow, targetWindow });
   } catch (err) {
@@ -156,16 +140,22 @@ export async function openNestingPlan(newWindow = false) {
 export function renderNestingSummary() {
   if (!nestingSummaryEl) return;
 
+  // Visible degraded state (not just a toast): the cut list can't refresh while the API is unreachable.
+  const outage = bom.getState().status === 'error'
+    ? `<div class="warning-banner">Backend unavailable — the cut list is out of date. It refreshes automatically on your next edit, or when you open/export the cut list.</div>`
+    : '';
+
   if (!lastNestingResult) {
-    nestingSummaryEl.innerHTML = '';
+    nestingSummaryEl.innerHTML = outage;
     return;
   }
 
   const { summary, signature } = lastNestingResult;
-  const stale = signature !== bomRowsSignature(lastBomRows);
+  const stale = signature !== bomRowsSignature(getLastBomRows());
   const unplacedMaterials = summary.perMaterial.filter((m) => m.unplacedCount > 0);
 
   nestingSummaryEl.innerHTML = `
+    ${outage}
     <div class="section-title">Nesting Plan</div>
 
     ${stale ? `

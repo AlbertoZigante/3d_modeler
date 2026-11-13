@@ -1,0 +1,111 @@
+{
+  "bom": {
+    "materialSummary": [
+      {
+        "areaM2": 0.18,
+        "material": "Melamine White 18mm",
+        "quantity": 2,
+        "thickness": 18
+      }
+    ],
+    "rows": [
+      {
+        "areaM2": 0.18,
+        "assembly": "—",
+        "bandedEdges": [],
+        "bandedEdgesLabel": "—",
+        "bandingCost": 0,
+        "bandingLengthM": 0,
+        "grainInterchangeable": true,
+        "heightMm": 300,
+        "isHardware": false,
+        "label": "A/B",
+        "material": "Melamine White 18mm",
+        "pieceCodes": [
+          null,
+          null
+        ],
+        "pieceNames": [
+          "A",
+          "B"
+        ],
+        "quantity": 2,
+        "thicknessMm": 18,
+        "unitAreaM2": 0.09,
+        "unitBandingLengthM": 0,
+        "widthMm": 300
+      }
+    ]
+  },
+  "results": [
+    {
+      "material": "Melamine White 18mm",
+      "sheets": [
+        {
+          "heightMm": 1220,
+          "placements": [
+            {
+              "finishedHeightMm": 300,
+              "finishedWidthMm": 300,
+              "heightMm": 300,
+              "pieceId": "A/B#1",
+              "rotated": false,
+              "widthMm": 300,
+              "xMm": 0,
+              "yMm": 0
+            },
+            {
+              "finishedHeightMm": 300,
+              "finishedWidthMm": 300,
+              "heightMm": 300,
+              "pieceId": "A/B#2",
+              "rotated": false,
+              "widthMm": 300,
+              "xMm": 0,
+              "yMm": 303
+            }
+          ],
+          "sheetIndex": 0,
+          "totalAreaM2": 2.9768,
+          "usedAreaM2": 0.18,
+          "utilization": 0.060467616,
+          "widthMm": 2440
+        }
+      ],
+      "stockSheet": {
+        "heightMm": 1220,
+        "widthMm": 2440
+      },
+      "thicknessMm": 18,
+      "unplaced": []
+    }
+  ],
+  "summary": {
+    "perMaterial": [
+      {
+        "material": "Melamine White 18mm",
+        "pricePerSheet": 45,
+        "sheetsUsed": 1,
+        "thicknessMm": 18,
+        "totalAreaM2": 2.9768,
+        "totalCost": 45,
+        "unplacedAreaM2": 0,
+        "unplacedCount": 0,
+        "unplacedLabels": [],
+        "usedAreaM2": 0.18,
+        "utilization": 0.060467616,
+        "wasteAreaM2": 2.7968
+      }
+    ],
+    "totals": {
+      "sheetsUsed": 1,
+      "totalAreaM2": 2.9768,
+      "totalCost": 45,
+      "unplacedAreaM2": 0,
+      "unplacedCount": 0,
+      "usedAreaM2": 0.18,
+      "utilization": 0.060467616,
+      "wasteAreaM2": 2.7968
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "materialSummary": [
+    {
+      "areaM2": 0.01,
+      "material": "Melamine White 18mm",
+      "quantity": 1,
+      "thickness": 18
+    }
+  ],
+  "rows": [
+    {
+      "areaM2": 0.01,
+      "assembly": "—",
+      "bandedEdges": [],
+      "bandedEdgesLabel": "—",
+      "bandingCost": 0,
+      "bandingLengthM": 0,
+      "grainInterchangeable": true,
+      "heightMm": 100,
+      "isHardware": false,
+      "label": "Floating",
+      "material": "Melamine White 18mm",
+      "pieceCodes": [
+        null
+      ],
+      "pieceNames": [
+        "Floating"
+      ],
+      "quantity": 1,
+      "thicknessMm": 18,
+      "unitAreaM2": 0.01,
+      "unitBandingLengthM": 0,
+      "widthMm": 100
+    }
+  ]
+}

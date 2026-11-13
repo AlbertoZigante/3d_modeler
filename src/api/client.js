@@ -12,64 +12,26 @@
  *   VITE_API_KEY  optional, sent as X-API-Key. NOT a secret (it ships in the
  *                 bundle) — only a coarse beta gate.
  *
- * `import.meta.env?.` (optional chaining) because the node test files in
- * /tests import modules that import this file, and plain node has no
- * import.meta.env.
+ * `import.meta.env ?? {}` because the node test files in /tests import modules that
+ * import this file, and plain node has no import.meta.env. The transport itself
+ * (timeouts, error codes, rules-version tracking) lives in ./http.js and is tested there.
  */
-const env = import.meta.env ?? {};
+import { ApiError, createHttp } from './http.js';
+
+// `globalThis.__MODELLER_ENV__`: test seam for node integration tests (no Vite there)
+const env = import.meta.env ?? globalThis.__MODELLER_ENV__ ?? {};
 const API_URL = String(env.VITE_API_URL ?? (env.DEV ? 'http://localhost:8000' : '')).replace(/\/+$/, '');
 const API_KEY = env.VITE_API_KEY ?? '';
-const TIMEOUT_MS = 20000;
 
-export const apiEnabled = API_URL.length > 0;
+const http = createHttp({ baseUrl: API_URL, apiKey: API_KEY });
+const request = http.request;
 
-export class ApiError extends Error {
-  constructor(message, { status = 0, cause, code } = {}) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-    this.code = code; // stable machine code from the API ('invalid_api_key', ...)
-    this.cause = cause;
-  }
-}
-
-async function request(path, { method = 'GET', body, signal } = {}) {
-  if (!apiEnabled) throw new ApiError('Backend not configured (VITE_API_URL is empty)');
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  signal?.addEventListener('abort', () => controller.abort());
-
-  try {
-    const response = await fetch(`${API_URL}${path}`, {
-      method,
-      headers: {
-        ...(body ? { 'Content-Type': 'application/json' } : {}),
-        ...(API_KEY ? { 'X-API-Key': API_KEY } : {}),
-      },
-      body: body ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      let code;
-      try { code = (await response.json())?.code; } catch { /* body is not JSON */ }
-      // Messages stay English here; the UI layer translates them (src/i18n).
-      const message = code === 'invalid_api_key'
-        ? 'Invalid or missing API key'
-        : `API ${method} ${path} failed (HTTP ${response.status})`;
-      throw new ApiError(message, { status: response.status, code });
-    }
-    return await response.json();
-  } catch (err) {
-    if (err instanceof ApiError) throw err;
-    throw new ApiError(
-      err?.name === 'AbortError' ? `API ${path} timed out` : `API ${path} unreachable`,
-      { cause: err }
-    );
-  } finally {
-    clearTimeout(timer);
-  }
-}
+export { ApiError };
+export const apiEnabled = http.enabled;
+/** Rules version last reported by the API (X-Rules-Version), or null before the first response. */
+export const getRulesVersion = http.getRulesVersion;
+/** cb(newVersion, previousVersion) when the API's rules change under a running session. */
+export const onRulesVersionChange = http.onRulesVersionChange;
 
 /** GET /v1/catalog/materials -> Material[] */
 export function getMaterials(options) {

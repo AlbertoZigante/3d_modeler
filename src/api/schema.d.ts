@@ -1296,6 +1296,13 @@ export interface operations {
                     "application/json": components["schemas"]["Material"][];
                 };
             };
+            /** @description Not modified (If-None-Match matched the ETag) */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description code=invalid_api_key */
             401: {
                 headers: {
