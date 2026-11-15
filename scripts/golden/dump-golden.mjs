@@ -21,7 +21,7 @@
  * module-level, so a fresh process = stable ids regardless of fixture order).
  */
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { toJson } from './normalize.mjs';
@@ -40,7 +40,7 @@ export const STAGES = ['raw', 'resolved', 'joints', 'featureJoints', 'hardware',
 if (one) {
   const { ensureMaterialCatalog } = await import('../../tests/helpers.mjs');
   await ensureMaterialCatalog();
-  const { DESIGNS } = await import('./builders.mjs');
+  const { DESIGNS, STAGE_SUBSET } = await import('./builders.mjs');
   const { resolveConstraints } = await import('../../src/modeller/snap.js');
   const { detectJoints, detectFeatureJoints } = await import('../../src/engine/joints.js');
   const { buildHardwarePlan } = await import('../../src/engine/hardware.js');
@@ -51,19 +51,21 @@ if (one) {
   // A stage that throws is itself behaviour worth freezing.
   const run = (fn) => { try { return fn(); } catch (e) { return { __error: String(e.message) }; } };
   const resolved = run(() => resolveConstraints(raw));
-  const stages = {
-    raw,
-    resolved,
-    joints: run(() => detectJoints(resolved)),
-    featureJoints: run(() => detectFeatureJoints(raw)),
-    hardware: run(() => buildHardwarePlan(raw)),
-    sequence: run(() => buildAssemblySequence(raw)),
-    assembly: run(() => buildAssemblyPlan(raw)),
+  // Designs in STAGE_SUBSET freeze only the stages that are meaningful for them (see builders.mjs).
+  const all = {
+    raw: () => raw,
+    resolved: () => resolved,
+    joints: () => run(() => detectJoints(resolved)),
+    featureJoints: () => run(() => detectFeatureJoints(raw)),
+    hardware: () => run(() => buildHardwarePlan(raw)),
+    sequence: () => run(() => buildAssemblySequence(raw)),
+    assembly: () => run(() => buildAssemblyPlan(raw)),
   };
+  const stages = Object.fromEntries((STAGE_SUBSET[one] ?? STAGES).map((name) => [name, all[name]()]));
   const dir = join(outDir, one);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
-  for (const name of STAGES) writeFileSync(join(dir, `${name}.json`), toJson(stages[name]));
+  for (const name of Object.keys(stages)) writeFileSync(join(dir, `${name}.json`), toJson(stages[name]));
   process.exit(0);
 }
 
@@ -81,6 +83,11 @@ for (const name of names) {
   }
   const { readFileSync } = await import('node:fs');
   const read = (stage) => JSON.parse(readFileSync(join(outDir, name, `${stage}.json`), 'utf8'));
+  if (!existsSync(join(outDir, name, 'hardware.json'))) { // partial design (resolver / joints fixtures)
+    summary[name] = { panels: read('raw').length, partial: true, warnings: read('resolved').flatMap((r) => r.warnings ?? []).length, joints: existsSync(join(outDir, name, 'joints.json')) ? read('joints').joints.length : undefined };
+    console.log(`ok  ${name.padEnd(30)} ${JSON.stringify(summary[name])}`);
+    continue;
+  }
   const j = read('joints'), h = read('hardware'), a = read('assembly');
   summary[name] = {
     panels: Array.isArray(read('raw')) ? read('raw').length : 0,
@@ -89,10 +96,15 @@ for (const name of names) {
     hardwareItems: h.summary ? h.summary.hingeCount + h.summary.runnerCount + h.summary.fastenerJointCount : 'error',
     steps: a.steps?.length ?? 'error',
   };
-  console.log(`ok  ${name.padEnd(24)} ${JSON.stringify(summary[name])}`);
+  console.log(`ok  ${name.padEnd(30)} ${JSON.stringify(summary[name])}`);
 }
 
 if (!only) {
   writeFileSync(join(outDir, 'manifest.json'), toJson({ designs: names, stages: STAGES, summary }));
+  // The per-design folders are rewritten above (legacyBom/legacyNesting would be lost): re-run the legacy
+  // bom/nesting oracle on the fresh resolved.json files so one command always leaves a complete tree.
+  const oracle = spawnSync(process.execPath,
+    [join(here, 'legacy-oracle.mjs'), '--in', outDir, '--out', outDir, '--catalog', join(root, 'fixtures/golden/catalog.json')], { encoding: 'utf8' });
+  if (oracle.status !== 0) { console.error(oracle.stderr || oracle.stdout); process.exit(1); }
 }
 console.log(`\n${names.length} design(s) -> ${outDir}`);

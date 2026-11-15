@@ -284,6 +284,13 @@ export interface components {
             areaM2: number;
             /** Assembly */
             assembly: string;
+            /** Assemblyindex */
+            assemblyIndex: number | null;
+            /**
+             * Assemblykind
+             * @enum {string}
+             */
+            assemblyKind: "box" | "drawer" | "group" | "none";
             /** Bandededges */
             bandedEdges: string[];
             /** Bandededgeslabel */
@@ -328,33 +335,56 @@ export interface components {
             /** Panelb */
             panelB: string;
         };
-        /** Constraint */
+        /**
+         * Constraint
+         * @description One relation on a node (modeller: snap.js resolveConstraints). Types:
+         *       spansBetween  sets a dimension from two faces            (field, from, to)
+         *       attachedTo    pins a position to a face                  (field, myFace, from)
+         *       distance      a user quote: clear gap to a face          (field, myFace, from, value)
+         *       equalSpacing  evenly spaces a set of shelves             (field, from, to, members, spacingId)
+         *     An unknown `type` is accepted and reported by the resolver as a warning (like the modeller).
+         */
         Constraint: {
             /** Field */
-            field?: string | null;
+            field?: ("width" | "height" | "thickness" | "positionX" | "positionY" | "positionZ") | null;
             from?: components["schemas"]["ConstraintEnd"] | null;
             /** Id */
             id?: string | null;
+            /** Kind */
+            kind?: string | null;
+            /**
+             * Members
+             * @default []
+             */
+            members: string[];
+            /** Myface */
+            myFace?: string | null;
             /**
              * Overridden
              * @default false
              */
             overridden: boolean;
+            /** Spacingid */
+            spacingId?: string | null;
             to?: components["schemas"]["ConstraintEnd"] | null;
             /** Type */
             type: string;
+            /** Value */
+            value?: number | null;
         };
-        /** ConstraintEnd */
+        /**
+         * ConstraintEnd
+         * @description A face reference: {node, face, offset}, or a literal snapshot {mm} (collinear tool's resize fallback).
+         */
         ConstraintEnd: {
             /** Face */
             face?: string | null;
+            /** Mm */
+            mm?: number | null;
             /** Node */
-            node: string;
-            /**
-             * Offset
-             * @default 0
-             */
-            offset: number;
+            node?: string | null;
+            /** Offset */
+            offset?: number | null;
         };
         /** DrawerBoxSpec */
         DrawerBoxSpec: {
@@ -969,12 +999,8 @@ export interface components {
             sign?: (-1 | 1) | null;
             /** Thickness */
             thickness: number;
-            /**
-             * Thicknessaxis
-             * @default z
-             * @enum {string}
-             */
-            thicknessAxis: "x" | "y" | "z";
+            /** Thicknessaxis */
+            thicknessAxis?: ("x" | "y" | "z") | null;
             /**
              * Type
              * @default panel
@@ -1496,6 +1522,15 @@ export interface operations {
             };
             /** @description code=validation_error */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description code=busy (retry shortly, see Retry-After) | code=nesting_timeout */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

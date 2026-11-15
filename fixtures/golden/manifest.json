@@ -19,7 +19,23 @@
     "empty",
     "single_panel",
     "synthetic_overlap",
-    "synthetic_near_contact"
+    "synthetic_near_contact",
+    "resolve_attached_to",
+    "resolve_distance_quote",
+    "resolve_quote_real",
+    "resolve_equal_spacing",
+    "resolve_equal_spacing_overflow",
+    "resolve_literal_anchor",
+    "resolve_cycle",
+    "resolve_errors",
+    "resolve_rotated",
+    "resolve_locked_axes",
+    "resolve_constraint_order",
+    "resolve_chain_reverse",
+    "joints_corner_vs_t",
+    "joints_thresholds",
+    "joints_edge_to_edge",
+    "joints_features_synthetic"
   ],
   "stages": [
     "raw",
@@ -142,6 +158,102 @@
       "joints": 0,
       "panels": 0,
       "steps": 0
+    },
+    "joints_corner_vs_t": {
+      "joints": 7,
+      "panels": 9,
+      "partial": true,
+      "warnings": 0
+    },
+    "joints_edge_to_edge": {
+      "joints": 4,
+      "panels": 7,
+      "partial": true,
+      "warnings": 0
+    },
+    "joints_features_synthetic": {
+      "joints": 32,
+      "panels": 17,
+      "partial": true,
+      "warnings": 0
+    },
+    "joints_thresholds": {
+      "joints": 8,
+      "panels": 30,
+      "partial": true,
+      "warnings": 0
+    },
+    "resolve_attached_to": {
+      "joints": null,
+      "panels": 2,
+      "partial": true,
+      "warnings": 0
+    },
+    "resolve_chain_reverse": {
+      "joints": null,
+      "panels": 5,
+      "partial": true,
+      "warnings": 0
+    },
+    "resolve_constraint_order": {
+      "joints": null,
+      "panels": 2,
+      "partial": true,
+      "warnings": 0
+    },
+    "resolve_cycle": {
+      "joints": null,
+      "panels": 4,
+      "partial": true,
+      "warnings": 3
+    },
+    "resolve_distance_quote": {
+      "joints": null,
+      "panels": 3,
+      "partial": true,
+      "warnings": 0
+    },
+    "resolve_equal_spacing": {
+      "joints": null,
+      "panels": 9,
+      "partial": true,
+      "warnings": 0
+    },
+    "resolve_equal_spacing_overflow": {
+      "joints": null,
+      "panels": 5,
+      "partial": true,
+      "warnings": 3
+    },
+    "resolve_errors": {
+      "joints": null,
+      "panels": 20,
+      "partial": true,
+      "warnings": 17
+    },
+    "resolve_literal_anchor": {
+      "joints": null,
+      "panels": 2,
+      "partial": true,
+      "warnings": 0
+    },
+    "resolve_locked_axes": {
+      "joints": null,
+      "panels": 2,
+      "partial": true,
+      "warnings": 0
+    },
+    "resolve_quote_real": {
+      "joints": null,
+      "panels": 7,
+      "partial": true,
+      "warnings": 0
+    },
+    "resolve_rotated": {
+      "joints": null,
+      "panels": 13,
+      "partial": true,
+      "warnings": 20
     },
     "single_panel": {
       "collisions": 0,

@@ -1,0 +1,233 @@
+[
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-1",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "E1",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 400
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-2",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "E2",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0002",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 800.04
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-3",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "E3",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0003",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 1200
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": true,
+    "id": "panel-4",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "Hidden",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0004",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 5000,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": "g",
+    "height": 400,
+    "hidden": false,
+    "id": "panel-5",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "G1",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0005",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 5000,
+      "y": 0,
+      "z": 18
+    },
+    "constraints": [],
+    "groupId": "g",
+    "height": 400,
+    "hidden": false,
+    "id": "panel-6",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "G2",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0006",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 5000,
+      "y": 0,
+      "z": 36
+    },
+    "constraints": [],
+    "groupId": "h",
+    "height": 400,
+    "hidden": false,
+    "id": "panel-7",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "G3",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0007",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  }
+]

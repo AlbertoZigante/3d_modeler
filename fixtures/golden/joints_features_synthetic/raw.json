@@ -1,0 +1,660 @@
+[
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": -300,
+      "y": 350,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 700,
+    "hidden": false,
+    "id": "panel-1",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "Left side",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "LE0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "type": "panel",
+    "width": 600
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 300,
+      "y": 350,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 700,
+    "hidden": false,
+    "id": "panel-2",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "Right side",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "RI0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "type": "panel",
+    "width": 600
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 350,
+      "z": 309
+    },
+    "boundaryIds": {
+      "left": "panel-1",
+      "right": "panel-2"
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 690,
+    "hidden": false,
+    "hinge": "left",
+    "id": "panel-3",
+    "isBoxWall": false,
+    "isDoor": true,
+    "material": "Melamine White 18mm",
+    "name": "door-left",
+    "normalAxis": "z",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "door",
+    "pieceCode": "LE0002",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 580
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 350,
+      "z": 309
+    },
+    "boundaryIds": {
+      "left": "panel-1",
+      "right": "panel-2"
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 690,
+    "hidden": false,
+    "hinge": "right",
+    "id": "panel-4",
+    "isBoxWall": false,
+    "isDoor": true,
+    "material": "Melamine White 18mm",
+    "name": "door-right",
+    "normalAxis": "z",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "door",
+    "pieceCode": "RI0002",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 580
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 309,
+      "y": 350,
+      "z": 0
+    },
+    "boundaryIds": {
+      "left": "panel-1",
+      "right": "panel-2"
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 690,
+    "hidden": false,
+    "hinge": "right",
+    "id": "panel-5",
+    "isBoxWall": false,
+    "isDoor": true,
+    "material": "Melamine White 18mm",
+    "name": "door-x-axis",
+    "normalAxis": "x",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "door",
+    "pieceCode": "PA0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "type": "panel",
+    "width": 580
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 350,
+      "z": 309
+    },
+    "boundaryIds": {
+      "left": "panel-1",
+      "right": "panel-2"
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 690,
+    "hidden": false,
+    "hinge": "left",
+    "id": "panel-6",
+    "isBoxWall": false,
+    "isDoor": true,
+    "material": "Melamine White 18mm",
+    "name": "door-lid-y",
+    "normalAxis": "y",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "door",
+    "pieceCode": "PA0002",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 580
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 350,
+      "z": 309
+    },
+    "boundaryIds": {
+      "left": "panel-1",
+      "right": "panel-2"
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 690,
+    "hidden": false,
+    "hinge": null,
+    "id": "panel-7",
+    "isBoxWall": false,
+    "isDoor": true,
+    "material": "Melamine White 18mm",
+    "name": "door-no-hinge",
+    "normalAxis": "z",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "door",
+    "pieceCode": "PA0003",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 580
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 350,
+      "z": 309
+    },
+    "boundaryIds": {
+      "left": "ghost",
+      "right": "panel-2"
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 690,
+    "hidden": false,
+    "hinge": "left",
+    "id": "panel-8",
+    "isBoxWall": false,
+    "isDoor": true,
+    "material": "Melamine White 18mm",
+    "name": "door-ghost-panel",
+    "normalAxis": "z",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "door",
+    "pieceCode": "PA0004",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 580
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 350,
+      "z": 309
+    },
+    "boundaryIds": {
+      "left": "panel-1"
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 690,
+    "hidden": false,
+    "hinge": "right",
+    "id": "panel-9",
+    "isBoxWall": false,
+    "isDoor": true,
+    "material": "Melamine White 18mm",
+    "name": "door-missing-side",
+    "normalAxis": "z",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "door",
+    "pieceCode": "PA0005",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 580
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 350,
+      "z": 309
+    },
+    "boundaryIds": {},
+    "constraints": [],
+    "groupId": null,
+    "height": 690,
+    "hidden": false,
+    "hinge": "left",
+    "id": "panel-10",
+    "isBoxWall": false,
+    "isDoor": true,
+    "material": "Melamine White 18mm",
+    "name": "door-empty-boundaries",
+    "normalAxis": "z",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "door",
+    "pieceCode": "PA0006",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 580
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 100,
+      "z": 309
+    },
+    "boundaryIds": {
+      "left": "panel-1",
+      "right": "panel-2"
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 200,
+    "hidden": false,
+    "id": "panel-11",
+    "isBoxWall": false,
+    "isDrawerFront": true,
+    "material": "Melamine White 18mm",
+    "name": "front",
+    "normalAxis": "z",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "drawer-front",
+    "pieceCode": "FR0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 580
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": -270,
+      "y": 100,
+      "z": 50
+    },
+    "constraints": [],
+    "drawerBoxFrontId": "panel-11",
+    "drawerBoxRole": "left",
+    "groupId": null,
+    "height": 150,
+    "hidden": false,
+    "id": "panel-12",
+    "isBoxWall": false,
+    "isDrawerBoxPanel": true,
+    "material": "Melamine White 18mm",
+    "name": "box-left",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "drawer-box",
+    "pieceCode": "LE0003",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "type": "panel",
+    "width": 500
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 272.5,
+      "y": 100,
+      "z": 50
+    },
+    "constraints": [],
+    "drawerBoxFrontId": "panel-11",
+    "drawerBoxRole": "right",
+    "groupId": null,
+    "height": 150,
+    "hidden": false,
+    "id": "panel-13",
+    "isBoxWall": false,
+    "isDrawerBoxPanel": true,
+    "material": "Melamine White 18mm",
+    "name": "box-right",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "drawer-box",
+    "pieceCode": "RI0003",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "type": "panel",
+    "width": 500
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": -150,
+      "z": 309
+    },
+    "boundaryIds": {
+      "left": "panel-1",
+      "right": "ghost"
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 200,
+    "hidden": false,
+    "id": "panel-14",
+    "isBoxWall": false,
+    "isDrawerFront": true,
+    "material": "Melamine White 18mm",
+    "name": "front2",
+    "normalAxis": "z",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "drawer-front",
+    "pieceCode": "FR0002",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 580
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": -270,
+      "y": 100,
+      "z": 50
+    },
+    "constraints": [],
+    "drawerBoxFrontId": "panel-14",
+    "drawerBoxRole": "left",
+    "groupId": null,
+    "height": 150,
+    "hidden": false,
+    "id": "panel-15",
+    "isBoxWall": false,
+    "isDrawerBoxPanel": true,
+    "material": "Melamine White 18mm",
+    "name": "box2-left",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "drawer-box",
+    "pieceCode": "LE0004",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "type": "panel",
+    "width": 500
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": -400,
+      "z": 309
+    },
+    "boundaryIds": {
+      "left": "panel-1",
+      "right": "panel-2"
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 200,
+    "hidden": false,
+    "id": "panel-16",
+    "isBoxWall": false,
+    "isDrawerFront": true,
+    "material": "Melamine White 18mm",
+    "name": "front3",
+    "normalAxis": "z",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "drawer-front",
+    "pieceCode": "FR0003",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 580
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": -270,
+      "y": 100,
+      "z": 50
+    },
+    "constraints": [],
+    "drawerBoxFrontId": "panel-16",
+    "drawerBoxRole": "bottom",
+    "groupId": null,
+    "height": 150,
+    "hidden": false,
+    "id": "panel-17",
+    "isBoxWall": false,
+    "isDrawerBoxPanel": true,
+    "material": "Melamine White 18mm",
+    "name": "box3-wrong-role",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "system",
+    "ownershipReason": "drawer-box",
+    "pieceCode": "PA0007",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "type": "panel",
+    "width": 500
+  }
+]

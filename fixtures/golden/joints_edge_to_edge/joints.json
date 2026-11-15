@@ -1,0 +1,97 @@
+{
+  "collisions": [],
+  "joints": [
+    {
+      "contactAxis": "z",
+      "contactPosition": 200,
+      "faceA": "left",
+      "faceB": "right",
+      "gap": 0,
+      "id": "panel-1:panel-2:z",
+      "overlap": {
+        "x": [
+          -9,
+          9
+        ],
+        "y": [
+          -200,
+          200
+        ]
+      },
+      "panelA": "panel-1",
+      "panelB": "panel-2",
+      "sameGroup": false,
+      "status": "unhandled",
+      "type": "edge_to_edge"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 600.02,
+      "faceA": "left",
+      "faceB": "right",
+      "gap": 0.04,
+      "id": "panel-2:panel-3:z",
+      "overlap": {
+        "x": [
+          -9,
+          9
+        ],
+        "y": [
+          -200,
+          200
+        ]
+      },
+      "panelA": "panel-2",
+      "panelB": "panel-3",
+      "sameGroup": false,
+      "status": "unhandled",
+      "type": "edge_to_edge"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 9,
+      "faceA": "front",
+      "faceB": "back",
+      "gap": 0,
+      "id": "panel-5:panel-6:z",
+      "overlap": {
+        "x": [
+          4800,
+          5200
+        ],
+        "y": [
+          -200,
+          200
+        ]
+      },
+      "panelA": "panel-5",
+      "panelB": "panel-6",
+      "sameGroup": true,
+      "status": "classified",
+      "type": "face_to_face"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 27,
+      "faceA": "front",
+      "faceB": "back",
+      "gap": 0,
+      "id": "panel-6:panel-7:z",
+      "overlap": {
+        "x": [
+          4800,
+          5200
+        ],
+        "y": [
+          -200,
+          200
+        ]
+      },
+      "panelA": "panel-6",
+      "panelB": "panel-7",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "face_to_face"
+    }
+  ]
+}

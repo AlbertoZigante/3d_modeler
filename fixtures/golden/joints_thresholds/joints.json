@@ -1,0 +1,217 @@
+{
+  "collisions": [
+    {
+      "overlapMm": {
+        "x": 400,
+        "y": 400,
+        "z": 1
+      },
+      "panelA": "panel-19",
+      "panelB": "panel-20"
+    },
+    {
+      "overlapMm": {
+        "x": 400,
+        "y": 400,
+        "z": 1.01
+      },
+      "panelA": "panel-21",
+      "panelB": "panel-22"
+    },
+    {
+      "overlapMm": {
+        "x": 400,
+        "y": 400,
+        "z": 5
+      },
+      "panelA": "panel-23",
+      "panelB": "panel-24"
+    }
+  ],
+  "joints": [
+    {
+      "contactAxis": "z",
+      "contactPosition": 8.976,
+      "faceA": "front",
+      "faceB": "back",
+      "gap": 0,
+      "id": "panel-1:panel-2:z",
+      "overlap": {
+        "x": [
+          -200,
+          200
+        ],
+        "y": [
+          -200,
+          200
+        ]
+      },
+      "panelA": "panel-1",
+      "panelB": "panel-2",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "face_to_face"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 9,
+      "faceA": "front",
+      "faceB": "back",
+      "gap": 0,
+      "id": "panel-5:panel-6:z",
+      "overlap": {
+        "x": [
+          1800,
+          2200
+        ],
+        "y": [
+          -200,
+          200
+        ]
+      },
+      "panelA": "panel-5",
+      "panelB": "panel-6",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "face_to_face"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 9.025,
+      "faceA": "front",
+      "faceB": "back",
+      "gap": 0.049,
+      "id": "panel-7:panel-8:z",
+      "overlap": {
+        "x": [
+          2800,
+          3200
+        ],
+        "y": [
+          -200,
+          200
+        ]
+      },
+      "panelA": "panel-7",
+      "panelB": "panel-8",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "face_to_face"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 9.026,
+      "faceA": "front",
+      "faceB": "back",
+      "gap": 0.051,
+      "id": "panel-9:panel-10:z",
+      "overlap": {
+        "x": [
+          3800,
+          4200
+        ],
+        "y": [
+          -200,
+          200
+        ]
+      },
+      "panelA": "panel-9",
+      "panelB": "panel-10",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "near_contact"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 10.45,
+      "faceA": "front",
+      "faceB": "back",
+      "gap": 2.9,
+      "id": "panel-11:panel-12:z",
+      "overlap": {
+        "x": [
+          -200,
+          200
+        ],
+        "y": [
+          800,
+          1200
+        ]
+      },
+      "panelA": "panel-11",
+      "panelB": "panel-12",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "near_contact"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 10.5,
+      "faceA": "front",
+      "faceB": "back",
+      "gap": 3,
+      "id": "panel-13:panel-14:z",
+      "overlap": {
+        "x": [
+          800,
+          1200
+        ],
+        "y": [
+          800,
+          1200
+        ]
+      },
+      "panelA": "panel-13",
+      "panelB": "panel-14",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "near_contact"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 9,
+      "faceA": "front",
+      "faceB": "back",
+      "gap": 0,
+      "id": "panel-27:panel-28:z",
+      "overlap": {
+        "x": [
+          3195,
+          3200
+        ],
+        "y": [
+          1800,
+          2200
+        ]
+      },
+      "panelA": "panel-27",
+      "panelB": "panel-28",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "face_to_face"
+    },
+    {
+      "contactAxis": "z",
+      "contactPosition": 9,
+      "faceA": "front",
+      "faceB": "back",
+      "gap": 0,
+      "id": "panel-29:panel-30:z",
+      "overlap": {
+        "x": [
+          4194.9,
+          4200
+        ],
+        "y": [
+          1800,
+          2200
+        ]
+      },
+      "panelA": "panel-29",
+      "panelB": "panel-30",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "face_to_face"
+    }
+  ]
+}

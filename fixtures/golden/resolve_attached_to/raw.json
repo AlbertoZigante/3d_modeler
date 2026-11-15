@@ -1,0 +1,93 @@
+[
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 600,
+    "hidden": false,
+    "id": "panel-1",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "Wall",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 1000
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [
+      {
+        "field": "positionY",
+        "from": {
+          "face": "top",
+          "node": "panel-1",
+          "offset": 50
+        },
+        "id": "a-positionY",
+        "myFace": "bottom",
+        "overridden": false,
+        "type": "attachedTo"
+      },
+      {
+        "field": "positionX",
+        "from": {
+          "face": "right",
+          "node": "panel-1",
+          "offset": -100
+        },
+        "id": "a-positionX",
+        "myFace": "left",
+        "overridden": false,
+        "type": "attachedTo"
+      }
+    ],
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-2",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "Shelf",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "SH0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  }
+]

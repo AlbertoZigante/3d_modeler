@@ -449,6 +449,27 @@
             "title": "Assembly",
             "type": "string"
           },
+          "assemblyIndex": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assemblyindex"
+          },
+          "assemblyKind": {
+            "enum": [
+              "box",
+              "drawer",
+              "group",
+              "none"
+            ],
+            "title": "Assemblykind",
+            "type": "string"
+          },
           "bandedEdges": {
             "items": {
               "type": "string"
@@ -548,7 +569,9 @@
           "isHardware",
           "areaM2",
           "bandingLengthM",
-          "bandingCost"
+          "bandingCost",
+          "assemblyKind",
+          "assemblyIndex"
         ],
         "title": "BomRow",
         "type": "object"
@@ -581,11 +604,19 @@
         "type": "object"
       },
       "Constraint": {
+        "description": "One relation on a node (modeller: snap.js resolveConstraints). Types:\n  spansBetween  sets a dimension from two faces            (field, from, to)\n  attachedTo    pins a position to a face                  (field, myFace, from)\n  distance      a user quote: clear gap to a face          (field, myFace, from, value)\n  equalSpacing  evenly spaces a set of shelves             (field, from, to, members, spacingId)\nAn unknown `type` is accepted and reported by the resolver as a warning (like the modeller).",
         "properties": {
           "field": {
             "anyOf": [
               {
-                "maxLength": 200,
+                "enum": [
+                  "width",
+                  "height",
+                  "thickness",
+                  "positionX",
+                  "positionY",
+                  "positionZ"
+                ],
                 "type": "string"
               },
               {
@@ -616,10 +647,56 @@
             ],
             "title": "Id"
           },
+          "kind": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "members": {
+            "default": [],
+            "items": {
+              "maxLength": 200,
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Members",
+            "type": "array"
+          },
+          "myFace": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Myface"
+          },
           "overridden": {
             "default": false,
             "title": "Overridden",
             "type": "boolean"
+          },
+          "spacingId": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spacingid"
           },
           "to": {
             "anyOf": [
@@ -635,6 +712,19 @@
             "maxLength": 200,
             "title": "Type",
             "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": -10000.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
           }
         },
         "required": [
@@ -644,6 +734,7 @@
         "type": "object"
       },
       "ConstraintEnd": {
+        "description": "A face reference: {node, face, offset}, or a literal snapshot {mm} (collinear tool's resize fallback).",
         "properties": {
           "face": {
             "anyOf": [
@@ -657,22 +748,45 @@
             ],
             "title": "Face"
           },
+          "mm": {
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": -10000.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mm"
+          },
           "node": {
-            "maxLength": 200,
-            "title": "Node",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node"
           },
           "offset": {
-            "default": 0,
-            "maximum": 10000.0,
-            "minimum": -10000.0,
-            "title": "Offset",
-            "type": "number"
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": -10000.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset"
           }
         },
-        "required": [
-          "node"
-        ],
         "title": "ConstraintEnd",
         "type": "object"
       },
@@ -2350,14 +2464,20 @@
             "type": "number"
           },
           "thicknessAxis": {
-            "default": "z",
-            "enum": [
-              "x",
-              "y",
-              "z"
+            "anyOf": [
+              {
+                "enum": [
+                  "x",
+                  "y",
+                  "z"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Thicknessaxis",
-            "type": "string"
+            "title": "Thicknessaxis"
           },
           "type": {
             "const": "panel",
@@ -3197,6 +3317,16 @@
               }
             },
             "description": "code=validation_error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=busy (retry shortly, see Retry-After) | code=nesting_timeout"
           }
         },
         "summary": "Nesting",

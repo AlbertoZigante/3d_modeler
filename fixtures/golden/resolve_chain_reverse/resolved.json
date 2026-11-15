@@ -1,0 +1,187 @@
+[
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 100,
+    "hidden": false,
+    "id": "panel-5",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": true
+    },
+    "material": "Melamine White 18mm",
+    "name": "N4",
+    "position": {
+      "x": 100,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 400
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 100,
+    "hidden": false,
+    "id": "panel-4",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": true
+    },
+    "material": "Melamine White 18mm",
+    "name": "N3",
+    "position": {
+      "x": 60,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 320
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 100,
+    "hidden": false,
+    "id": "panel-3",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": true
+    },
+    "material": "Melamine White 18mm",
+    "name": "N2",
+    "position": {
+      "x": 30,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 260
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 100,
+    "hidden": false,
+    "id": "panel-2",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": true
+    },
+    "material": "Melamine White 18mm",
+    "name": "N1",
+    "position": {
+      "x": 10,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 220
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 100,
+    "hidden": false,
+    "id": "panel-1",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "N0",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 200
+  }
+]

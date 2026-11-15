@@ -1,0 +1,775 @@
+[
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 600,
+    "hidden": false,
+    "id": "panel-1",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Ref",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 1000
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 500,
+    "hidden": false,
+    "id": "panel-2",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Tilted",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 45
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 500
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-3",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "missing-ref",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "references missing panel \"panel-9999\""
+    ],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-4",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "unknown-face",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "unknown face \"sideways\""
+    ],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-5",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "target-not-aligned",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "\"right\" face of panel-2 isn't aligned with the X axis at its current rotation — angled/non-axis-aligned relations aren't supported yet"
+    ],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-6",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "thickness-span",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "thickness is fixed by Material now — a spansBetween constraint on it is ignored"
+    ],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-7",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "unknown-type",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "unknown constraint type \"frobnicate\""
+    ],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-8",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "distance-negative",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "a distance quote needs a value of 0 mm or more"
+    ],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-9",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "distance-not-facing",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "the two faces must face each other along the quoted axis"
+    ],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-10",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "distance-no-myface",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "missing or unknown \"myFace\" for distance quote"
+    ],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-11",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "distance-on-size",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "a distance quote can only drive a position field, never a size"
+    ],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-12",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "distance-missing-anchor",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "references missing panel \"panel-9999\""
+    ],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-13",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "attached-no-myface",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "missing or unknown \"myFace\" for attachedTo constraint"
+    ],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-14",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "attached-misaligned-own-face",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 45
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "this panel's own \"right\" face isn't aligned with the X axis at its current rotation — angled/non-axis-aligned relations aren't supported yet"
+    ],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-15",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "own-dimension-misaligned",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 45
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "this panel's own \"width\" doesn't line up with any main axis at its current rotation"
+    ],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-16",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "overridden-is-ignored",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-17",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": true
+    },
+    "material": "Melamine White 18mm",
+    "name": "min-dimension-clamp",
+    "position": {
+      "x": 101.5,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 10
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-18",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "not-in-own-set",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "is not part of its own equal-spacing set"
+    ],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-19",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "span-on-position-field",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "this panel's own \"positionX\" doesn't line up with any main axis at its current rotation"
+    ],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-20",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "two-bad-constraints",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "unknown face \"sideways\"",
+      "references missing panel \"panel-9999\""
+    ],
+    "width": 300
+  }
+]

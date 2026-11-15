@@ -14,7 +14,7 @@
  *   node scripts/golden/legacy-oracle.mjs [--in <dir>] [--out <dir>] [--catalog <file>]
  *     --in   where designs' resolved.json are read from (default fixtures/golden)
  */
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { toJsonExact } from './normalize.mjs';
@@ -36,6 +36,7 @@ setCatalog(catalog);
 
 const designs = readdirSync(inDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort();
 for (const name of designs) {
+  if (!existsSync(join(inDir, name, 'hardware.json'))) continue; // resolver-only design: no bom/nesting reference
   const resolved = JSON.parse(readFileSync(join(inDir, name, 'resolved.json'), 'utf8'));
   const visible = Array.isArray(resolved) ? resolved.filter((p) => !p.hidden) : [];
   const bom = { rows: computeBom(visible), materialSummary: computeMaterialSummary(visible) };
