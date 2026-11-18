@@ -104,5 +104,45 @@ console.log('X-Rules-Version tracking');
   check('version is tracked on error responses too', err.getRulesVersion() === '9');
 }
 
+console.log('per-user token (Authorization: Bearer)');
+{
+  const seen = [];
+  const mk = (getToken, apiKey = '') => createHttp({ baseUrl: 'http://x', apiKey, getToken, fetchImpl: async (u, init) => { seen.push(init.headers); return json(200, {}); } });
+  await mk(() => 'tok123').request('/v1/bom');
+  check('token provider -> Authorization: Bearer', seen[0].Authorization === 'Bearer tok123');
+  await mk(async () => 'async-tok').request('/v1/bom');
+  check('async provider is awaited', seen[1].Authorization === 'Bearer async-tok');
+  await mk(() => null).request('/v1/bom');
+  check('no token -> no Authorization header', !('Authorization' in seen[2]));
+  await mk(() => 't', 'k').request('/v1/bom');
+  check('API key and token can both be sent (the server prefers the token)', seen[3]['X-API-Key'] === 'k' && seen[3].Authorization === 'Bearer t');
+  let n = 0;
+  const http = mk(() => `t${++n}`);
+  await http.request('/a'); await http.request('/b');
+  check('the provider is asked on EVERY request (no caching: the auth layer owns refresh)', seen[4].Authorization === 'Bearer t1' && seen[5].Authorization === 'Bearer t2' && n === 2);
+  const failing = createHttp({ baseUrl: 'http://x', getToken: () => { throw new Error('refresh failed'); }, fetchImpl: async () => json(200, {}) });
+  const e = await rejects(failing.request('/a'));
+  check('a failing provider surfaces as an ApiError (never a crash)', e instanceof ApiError);
+}
+
+console.log('auth + rate-limit errors');
+{
+  const mk = (status, body, headers) => createHttp({ baseUrl: 'http://x', fetchImpl: async () => json(status, body, headers) });
+  for (const code of ['unauthorized', 'invalid_token', 'token_expired']) {
+    const e = await rejects(mk(401, { code }).request('/v1/bom'));
+    check(`401 ${code} keeps its code`, e.code === code && e.status === 401);
+  }
+  let e = await rejects(mk(429, { code: 'rate_limited' }, { 'Retry-After': '17' }).request('/v1/bom'));
+  check('429 -> rate_limited with retryAfterS', e.code === 'rate_limited' && e.status === 429 && e.retryAfterS === 17);
+  e = await rejects(mk(429, { code: 'rate_limited' }).request('/v1/bom'));
+  check('429 without Retry-After -> retryAfterS undefined', e.retryAfterS === undefined);
+  e = await rejects(mk(503, { code: 'busy' }, { 'Retry-After': '1' }).request('/v1/nesting'));
+  check('503 busy carries Retry-After too', e.code === 'busy' && e.retryAfterS === 1);
+  e = await rejects(mk(429, { code: 'rate_limited' }, { 'Retry-After': 'soon' }).request('/v1/bom'));
+  check('garbage Retry-After is ignored', e.retryAfterS === undefined);
+  e = await rejects(mk(500, { code: 'internal_error' }).request('/v1/bom'));
+  check('500 -> internal_error', e.code === 'internal_error');
+}
+
 console.log(`\n${pass}/${pass + fail} checks passed.`);
 process.exit(fail ? 1 : 0);

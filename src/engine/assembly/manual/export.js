@@ -1,4 +1,4 @@
-import { translateHtml } from '../../../i18n/index.js';
+import { locale as currentLocale, translateHtml } from '../../../i18n/index.js';
 import { buildAssemblyManualModel } from './model.js';
 import { renderAssemblyManualHtml } from './html.js';
 
@@ -33,6 +33,8 @@ export function exportAssemblyManualPdf(
     mode = 'open',
     panels = [],
     resolvedPanels = [],
+    // a tab opened synchronously inside the click handler, before an async API call (popup blockers)
+    targetWindow = null,
   } = {}
 ) {
   const rawHtml =
@@ -49,6 +51,9 @@ export function exportAssemblyManualPdf(
 
         resolvedPanels:
           resolvedPanels || [],
+
+        // structured steps (API) render in the site language; JS-planner steps are English prose
+        locale: currentLocale,
       }
     );
 
@@ -60,10 +65,12 @@ export function exportAssemblyManualPdf(
    */
   if (mode === 'open') {
     const printWindow =
-      window.open(
-        '',
-        '_blank'
-      );
+      targetWindow && !targetWindow.closed
+        ? targetWindow
+        : window.open(
+          '',
+          '_blank'
+        );
 
     if (!printWindow) {
       return false;

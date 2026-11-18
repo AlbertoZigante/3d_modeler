@@ -12,6 +12,10 @@
             "title": "Name",
             "type": "string"
           },
+          "ordinal": {
+            "title": "Ordinal",
+            "type": "integer"
+          },
           "panelIds": {
             "items": {
               "type": "string"
@@ -20,6 +24,13 @@
             "type": "array"
           },
           "role": {
+            "enum": [
+              "door",
+              "drawer_box",
+              "drawer_front",
+              "plinth",
+              "carcass"
+            ],
             "title": "Role",
             "type": "string"
           }
@@ -28,6 +39,7 @@
           "id",
           "name",
           "role",
+          "ordinal",
           "panelIds"
         ],
         "title": "AssemblyCluster",
@@ -56,12 +68,26 @@
             },
             "title": "Toolssummary",
             "type": "array"
+          },
+          "toolsSummaryCodes": {
+            "items": {
+              "enum": [
+                "screwdriver_pz2",
+                "drill_bit_pilot_4_5",
+                "drill_bit_clearance_7",
+                "bit_pozidriv_pz3"
+              ],
+              "type": "string"
+            },
+            "title": "Toolssummarycodes",
+            "type": "array"
           }
         },
         "required": [
           "steps",
           "clusters",
-          "toolsSummary"
+          "toolsSummary",
+          "toolsSummaryCodes"
         ],
         "title": "AssemblyResponse",
         "type": "object"
@@ -74,8 +100,15 @@
             "type": "string"
           },
           "clusterKind": {
-            "title": "Clusterkind",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clusterkind"
           },
           "completionInstruction": {
             "anyOf": [
@@ -87,6 +120,26 @@
               }
             ],
             "title": "Completioninstruction"
+          },
+          "completionRef": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubassemblyRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "component": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StepComponent"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "componentKind": {
             "title": "Componentkind",
@@ -104,8 +157,15 @@
             "title": "Componentsubtitle"
           },
           "componentTitle": {
-            "title": "Componenttitle",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Componenttitle"
           },
           "description": {
             "title": "Description",
@@ -131,12 +191,55 @@
             "title": "Hardware",
             "type": "array"
           },
+          "hardwareIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Hardwareids",
+            "type": "array"
+          },
           "index": {
             "title": "Index",
             "type": "integer"
           },
           "instruction": {
             "title": "Instruction",
+            "type": "string"
+          },
+          "instructionVerb": {
+            "enum": [
+              "prepare_hardware",
+              "fit_guide_box_left",
+              "fit_guide_box_right",
+              "mount_guide_shelf",
+              "mount_guide_panel",
+              "start_door",
+              "start_drawer",
+              "start_plinth",
+              "start_subassembly",
+              "set_aside",
+              "place_loose",
+              "attach_to",
+              "attach_plain",
+              "install_closure_back",
+              "install_closure_top",
+              "fit_handle_door",
+              "fit_handle_drawer_front",
+              "fit_plinth",
+              "fit_plinth_to",
+              "slide_drawer",
+              "hang_door",
+              "install_back",
+              "install_top",
+              "install_vertical",
+              "install_horizontal",
+              "drawer_attach_left",
+              "drawer_attach_right",
+              "drawer_attach_back",
+              "drawer_attach_bottom",
+              "identify_unattached"
+            ],
+            "title": "Instructionverb",
             "type": "string"
           },
           "integrationSubassemblyIds": {
@@ -197,6 +300,10 @@
             "title": "Kind",
             "type": "string"
           },
+          "order": {
+            "title": "Order",
+            "type": "integer"
+          },
           "orientation": {
             "title": "Orientation",
             "type": "string"
@@ -232,6 +339,11 @@
             },
             "title": "Panelnames",
             "type": "array"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
           },
           "phase": {
             "enum": [
@@ -318,12 +430,61 @@
             "type": "boolean"
           },
           "subassemblyId": {
-            "title": "Subassemblyid",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subassemblyid"
           },
           "subassemblyName": {
-            "title": "Subassemblyname",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subassemblyname"
+          },
+          "subassemblyRef": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubassemblyRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "toolCodes": {
+            "items": {
+              "enum": [
+                "screwdriver_pz2",
+                "drill_bit_pilot_4_5",
+                "drill_bit_clearance_7",
+                "bit_pozidriv_pz3"
+              ],
+              "type": "string"
+            },
+            "title": "Toolcodes",
+            "type": "array"
+          },
+          "toolNoteCodes": {
+            "items": {
+              "enum": [
+                "concealed_hinge",
+                "drawer_runner_wood_screw",
+                "confirmat_screw"
+              ],
+              "type": "string"
+            },
+            "title": "Toolnotecodes",
+            "type": "array"
           },
           "toolNotes": {
             "items": {
@@ -353,6 +514,60 @@
             ],
             "title": "Unitpanelids"
           },
+          "verb": {
+            "enum": [
+              "prepare_hardware",
+              "fit_guide_box_left",
+              "fit_guide_box_right",
+              "mount_guide_shelf",
+              "mount_guide_panel",
+              "start_door",
+              "start_drawer",
+              "start_plinth",
+              "start_subassembly",
+              "set_aside",
+              "place_loose",
+              "attach_to",
+              "attach_plain",
+              "install_closure_back",
+              "install_closure_top",
+              "fit_handle_door",
+              "fit_handle_drawer_front",
+              "fit_plinth",
+              "fit_plinth_to",
+              "slide_drawer",
+              "hang_door",
+              "install_back",
+              "install_top",
+              "install_vertical",
+              "install_horizontal",
+              "drawer_attach_left",
+              "drawer_attach_right",
+              "drawer_attach_back",
+              "drawer_attach_bottom",
+              "identify_unattached"
+            ],
+            "title": "Verb",
+            "type": "string"
+          },
+          "warningCodes": {
+            "items": {
+              "enum": [
+                "door_build_flat",
+                "door_support_hinges",
+                "drawer_complete_box",
+                "vertical_before_top",
+                "horizontal_before_back",
+                "back_after_internals",
+                "top_after_internals",
+                "keep_panel_separate",
+                "handle_fit_flat"
+              ],
+              "type": "string"
+            },
+            "title": "Warningcodes",
+            "type": "array"
+          },
           "warnings": {
             "items": {
               "type": "string"
@@ -378,18 +593,22 @@
           "panelCodes",
           "jointIds",
           "prerequisiteStepIds",
-          "subassemblyId",
-          "subassemblyName",
           "subassemblyComplete",
-          "clusterKind",
           "componentKind",
-          "componentTitle",
           "repeatCount",
           "hardware",
           "tools",
           "toolNotes",
           "ergonomic",
           "ergonomics",
+          "order",
+          "verb",
+          "instructionVerb",
+          "params",
+          "warningCodes",
+          "hardwareIds",
+          "toolCodes",
+          "toolNoteCodes",
           "description",
           "instruction",
           "orientationInstruction",
@@ -2642,6 +2861,77 @@
         "title": "Sheet",
         "type": "object"
       },
+      "StepComponent": {
+        "additionalProperties": false,
+        "description": "Structured twin of componentTitle / componentSubtitle.",
+        "properties": {
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          },
+          "kind": {
+            "enum": [
+              "door",
+              "drawer",
+              "drawers",
+              "plinth",
+              "guides",
+              "carcass",
+              "integration"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "numbers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numbers"
+          },
+          "ordinal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordinal"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "StepComponent",
+        "type": "object"
+      },
       "StockSheet": {
         "properties": {
           "heightMm": {
@@ -2658,6 +2948,94 @@
           "heightMm"
         ],
         "title": "StockSheet",
+        "type": "object"
+      },
+      "SubassemblyRef": {
+        "additionalProperties": false,
+        "description": "Structured twin of subassemblyName: a cluster (role + ordinal), drawer(s), or a generic fallback.",
+        "properties": {
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          },
+          "drawer": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawer"
+          },
+          "drawers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawers"
+          },
+          "fallback": {
+            "anyOf": [
+              {
+                "enum": [
+                  "door",
+                  "drawer"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback"
+          },
+          "ordinal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordinal"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "door",
+                  "drawer_box",
+                  "drawer_front",
+                  "plinth",
+                  "carcass"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "title": "SubassemblyRef",
         "type": "object"
       },
       "Unmatched": {
@@ -2816,7 +3194,7 @@
                 }
               }
             },
-            "description": "code=invalid_api_key"
+            "description": "code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired"
           },
           "413": {
             "content": {
@@ -2837,6 +3215,16 @@
               }
             },
             "description": "code=validation_error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=rate_limited (wait Retry-After seconds)"
           }
         },
         "summary": "Health",
@@ -2847,6 +3235,7 @@
     },
     "/v1/assembly": {
       "post": {
+        "description": "RAW graph -> server-side resolve -> joints -> hardware -> ordered steps + clusters + tools.",
         "operationId": "assembly_v1_assembly_post",
         "parameters": [
           {
@@ -2863,6 +3252,22 @@
                 }
               ],
               "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -2895,7 +3300,7 @@
                 }
               }
             },
-            "description": "code=invalid_api_key"
+            "description": "code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired"
           },
           "413": {
             "content": {
@@ -2916,6 +3321,16 @@
               }
             },
             "description": "code=validation_error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=rate_limited (wait Retry-After seconds)"
           },
           "501": {
             "description": "Not implemented yet (contract only)"
@@ -2945,6 +3360,22 @@
                 }
               ],
               "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -2977,7 +3408,7 @@
                 }
               }
             },
-            "description": "code=invalid_api_key"
+            "description": "code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired"
           },
           "413": {
             "content": {
@@ -2998,6 +3429,16 @@
               }
             },
             "description": "code=validation_error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=rate_limited (wait Retry-After seconds)"
           }
         },
         "summary": "Bom",
@@ -3024,6 +3465,22 @@
                 }
               ],
               "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -3053,7 +3510,7 @@
                 }
               }
             },
-            "description": "code=invalid_api_key"
+            "description": "code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired"
           },
           "413": {
             "content": {
@@ -3074,6 +3531,16 @@
               }
             },
             "description": "code=validation_error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=rate_limited (wait Retry-After seconds)"
           }
         },
         "summary": "Materials",
@@ -3084,6 +3551,7 @@
     },
     "/v1/hardware-plan": {
       "post": {
+        "description": "RAW graph -> server-side resolve -> joints (server-computed) -> hinges, runners, fasteners + unmatched.",
         "operationId": "hardware_plan_v1_hardware_plan_post",
         "parameters": [
           {
@@ -3100,6 +3568,22 @@
                 }
               ],
               "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -3132,7 +3616,7 @@
                 }
               }
             },
-            "description": "code=invalid_api_key"
+            "description": "code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired"
           },
           "413": {
             "content": {
@@ -3154,6 +3638,16 @@
             },
             "description": "code=validation_error"
           },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=rate_limited (wait Retry-After seconds)"
+          },
           "501": {
             "description": "Not implemented yet (contract only)"
           }
@@ -3166,6 +3660,7 @@
     },
     "/v1/joints": {
       "post": {
+        "description": "RAW graph -> server-side resolve -> contact joints + collisions + door-hinge / drawer-slide joints.",
         "operationId": "joints_v1_joints_post",
         "parameters": [
           {
@@ -3182,6 +3677,22 @@
                 }
               ],
               "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -3214,7 +3725,7 @@
                 }
               }
             },
-            "description": "code=invalid_api_key"
+            "description": "code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired"
           },
           "413": {
             "content": {
@@ -3235,6 +3746,16 @@
               }
             },
             "description": "code=validation_error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=rate_limited (wait Retry-After seconds)"
           },
           "501": {
             "description": "Not implemented yet (contract only)"
@@ -3264,6 +3785,22 @@
                 }
               ],
               "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -3296,7 +3833,7 @@
                 }
               }
             },
-            "description": "code=invalid_api_key"
+            "description": "code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired"
           },
           "413": {
             "content": {
@@ -3317,6 +3854,16 @@
               }
             },
             "description": "code=validation_error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=rate_limited (wait Retry-After seconds)"
           },
           "503": {
             "content": {
@@ -3357,7 +3904,7 @@
                 }
               }
             },
-            "description": "code=invalid_api_key"
+            "description": "code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired"
           },
           "413": {
             "content": {
@@ -3378,6 +3925,16 @@
               }
             },
             "description": "code=validation_error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "code=rate_limited (wait Retry-After seconds)"
           }
         },
         "summary": "Version",

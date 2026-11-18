@@ -24,7 +24,7 @@ console.log('every code documented in the API contract is handled');
   Object.values(spec.paths).forEach((methods) => Object.values(methods).forEach((op) => scan(op.responses)));
   check('the contract documents error codes', documented.size >= 5);
   for (const code of documented) check(`contract code "${code}" is mapped`, describeApiError({ code }).code === code);
-  ['busy', 'nesting_timeout', 'validation_error', 'invalid_api_key', 'payload_too_large'].forEach((c) => check(`"${c}" is documented`, documented.has(c)));
+  ['busy', 'nesting_timeout', 'validation_error', 'invalid_api_key', 'unauthorized', 'invalid_token', 'token_expired', 'rate_limited', 'payload_too_large'].forEach((c) => check(`"${c}" is documented`, documented.has(c)));
 }
 
 console.log('every user-facing message is translated (fr + it)');
@@ -40,7 +40,10 @@ console.log('every user-facing message is translated (fr + it)');
 console.log('mapping rules');
 {
   check('ApiError with a known code', describeApiError(new ApiError('x', { code: 'busy', status: 503 })).message === API_ERROR_MESSAGES.busy);
-  check('busy / unreachable / timeout are retryable', ['busy', 'unreachable', 'timeout'].every((c) => describeApiError({ code: c }).retryable));
+  check('busy / unreachable / timeout / rate_limited / internal_error are retryable', ['busy', 'unreachable', 'timeout', 'rate_limited', 'internal_error'].every((c) => describeApiError({ code: c }).retryable));
+  check('sign-in problems say so (needsSignIn) and are not retryable', ['invalid_api_key', 'unauthorized', 'invalid_token', 'token_expired'].every((c) => describeApiError({ code: c }).needsSignIn && !describeApiError({ code: c }).retryable));
+  check('retryAfterS is passed through for the UI', describeApiError(new ApiError('x', { code: 'rate_limited', status: 429, retryAfterS: 12 })).retryAfterS === 12 && describeApiError({ code: 'busy' }).retryAfterS === undefined);
+  check('other codes do not claim needsSignIn', !describeApiError({ code: 'busy' }).needsSignIn && !describeApiError({ code: 'validation_error' }).needsSignIn);
   check('nesting_timeout is NOT retryable (same input would time out again)', !describeApiError({ code: 'nesting_timeout' }).retryable);
   check('validation / auth / config errors are not retryable', ['validation_error', 'invalid_api_key', 'not_configured', 'payload_too_large'].every((c) => !describeApiError({ code: c }).retryable));
   check('only "aborted" is silent', describeApiError({ code: 'aborted' }).silent && !describeApiError({ code: 'busy' }).silent);

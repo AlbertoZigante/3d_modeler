@@ -30,7 +30,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Assembly */
+        /**
+         * Assembly
+         * @description RAW graph -> server-side resolve -> joints -> hardware -> ordered steps + clusters + tools.
+         */
         post: operations["assembly_v1_assembly_post"];
         delete?: never;
         options?: never;
@@ -81,7 +84,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Hardware Plan */
+        /**
+         * Hardware Plan
+         * @description RAW graph -> server-side resolve -> joints (server-computed) -> hinges, runners, fasteners + unmatched.
+         */
         post: operations["hardware_plan_v1_hardware_plan_post"];
         delete?: never;
         options?: never;
@@ -98,7 +104,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Joints */
+        /**
+         * Joints
+         * @description RAW graph -> server-side resolve -> contact joints + collisions + door-hinge / drawer-slide joints.
+         */
         post: operations["joints_v1_joints_post"];
         delete?: never;
         options?: never;
@@ -150,10 +159,15 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /** Ordinal */
+            ordinal: number;
             /** Panelids */
             panelIds: string[];
-            /** Role */
-            role: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "door" | "drawer_box" | "drawer_front" | "plinth" | "carcass";
         };
         /** AssemblyResponse */
         AssemblyResponse: {
@@ -163,21 +177,25 @@ export interface components {
             steps: components["schemas"]["AssemblyStep"][];
             /** Toolssummary */
             toolsSummary: string[];
+            /** Toolssummarycodes */
+            toolsSummaryCodes: ("screwdriver_pz2" | "drill_bit_pilot_4_5" | "drill_bit_clearance_7" | "bit_pozidriv_pz3")[];
         };
         /** AssemblyStep */
         AssemblyStep: {
             /** Action */
             action: string;
             /** Clusterkind */
-            clusterKind: string;
+            clusterKind?: string | null;
             /** Completioninstruction */
             completionInstruction?: string | null;
+            completionRef?: components["schemas"]["SubassemblyRef"] | null;
+            component?: components["schemas"]["StepComponent"] | null;
             /** Componentkind */
             componentKind: string;
             /** Componentsubtitle */
             componentSubtitle?: string | null;
             /** Componenttitle */
-            componentTitle: string;
+            componentTitle?: string | null;
             /** Description */
             description: string;
             /** Ergonomic */
@@ -192,10 +210,17 @@ export interface components {
             hardware: {
                 [key: string]: unknown;
             }[];
+            /** Hardwareids */
+            hardwareIds: string[];
             /** Index */
             index: number;
             /** Instruction */
             instruction: string;
+            /**
+             * Instructionverb
+             * @enum {string}
+             */
+            instructionVerb: "prepare_hardware" | "fit_guide_box_left" | "fit_guide_box_right" | "mount_guide_shelf" | "mount_guide_panel" | "start_door" | "start_drawer" | "start_plinth" | "start_subassembly" | "set_aside" | "place_loose" | "attach_to" | "attach_plain" | "install_closure_back" | "install_closure_top" | "fit_handle_door" | "fit_handle_drawer_front" | "fit_plinth" | "fit_plinth_to" | "slide_drawer" | "hang_door" | "install_back" | "install_top" | "install_vertical" | "install_horizontal" | "drawer_attach_left" | "drawer_attach_right" | "drawer_attach_back" | "drawer_attach_bottom" | "identify_unattached";
             /** Integrationsubassemblyids */
             integrationSubassemblyIds?: string[] | null;
             /** Jointids */
@@ -211,6 +236,8 @@ export interface components {
              * @enum {string}
              */
             kind: "pre_install" | "fit_handle" | "join" | "integrate" | "unattached";
+            /** Order */
+            order: number;
             /** Orientation */
             orientation: string;
             /** Orientationinstruction */
@@ -223,6 +250,10 @@ export interface components {
             panelIds: string[];
             /** Panelnames */
             panelNames: string[];
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            };
             /**
              * Phase
              * @enum {string}
@@ -254,15 +285,27 @@ export interface components {
             /** Subassemblycomplete */
             subassemblyComplete: boolean;
             /** Subassemblyid */
-            subassemblyId: string;
+            subassemblyId?: string | null;
             /** Subassemblyname */
-            subassemblyName: string;
+            subassemblyName?: string | null;
+            subassemblyRef?: components["schemas"]["SubassemblyRef"] | null;
+            /** Toolcodes */
+            toolCodes: ("screwdriver_pz2" | "drill_bit_pilot_4_5" | "drill_bit_clearance_7" | "bit_pozidriv_pz3")[];
+            /** Toolnotecodes */
+            toolNoteCodes: ("concealed_hinge" | "drawer_runner_wood_screw" | "confirmat_screw")[];
             /** Toolnotes */
             toolNotes: string[];
             /** Tools */
             tools: string[];
             /** Unitpanelids */
             unitPanelIds?: string[] | null;
+            /**
+             * Verb
+             * @enum {string}
+             */
+            verb: "prepare_hardware" | "fit_guide_box_left" | "fit_guide_box_right" | "mount_guide_shelf" | "mount_guide_panel" | "start_door" | "start_drawer" | "start_plinth" | "start_subassembly" | "set_aside" | "place_loose" | "attach_to" | "attach_plain" | "install_closure_back" | "install_closure_top" | "fit_handle_door" | "fit_handle_drawer_front" | "fit_plinth" | "fit_plinth_to" | "slide_drawer" | "hang_door" | "install_back" | "install_top" | "install_vertical" | "install_horizontal" | "drawer_attach_left" | "drawer_attach_right" | "drawer_attach_back" | "drawer_attach_bottom" | "identify_unattached";
+            /** Warningcodes */
+            warningCodes: ("door_build_flat" | "door_support_hinges" | "drawer_complete_box" | "vertical_before_top" | "horizontal_before_back" | "back_after_internals" | "top_after_internals" | "keep_panel_separate" | "handle_fit_flat")[];
             /** Warnings */
             warnings: string[];
         };
@@ -1075,12 +1118,49 @@ export interface components {
             /** Widthmm */
             widthMm: number;
         };
+        /**
+         * StepComponent
+         * @description Structured twin of componentTitle / componentSubtitle.
+         */
+        StepComponent: {
+            /** Count */
+            count?: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "door" | "drawer" | "drawers" | "plinth" | "guides" | "carcass" | "integration";
+            /** Number */
+            number?: number | null;
+            /** Numbers */
+            numbers?: number[] | null;
+            /** Ordinal */
+            ordinal?: number | null;
+        };
         /** StockSheet */
         StockSheet: {
             /** Heightmm */
             heightMm: number;
             /** Widthmm */
             widthMm: number;
+        };
+        /**
+         * SubassemblyRef
+         * @description Structured twin of subassemblyName: a cluster (role + ordinal), drawer(s), or a generic fallback.
+         */
+        SubassemblyRef: {
+            /** Count */
+            count?: number | null;
+            /** Drawer */
+            drawer?: number | null;
+            /** Drawers */
+            drawers?: number[] | null;
+            /** Fallback */
+            fallback?: ("door" | "drawer") | null;
+            /** Ordinal */
+            ordinal?: number | null;
+            /** Role */
+            role?: ("door" | "drawer_box" | "drawer_front" | "plinth" | "carcass") | null;
         };
         /** Unmatched */
         Unmatched: {
@@ -1160,7 +1240,7 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description code=invalid_api_key */
+            /** @description code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1187,6 +1267,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description code=rate_limited (wait Retry-After seconds) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
         };
     };
     assembly_v1_assembly_post: {
@@ -1194,6 +1283,7 @@ export interface operations {
             query?: never;
             header?: {
                 "x-api-key"?: string | null;
+                authorization?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -1213,7 +1303,7 @@ export interface operations {
                     "application/json": components["schemas"]["AssemblyResponse"];
                 };
             };
-            /** @description code=invalid_api_key */
+            /** @description code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1233,6 +1323,15 @@ export interface operations {
             };
             /** @description code=validation_error */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description code=rate_limited (wait Retry-After seconds) */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1254,6 +1353,7 @@ export interface operations {
             query?: never;
             header?: {
                 "x-api-key"?: string | null;
+                authorization?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -1273,7 +1373,7 @@ export interface operations {
                     "application/json": components["schemas"]["BomResponse"];
                 };
             };
-            /** @description code=invalid_api_key */
+            /** @description code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1300,6 +1400,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description code=rate_limited (wait Retry-After seconds) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
         };
     };
     materials_v1_catalog_materials_get: {
@@ -1307,6 +1416,7 @@ export interface operations {
             query?: never;
             header?: {
                 "x-api-key"?: string | null;
+                authorization?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -1329,7 +1439,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description code=invalid_api_key */
+            /** @description code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1356,6 +1466,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description code=rate_limited (wait Retry-After seconds) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
         };
     };
     hardware_plan_v1_hardware_plan_post: {
@@ -1363,6 +1482,7 @@ export interface operations {
             query?: never;
             header?: {
                 "x-api-key"?: string | null;
+                authorization?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -1382,7 +1502,7 @@ export interface operations {
                     "application/json": components["schemas"]["HardwarePlanResponse"];
                 };
             };
-            /** @description code=invalid_api_key */
+            /** @description code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1402,6 +1522,15 @@ export interface operations {
             };
             /** @description code=validation_error */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description code=rate_limited (wait Retry-After seconds) */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1423,6 +1552,7 @@ export interface operations {
             query?: never;
             header?: {
                 "x-api-key"?: string | null;
+                authorization?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -1442,7 +1572,7 @@ export interface operations {
                     "application/json": components["schemas"]["JointsResponse"];
                 };
             };
-            /** @description code=invalid_api_key */
+            /** @description code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1462,6 +1592,15 @@ export interface operations {
             };
             /** @description code=validation_error */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description code=rate_limited (wait Retry-After seconds) */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1483,6 +1622,7 @@ export interface operations {
             query?: never;
             header?: {
                 "x-api-key"?: string | null;
+                authorization?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -1502,7 +1642,7 @@ export interface operations {
                     "application/json": components["schemas"]["NestingResponse"];
                 };
             };
-            /** @description code=invalid_api_key */
+            /** @description code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1522,6 +1662,15 @@ export interface operations {
             };
             /** @description code=validation_error */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description code=rate_limited (wait Retry-After seconds) */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1558,7 +1707,7 @@ export interface operations {
                     "application/json": components["schemas"]["VersionInfo"];
                 };
             };
-            /** @description code=invalid_api_key */
+            /** @description code=invalid_api_key | code=unauthorized | code=invalid_token | code=token_expired */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1578,6 +1727,15 @@ export interface operations {
             };
             /** @description code=validation_error */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description code=rate_limited (wait Retry-After seconds) */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

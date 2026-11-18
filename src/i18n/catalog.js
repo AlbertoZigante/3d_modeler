@@ -426,6 +426,11 @@ export const CATALOG = [
   ['Group {}', 'Groupe {1}', 'Gruppo {1}'],
   ['Group', 'Groupe', 'Gruppo'],
   ['Invalid or missing API key', 'Clé API invalide ou manquante', 'Chiave API non valida o mancante'],
+  ['Please sign in to use this feature.', 'Connectez-vous pour utiliser cette fonction.', 'Accedi per usare questa funzione.'],
+  ['Your session is not valid — please sign in again.', "Votre session n'est pas valide — reconnectez-vous.", 'La tua sessione non è valida — accedi di nuovo.'],
+  ['Your session has expired — please sign in again.', 'Votre session a expiré — reconnectez-vous.', 'La tua sessione è scaduta — accedi di nuovo.'],
+  ['Too many requests — wait a moment and try again.', 'Trop de requêtes — patientez un instant puis réessayez.', 'Troppe richieste — attendi un momento e riprova.'],
+  ['The server had a problem — please try again.', 'Le serveur a rencontré un problème — réessayez.', 'Il server ha avuto un problema — riprova.'],
 
   // ---- More UI / tool messages -------------------------------------------
   ['Open door', 'Ouvrir la porte', "Apri l'anta"],

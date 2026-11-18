@@ -6,23 +6,29 @@
  *
  * Guarantees:
  *   - every failure is an ApiError with a machine `code`:
- *       API codes     'invalid_api_key', 'validation_error', 'payload_too_large', 'not_implemented', ...
+ *       API codes     'invalid_api_key', 'unauthorized', 'invalid_token', 'token_expired', 'rate_limited',
+ *                     'validation_error', 'payload_too_large', 'not_implemented', ...
  *       client codes  'timeout', 'unreachable', 'aborted', 'not_configured'
  *   - a caller-supplied AbortSignal cancels the request (also if it is ALREADY aborted)
  *   - the API's X-Rules-Version header is tracked; listeners fire when it CHANGES, so
  *     cached results computed under old rules can be dropped.
  */
 export class ApiError extends Error {
-  constructor(message, { status = 0, cause, code } = {}) {
+  constructor(message, { status = 0, cause, code, retryAfterS } = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.cause = cause;
+    this.retryAfterS = retryAfterS; // seconds, from the Retry-After header of a 429 / 503 (undefined if absent)
   }
 }
 
-export function createHttp({ baseUrl = '', apiKey = '', timeoutMs = 20000, fetchImpl } = {}) {
+/**
+ * `getToken`: optional () => string | null | Promise<...>, called per request; a token is sent as
+ * `Authorization: Bearer <token>` (per-user auth, API phase 11). Never cached here: the auth layer owns refresh.
+ */
+export function createHttp({ baseUrl = '', apiKey = '', timeoutMs = 20000, fetchImpl, getToken } = {}) {
   const base = String(baseUrl).replace(/\/+$/, '');
   const enabled = base.length > 0;
   const doFetch = fetchImpl ?? ((...args) => globalThis.fetch(...args));
@@ -48,11 +54,13 @@ export function createHttp({ baseUrl = '', apiKey = '', timeoutMs = 20000, fetch
 
     try {
       if (signal?.aborted) throw new ApiError(`API ${path} aborted`, { code: 'aborted' });
+      const token = getToken ? await getToken() : null;
       const response = await doFetch(`${base}${path}`, {
         method,
         headers: {
           ...(body ? { 'Content-Type': 'application/json' } : {}),
           ...(apiKey ? { 'X-API-Key': apiKey } : {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: body ? JSON.stringify(body) : undefined,
         signal: controller.signal,
@@ -65,7 +73,10 @@ export function createHttp({ baseUrl = '', apiKey = '', timeoutMs = 20000, fetch
         const message = code === 'invalid_api_key'
           ? 'Invalid or missing API key'
           : `API ${method} ${path} failed (HTTP ${response.status})`;
-        throw new ApiError(message, { status: response.status, code });
+        const retryAfter = Number(response.headers?.get?.('Retry-After'));
+        throw new ApiError(message, {
+          status: response.status, code, retryAfterS: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+        });
       }
       return await response.json();
     } catch (err) {

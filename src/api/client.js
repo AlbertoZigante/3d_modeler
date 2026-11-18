@@ -17,13 +17,19 @@
  * (timeouts, error codes, rules-version tracking) lives in ./http.js and is tested there.
  */
 import { ApiError, createHttp } from './http.js';
+import { createPlanFetcher } from './plans.js';
 
 // `globalThis.__MODELLER_ENV__`: test seam for node integration tests (no Vite there)
 const env = import.meta.env ?? globalThis.__MODELLER_ENV__ ?? {};
 const API_URL = String(env.VITE_API_URL ?? (env.DEV ? 'http://localhost:8000' : '')).replace(/\/+$/, '');
 const API_KEY = env.VITE_API_KEY ?? '';
 
-const http = createHttp({ baseUrl: API_URL, apiKey: API_KEY });
+// Per-user auth (API phase 11): the sign-in layer registers a provider; nothing else changes for callers.
+let tokenProvider = null;
+/** setAuthTokenProvider(() => string | null | Promise<string | null>) — or null to go back to the API key / anonymous. */
+export const setAuthTokenProvider = (fn) => { tokenProvider = typeof fn === 'function' ? fn : null; };
+
+const http = createHttp({ baseUrl: API_URL, apiKey: API_KEY, getToken: () => (tokenProvider ? tokenProvider() : null) });
 const request = http.request;
 
 export { ApiError };
@@ -55,8 +61,7 @@ export function getVersion(options) {
 
 /**
  * Rules chain — RAW panel graph in (see payload.js toRawPayload), the server
- * resolves it itself. Until the Python port lands these answer 501
- * (ApiError.code === 'not_implemented').
+ * resolves it itself, detects the joints itself and never takes joints / hardware from the client.
  */
 /** POST /v1/joints  { panels } -> { joints, collisions, featureJoints } */
 export function postJoints(rawPanels, options) {
@@ -72,3 +77,13 @@ export function postHardwarePlan(rawPanels, options) {
 export function postAssembly(rawPanels, options) {
   return request('/v1/assembly', { method: 'POST', body: { panels: rawPanels }, ...options });
 }
+
+// Cached, de-duplicated fetchers for the user-triggered exports (see plans.js). Dropped when the rules change.
+const hardwareFetcher = createPlanFetcher({ call: (payload, options) => postHardwarePlan(payload, options) });
+const assemblyFetcher = createPlanFetcher({ call: (payload, options) => postAssembly(payload, options) });
+http.onRulesVersionChange(() => { hardwareFetcher.invalidate(); assemblyFetcher.invalidate(); });
+
+/** RAW panels -> hardware plan (cached). */
+export const fetchHardwarePlan = (rawPanels, options) => hardwareFetcher.fetchPlan(rawPanels, options);
+/** RAW panels -> assembly plan { steps, clusters, toolsSummary } (cached). */
+export const fetchAssemblyPlan = (rawPanels, options) => assemblyFetcher.fetchPlan(rawPanels, options);

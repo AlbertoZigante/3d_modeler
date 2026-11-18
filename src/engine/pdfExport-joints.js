@@ -62,7 +62,7 @@ const TABLE_ROW_HEIGHT_MM = 6;
  * @param {ReturnType<typeof import('./hardware.js').buildHardwarePlan>} [hardwarePlan] - optional third table (hinges/runners/fasteners); omitted entirely when not supplied
  * @param {{projectName?:string, fileName?:string, mode?:'save'|'open'}} [options]
  */
-export function exportJointsPdf(report, hardwarePlan, { projectName = 'Joint Report', fileName = 'joint-report.pdf', mode = 'save' } = {}) {
+export function exportJointsPdf(report, hardwarePlan, { projectName = 'Joint Report', fileName = 'joint-report.pdf', mode = 'save', targetWindow = null } = {}) {
   const doc = createPdf({ unit: 'mm', format: 'a4' });
   const pageHeight = doc.internal.pageSize.getHeight();
   const startX = PAGE_MARGIN_MM;
@@ -213,5 +213,5 @@ export function exportJointsPdf(report, hardwarePlan, { projectName = 'Joint Rep
     }
   }
 
-  outputPdf(doc, mode, fileName);
+  outputPdf(doc, mode, fileName, targetWindow);
 }

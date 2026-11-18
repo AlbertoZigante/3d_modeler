@@ -31,6 +31,9 @@
  * handles (the live panels array, the scene's pick-mode hooks) that
  * don't exist as static module exports anywhere.
  */
+import { useApiAssembly, useApiHardware } from './api/flags.js';
+import { fetchAssemblyPlan, fetchHardwarePlan } from './api/client.js';
+import { describeApiError } from './api/errors.js';
 import './i18n/boot.js';
 import { protectNames } from './units/index.js';
 import {
@@ -255,6 +258,19 @@ printHistoryBtn?.addEventListener('click', (event) => {
 // this always reflects the CURRENT design, never a stale snapshot, and
 // deliberately re-runs detectJoints() rather than caching its result
 // anywhere, so any staleness bug is impossible by construction.
+// With a server-side plan (flags in api/flags.js) the PDF opens after an async call, when popup blockers no longer
+// consider it a click: open the tab NOW, synchronously, and hand it to the exporter (same pattern as the cut list).
+function openExportTab() {
+  const tab = window.open('', '_blank');
+  try { tab?.document.write('<title>…</title><p style="font:14px sans-serif;padding:2rem">Generating…</p>'); } catch { /* cross-origin / blocked: the exporter opens its own */ }
+  return tab;
+}
+// A failed server call: say so, drop the placeholder tab; the editor itself keeps working.
+function reportPlanError(err, tab) {
+  try { tab?.close(); } catch { /* already gone */ }
+  showActionToast(describeApiError(err).message);
+}
+
 printJointsBtn?.addEventListener('click', (event) => {
   showActionToast('Generating PDF…');
   const resolved = resolveConstraints(panels);
@@ -276,6 +292,13 @@ printJointsBtn?.addEventListener('click', (event) => {
   // the same design, same tradeoff computeJointExtremities/detectJoints
   // already make elsewhere (cheap and pure beats caching and risking
   // staleness — see engine/hardware.js's own doc comment).
+  if (useApiHardware) {
+    const tab = openExportTab();
+    fetchHardwarePlan(panels)
+      .then((plan) => exportJointsPdf(report, plan, { projectName: 'Joint Report', mode: 'open', targetWindow: tab }))
+      .catch((err) => reportPlanError(err, tab));
+    return;
+  }
   const hardwarePlan = buildHardwarePlan(panels);
   exportJointsPdf(report, hardwarePlan, { projectName: 'Joint Report', mode: 'open', newWindow: event.ctrlKey || event.metaKey });
 });
@@ -294,14 +317,20 @@ exportJointsJsonBtn?.addEventListener('click', () => {
   const featureJoints = detectFeatureJoints(panels);
   const pieceCodeById = new Map(panels.map((p) => [p.id, p.pieceCode]));
   const report = buildJointsReport(resolved, joints, collisions, featureJoints, { pieceCodeById });
-  const hardware = buildHardwarePlan(panels);
-  const blob = new Blob([JSON.stringify({ ...report, hardware }, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'joint-report.json';
-  link.click();
-  URL.revokeObjectURL(url);
+  const download = (hardware) => {
+    const blob = new Blob([JSON.stringify({ ...report, hardware }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'joint-report.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  if (useApiHardware) {
+    fetchHardwarePlan(panels).then(download).catch((err) => reportPlanError(err, null));
+    return;
+  }
+  download(buildHardwarePlan(panels));
 });
 // buildAssemblyPlan takes the raw `panels` array (same reasoning as
 // buildHardwarePlan above) and reruns the whole joints/hardware/
@@ -312,6 +341,14 @@ exportJointsJsonBtn?.addEventListener('click', () => {
 printAssemblyBtn?.addEventListener('click', () => {
   showActionToast('Generating PDF…');
   const resolved = resolveConstraints(panels);
+  if (useApiAssembly) {
+    // structured steps from the server, rendered in the site language by the manual model (i18n/steps.js)
+    const tab = openExportTab();
+    fetchAssemblyPlan(panels)
+      .then((plan) => exportAssemblyManualPdf(plan, { projectName: 'Assembly Instructions', mode: 'open', panels, resolvedPanels: resolved, targetWindow: tab }))
+      .catch((err) => reportPlanError(err, tab));
+    return;
+  }
   const sequence = buildAssemblySequence(panels);
   exportAssemblyManualPdf(sequence, { projectName: 'Assembly Instructions', mode: 'open', panels, resolvedPanels: resolved });
 });

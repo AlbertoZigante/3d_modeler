@@ -12,11 +12,16 @@ import { readFileSync } from 'node:fs';
 
 const { resolveConstraints } = await import('../../src/modeller/snap.js');
 const { detectJoints, detectFeatureJoints } = await import('../../src/engine/joints.js');
+const { buildHardwarePlan } = await import('../../src/engine/hardware.js');
+const { buildAssemblySequence } = await import('../../src/engine/assembly.js');
+const { buildAssemblyPlan } = await import('../../src/engine/ergonomics.js');
 const graphs = JSON.parse(readFileSync(0, 'utf8'));
 const out = graphs.map((panels) => {
   try {
     const resolved = resolveConstraints(panels);
-    return { ok: { resolved, joints: detectJoints(resolved), featureJoints: detectFeatureJoints(panels) } };
+    const { generatedAt, ...hardware } = buildHardwarePlan(panels);
+    return { ok: { resolved, joints: detectJoints(resolved), featureJoints: detectFeatureJoints(panels), hardware,
+      sequence: buildAssemblySequence(panels), assembly: buildAssemblyPlan(panels) } };
   } catch (e) {
     return { error: String(e.message) };
   }

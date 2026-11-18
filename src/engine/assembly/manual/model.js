@@ -1,3 +1,4 @@
+import { localizeStep } from '../../../i18n/steps.js';
 import { PHASE4_PHASES, phase4ActionLabel, phase4Array, phase4ErgonomicLabel, phase4OrientationIcon, phase4OrientationLabel, phase4PhaseIndex, phase4Unique } from './format.js';
 import { phase4BuildVisualParts } from './visualParts.js';
 import { phase4BuildAssemblyStateSvg, phase4StepDiagram } from './diagram.js';
@@ -11,9 +12,14 @@ import { phase4BuildHardwareSummary, phase4BuildPartsSummary, phase4BuildProgres
  * print-to-PDF implementation.
  */
 export function buildAssemblyManualModel(
-  sequence,
+  rawSequence,
   options = {}
 ) {
+  // Steps from the API carry structured wording (verb + params, codes): render it in the requested language.
+  // Steps from the client-side JS planner have no `verb` and pass through unchanged (English prose).
+  const sequence = rawSequence && Array.isArray(rawSequence.steps)
+    ? { ...rawSequence, steps: rawSequence.steps.map((step) => localizeStep(step, options.locale ?? 'en')) }
+    : rawSequence;
   const steps = phase4Array(sequence?.steps);
 
   const title =
