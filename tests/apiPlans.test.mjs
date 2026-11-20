@@ -1,15 +1,8 @@
-/** tests/apiPlans.test.mjs — flags + the cached plan fetcher (phase 10). Run: node tests/apiPlans.test.mjs */
-import { flagsFrom } from '../src/api/flags.js';
+/** tests/apiPlans.test.mjs — the cached plan fetcher (phases 10 + 12). Run: node tests/apiPlans.test.mjs */
 import { createPlanFetcher } from '../src/api/plans.js';
 
 let pass = 0, fail = 0;
 const check = (name, ok) => { ok ? pass++ : (fail++, console.error('  FAIL:', name)); };
-
-console.log('flags');
-check('default off', JSON.stringify(flagsFrom({})) === '{"useApiHardware":false,"useApiAssembly":false}');
-check('true / TRUE / " true "', flagsFrom({ VITE_USE_API_HARDWARE: 'true', VITE_USE_API_ASSEMBLY: ' TRUE ' }).useApiAssembly && flagsFrom({ VITE_USE_API_HARDWARE: 'true' }).useApiHardware);
-check('anything else is off (false, 0, yes, empty)', ['false', '0', 'yes', '', undefined].every((v) => !flagsFrom({ VITE_USE_API_HARDWARE: v }).useApiHardware));
-check('the two flags are independent', !flagsFrom({ VITE_USE_API_HARDWARE: 'true' }).useApiAssembly);
 
 const panel = (id, extra = {}) => ({ id, name: id, material: 'M', quantity: 1, thicknessAxis: 'x', width: 100, height: 100, thickness: 18, rotation: { x: 0, y: 0, z: 0 }, basePosition: { x: 0, y: 0, z: 0 }, offset: { x: 0, y: 0, z: 0 }, constraints: [], ...extra });
 

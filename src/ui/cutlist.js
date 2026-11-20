@@ -14,7 +14,7 @@
  * (unit-tested); this file only wires it to the DOM.
  *
  * There is deliberately NO local JS fallback: the original BOM/nesting engines
- * are kept only as test oracles (scripts/golden/legacy). If the API is down the
+ * were deleted in phase 12 (see fixtures/golden/README.md). If the API is down the
  * cut list shows a visible error state and exports retry on demand.
  *
  * modeller-main.js calls requestBom(visiblePanels) once per renderAll().

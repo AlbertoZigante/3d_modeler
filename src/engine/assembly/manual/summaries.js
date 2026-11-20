@@ -1,4 +1,3 @@
-import { panelRole } from '../roles.js';
 import { PHASE4_PHASES, phase4Array, phase4PhaseIndex, phase4Unique } from './format.js';
 
 export function phase4Warnings(step) {
@@ -202,6 +201,12 @@ export function phase4BuildPartsSummary(
   const steps =
     phase4Array(sequence?.steps);
 
+  const roleByPanel = new Map();
+  steps.forEach((step) => {
+    const id = step?.panelIds?.[0];
+    if (id && step.role && !roleByPanel.has(id)) roleByPanel.set(id, step.role);
+  });
+
   /*
    * First source of truth:
    * the actual model panels.
@@ -216,8 +221,9 @@ export function phase4BuildPartsSummary(
     const resolved =
       resolvedById.get(panel.id);
 
+    // the server classifies every panel it plans (step.role); a panel the plan never mentions stays 'unknown'
     const role =
-      panelRole(panel);
+      roleByPanel.get(panel.id) || 'unknown';
 
     const dimensions =
       phase4PanelDimensions(

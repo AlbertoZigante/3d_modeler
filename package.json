@@ -8,22 +8,22 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "golden:dump": "node scripts/golden/dump-golden.mjs",
-    "golden:check": "node scripts/golden/check-golden.mjs",
     "api:types": "node scripts/api/sync-contract.mjs --api ../api/openapi.json",
     "api:types:check": "node scripts/api/sync-contract.mjs --check",
-    "golden:legacy": "node scripts/golden/legacy-oracle.mjs",
-    "test:unit": "node tests/requester.test.mjs && node tests/http.test.mjs && node tests/contract.test.mjs && node tests/payload.test.mjs && node tests/apiErrors.test.mjs && node tests/apiPlans.test.mjs && node tests/stepsI18n.test.mjs",
-    "test:e2e": "node tests/cutlist.integration.test.mjs"
+    "test:unit": "node tests/requester.test.mjs && node tests/http.test.mjs && node tests/contract.test.mjs && node tests/payload.test.mjs && node tests/apiErrors.test.mjs && node tests/apiPlans.test.mjs && node tests/stepsI18n.test.mjs && node tests/manual.test.mjs",
+    "test:e2e": "node tests/cutlist.integration.test.mjs",
+    "test:engine": "node tests/joints.test.mjs && node tests/clearance.test.mjs && node tests/hardware.test.mjs && node tests/spacing.test.mjs && node tests/validator.test.mjs && node tests/drawer.test.mjs && node tests/quotes.test.mjs && node tests/units.test.mjs",
+    "test:bundle": "vite build && node scripts/check-bundle.mjs",
+    "test:e2e:browser": "node tests/e2e/smoke.mjs",
+    "test:engine:plinth": "node tests/plinth.test.mjs"
   },
   "devDependencies": {
     "openapi-typescript": "^7.13.0",
+    "playwright": "^1.65.1",
     "vite": "^8.1.1"
   },
   "dependencies": {
-    "add": "^2.0.6",
     "jspdf": "^4.2.1",
-    "package-lock.json": "^1.0.0",
     "three": "^0.185.1"
   }
 }
