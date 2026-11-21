@@ -13,12 +13,13 @@
  * Needs: playwright (devDependency) + a Chromium (`npx playwright install chromium`), python deps of ../api.
  */
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173';
 const API = process.env.API_URL ?? 'http://localhost:8000';
-const API_DIR = process.env.API_DIR ?? new URL('../../../api', import.meta.url).pathname;
+const API_DIR = process.env.API_DIR ?? fileURLToPath(new URL('../../../api', import.meta.url));
 let pass = 0, fail = 0;
 const check = (name, ok, extra = '') => { ok ? pass++ : (fail++, console.error(`  FAIL: ${name} ${extra}`)); if (ok) console.log(`  ok: ${name}`); };
 
@@ -26,7 +27,9 @@ const up = async (url) => { try { return (await fetch(url)).ok; } catch { return
 const children = [];
 async function ensure(url, cmd, args, opts) {
   if (await up(url)) return;
-  const child = spawn(cmd, args, { ...opts, stdio: 'ignore' });
+  // shell:true so Windows resolves npx.cmd (spawn('npx') alone fails with ENOENT there)
+  const child = spawn(cmd, args, { ...opts, stdio: 'ignore', shell: process.platform === 'win32' });
+  child.on('error', (e) => { throw new Error(`could not spawn ${cmd}: ${e.message}`); });
   children.push(child);
   for (let i = 0; i < 100 && !(await up(url)); i++) await new Promise((r) => setTimeout(r, 300));
   if (!(await up(url))) throw new Error(`could not start ${cmd} for ${url}`);
@@ -35,7 +38,7 @@ async function ensure(url, cmd, args, opts) {
 await ensure(`${API}/health`, 'python', ['-m', 'uvicorn', 'app.main:app', '--port', new URL(API).port, '--log-level', 'warning'],
   { cwd: API_DIR, env: { ...process.env, API_KEYS: '', ENV: 'development', RATE_LIMIT: '100000/minute', RATE_LIMIT_HEAVY: '100000/minute' } });
 await ensure(`${BASE}/modeller.html`, 'npx', ['vite', '--port', new URL(BASE).port, '--host', 'localhost'],
-  { cwd: new URL('../..', import.meta.url).pathname, env: { ...process.env, VITE_API_URL: API } });
+  { cwd: fileURLToPath(new URL('../..', import.meta.url)), env: { ...process.env, VITE_API_URL: API } });
 
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1500, height: 900 }, acceptDownloads: true });
