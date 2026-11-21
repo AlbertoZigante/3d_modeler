@@ -1,0 +1,2063 @@
+{
+  "clusters": [
+    {
+      "id": "SUB02",
+      "name": "Plinth",
+      "panelIds": [
+        "panel-8",
+        "panel-10",
+        "panel-11",
+        "panel-9",
+        "panel-12"
+      ],
+      "role": "plinth"
+    },
+    {
+      "id": "SUB01",
+      "name": "Main carcass",
+      "panelIds": [
+        "panel-1",
+        "panel-3",
+        "panel-4",
+        "panel-5",
+        "panel-2"
+      ],
+      "role": "carcass"
+    }
+  ],
+  "steps": [
+    {
+      "action": "assemble",
+      "clusterKind": "plinth",
+      "componentKind": "plinth",
+      "componentSubtitle": null,
+      "componentTitle": "PLINTH",
+      "description": "Start the plinth with BA0002.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 53,
+        "support": 10,
+        "toolAccess": 0,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "ergonomics": {
+        "recommendedSurface": "table",
+        "twoPersonJob": false,
+        "weightKg": 0.4
+      },
+      "hardware": [],
+      "index": 1,
+      "instruction": "Start the plinth with BA0002.",
+      "jointIds": [],
+      "kind": "join",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "BA0002"
+      ],
+      "panelIds": [
+        "panel-10"
+      ],
+      "panelNames": [
+        "Plinth Back"
+      ],
+      "phase": "internal",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "plinth",
+      "stage": "plinth",
+      "stepId": "S01",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB02",
+      "subassemblyName": "Plinth",
+      "toolNotes": [],
+      "tools": [],
+      "unitPanelIds": [
+        "panel-8",
+        "panel-10",
+        "panel-11",
+        "panel-9",
+        "panel-12"
+      ],
+      "warnings": []
+    },
+    {
+      "action": "assemble",
+      "clusterKind": "plinth",
+      "componentKind": "plinth",
+      "componentSubtitle": null,
+      "componentTitle": "PLINTH",
+      "description": "Attach LE0002 to BA0002 (corner_butt).",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 57,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "ergonomics": {
+        "orientationAxis": "z",
+        "recommendedSurface": "table",
+        "reorientationNeeded": false,
+        "singleJointCaution": true,
+        "twoPersonJob": false,
+        "weightKg": 0.6
+      },
+      "hardware": [
+        {
+          "displayId": "FS014",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-8:panel-10:z",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-8",
+          "panelACode": "LE0002",
+          "panelAName": "Plinth Left",
+          "panelB": "panel-10",
+          "panelBCode": "BA0002",
+          "panelBName": "Plinth Back",
+          "positions": [
+            {
+              "x": 9,
+              "y": 30,
+              "z": -182
+            }
+          ]
+        }
+      ],
+      "index": 2,
+      "instruction": "Attach LE0002 to BA0002.",
+      "jointIds": [
+        "panel-8:panel-10:z"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "z",
+          "contactPosition": -182,
+          "faceA": "right",
+          "faceB": "front",
+          "gap": 0,
+          "id": "panel-8:panel-10:z",
+          "overlap": {
+            "x": [
+              0,
+              18
+            ],
+            "y": [
+              0,
+              60
+            ]
+          },
+          "panelA": "panel-8",
+          "panelB": "panel-10",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        }
+      ],
+      "kind": "join",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [
+        "panel-10"
+      ],
+      "panelCodes": [
+        "LE0002"
+      ],
+      "panelIds": [
+        "panel-8"
+      ],
+      "panelNames": [
+        "Plinth Left"
+      ],
+      "phase": "subassembly",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "plinth",
+      "stage": "plinth",
+      "stepId": "S02",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB02",
+      "subassemblyName": "Plinth",
+      "toolNotes": [
+        "Requires a proper two-stage pilot + clearance hole (see the catalog entry's own pilotHoleDiameterMm/clearanceHoleDiameterMm) or the panel will split. Drive type (Pozidriv PZ3 here) is a common convention, not a verified spec — confirm against your specific confirmat screw brand."
+      ],
+      "tools": [
+        "4.5mm drill bit (pilot hole)",
+        "7mm drill bit or a stepped confirmat bit (clearance hole)",
+        "Pozidriv PZ3 screwdriver bit (or drill/driver)"
+      ],
+      "unitPanelIds": [
+        "panel-8",
+        "panel-10",
+        "panel-11",
+        "panel-9",
+        "panel-12"
+      ],
+      "warnings": []
+    },
+    {
+      "action": "assemble",
+      "clusterKind": "plinth",
+      "componentKind": "plinth",
+      "componentSubtitle": null,
+      "componentTitle": "PLINTH",
+      "description": "Attach FR0002 to LE0002 (corner_butt).",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 57,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "ergonomics": {
+        "orientationAxis": "z",
+        "recommendedSurface": "table",
+        "reorientationNeeded": false,
+        "singleJointCaution": true,
+        "twoPersonJob": false,
+        "weightKg": 1
+      },
+      "hardware": [
+        {
+          "displayId": "FS015",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-8:panel-11:z",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-8",
+          "panelACode": "LE0002",
+          "panelAName": "Plinth Left",
+          "panelB": "panel-11",
+          "panelBCode": "FR0002",
+          "panelBName": "Plinth Front",
+          "positions": [
+            {
+              "x": 9,
+              "y": 30,
+              "z": 182
+            }
+          ]
+        }
+      ],
+      "index": 3,
+      "instruction": "Attach FR0002 to LE0002.",
+      "jointIds": [
+        "panel-8:panel-11:z"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "z",
+          "contactPosition": 182,
+          "faceA": "left",
+          "faceB": "back",
+          "gap": 0,
+          "id": "panel-8:panel-11:z",
+          "overlap": {
+            "x": [
+              0,
+              18
+            ],
+            "y": [
+              0,
+              60
+            ]
+          },
+          "panelA": "panel-8",
+          "panelB": "panel-11",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        }
+      ],
+      "kind": "join",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [
+        "panel-8"
+      ],
+      "panelCodes": [
+        "FR0002"
+      ],
+      "panelIds": [
+        "panel-11"
+      ],
+      "panelNames": [
+        "Plinth Front"
+      ],
+      "phase": "subassembly",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "plinth",
+      "stage": "plinth",
+      "stepId": "S03",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB02",
+      "subassemblyName": "Plinth",
+      "toolNotes": [
+        "Requires a proper two-stage pilot + clearance hole (see the catalog entry's own pilotHoleDiameterMm/clearanceHoleDiameterMm) or the panel will split. Drive type (Pozidriv PZ3 here) is a common convention, not a verified spec — confirm against your specific confirmat screw brand."
+      ],
+      "tools": [
+        "4.5mm drill bit (pilot hole)",
+        "7mm drill bit or a stepped confirmat bit (clearance hole)",
+        "Pozidriv PZ3 screwdriver bit (or drill/driver)"
+      ],
+      "unitPanelIds": [
+        "panel-8",
+        "panel-10",
+        "panel-11",
+        "panel-9",
+        "panel-12"
+      ],
+      "warnings": []
+    },
+    {
+      "action": "assemble",
+      "clusterKind": "plinth",
+      "componentKind": "plinth",
+      "componentSubtitle": null,
+      "componentTitle": "PLINTH",
+      "description": "Attach PA0001 to BA0002, FR0002 (t_butt, t_butt).",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 57,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "ergonomics": {
+        "orientationAxis": "z",
+        "recommendedSurface": "table",
+        "reorientationNeeded": false,
+        "singleJointCaution": false,
+        "twoPersonJob": false,
+        "weightKg": 1.2
+      },
+      "hardware": [
+        {
+          "displayId": "FS018",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-10:panel-12:z",
+          "jointType": "t_butt",
+          "kind": "fastener",
+          "panelA": "panel-10",
+          "panelACode": "BA0002",
+          "panelAName": "Plinth Back",
+          "panelB": "panel-12",
+          "panelBCode": "PA0001",
+          "panelBName": "Plinth Rib y-1-1",
+          "positions": [
+            {
+              "x": 250,
+              "y": 30,
+              "z": -182
+            }
+          ]
+        },
+        {
+          "displayId": "FS019",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-11:panel-12:z",
+          "jointType": "t_butt",
+          "kind": "fastener",
+          "panelA": "panel-11",
+          "panelACode": "FR0002",
+          "panelAName": "Plinth Front",
+          "panelB": "panel-12",
+          "panelBCode": "PA0001",
+          "panelBName": "Plinth Rib y-1-1",
+          "positions": [
+            {
+              "x": 250,
+              "y": 30,
+              "z": 182
+            }
+          ]
+        }
+      ],
+      "index": 4,
+      "instruction": "Attach PA0001 to BA0002, FR0002.",
+      "jointIds": [
+        "panel-10:panel-12:z",
+        "panel-11:panel-12:z"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "z",
+          "contactPosition": -182,
+          "faceA": "front",
+          "faceB": "right",
+          "gap": 0,
+          "id": "panel-10:panel-12:z",
+          "overlap": {
+            "x": [
+              241,
+              259
+            ],
+            "y": [
+              0,
+              60
+            ]
+          },
+          "panelA": "panel-10",
+          "panelB": "panel-12",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "t_butt"
+        },
+        {
+          "contactAxis": "z",
+          "contactPosition": 182,
+          "faceA": "back",
+          "faceB": "left",
+          "gap": 0,
+          "id": "panel-11:panel-12:z",
+          "overlap": {
+            "x": [
+              241,
+              259
+            ],
+            "y": [
+              0,
+              60
+            ]
+          },
+          "panelA": "panel-11",
+          "panelB": "panel-12",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "t_butt"
+        }
+      ],
+      "kind": "join",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [
+        "panel-10",
+        "panel-11"
+      ],
+      "panelCodes": [
+        "PA0001"
+      ],
+      "panelIds": [
+        "panel-12"
+      ],
+      "panelNames": [
+        "Plinth Rib y-1-1"
+      ],
+      "phase": "subassembly",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "plinth",
+      "stage": "plinth",
+      "stepId": "S04",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB02",
+      "subassemblyName": "Plinth",
+      "toolNotes": [
+        "Requires a proper two-stage pilot + clearance hole (see the catalog entry's own pilotHoleDiameterMm/clearanceHoleDiameterMm) or the panel will split. Drive type (Pozidriv PZ3 here) is a common convention, not a verified spec — confirm against your specific confirmat screw brand."
+      ],
+      "tools": [
+        "4.5mm drill bit (pilot hole)",
+        "7mm drill bit or a stepped confirmat bit (clearance hole)",
+        "Pozidriv PZ3 screwdriver bit (or drill/driver)"
+      ],
+      "unitPanelIds": [
+        "panel-8",
+        "panel-10",
+        "panel-11",
+        "panel-9",
+        "panel-12"
+      ],
+      "warnings": []
+    },
+    {
+      "action": "assemble",
+      "clusterKind": "plinth",
+      "completionInstruction": "Sub-assembly complete: Plinth. Set it aside until final integration.",
+      "componentKind": "plinth",
+      "componentSubtitle": null,
+      "componentTitle": "PLINTH",
+      "description": "Attach RI0002 to BA0002, FR0002 (corner_butt, corner_butt).",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 57,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "ergonomics": {
+        "orientationAxis": "z",
+        "recommendedSurface": "table",
+        "reorientationNeeded": false,
+        "singleJointCaution": false,
+        "twoPersonJob": false,
+        "weightKg": 1.5
+      },
+      "hardware": [
+        {
+          "displayId": "FS016",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-9:panel-10:z",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-9",
+          "panelACode": "RI0002",
+          "panelAName": "Plinth Right",
+          "panelB": "panel-10",
+          "panelBCode": "BA0002",
+          "panelBName": "Plinth Back",
+          "positions": [
+            {
+              "x": 491,
+              "y": 30,
+              "z": -182
+            }
+          ]
+        },
+        {
+          "displayId": "FS017",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-9:panel-11:z",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-9",
+          "panelACode": "RI0002",
+          "panelAName": "Plinth Right",
+          "panelB": "panel-11",
+          "panelBCode": "FR0002",
+          "panelBName": "Plinth Front",
+          "positions": [
+            {
+              "x": 491,
+              "y": 30,
+              "z": 182
+            }
+          ]
+        }
+      ],
+      "index": 5,
+      "instruction": "Attach RI0002 to BA0002, FR0002.",
+      "jointIds": [
+        "panel-9:panel-10:z",
+        "panel-9:panel-11:z"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "z",
+          "contactPosition": -182,
+          "faceA": "right",
+          "faceB": "front",
+          "gap": 0,
+          "id": "panel-9:panel-10:z",
+          "overlap": {
+            "x": [
+              482,
+              500
+            ],
+            "y": [
+              0,
+              60
+            ]
+          },
+          "panelA": "panel-9",
+          "panelB": "panel-10",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        },
+        {
+          "contactAxis": "z",
+          "contactPosition": 182,
+          "faceA": "left",
+          "faceB": "back",
+          "gap": 0,
+          "id": "panel-9:panel-11:z",
+          "overlap": {
+            "x": [
+              482,
+              500
+            ],
+            "y": [
+              0,
+              60
+            ]
+          },
+          "panelA": "panel-9",
+          "panelB": "panel-11",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        }
+      ],
+      "kind": "join",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [
+        "panel-10",
+        "panel-11"
+      ],
+      "panelCodes": [
+        "RI0002"
+      ],
+      "panelIds": [
+        "panel-9"
+      ],
+      "panelNames": [
+        "Plinth Right"
+      ],
+      "phase": "subassembly",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "plinth",
+      "stage": "plinth",
+      "stepId": "S05",
+      "subassemblyComplete": true,
+      "subassemblyId": "SUB02",
+      "subassemblyName": "Plinth",
+      "toolNotes": [
+        "Requires a proper two-stage pilot + clearance hole (see the catalog entry's own pilotHoleDiameterMm/clearanceHoleDiameterMm) or the panel will split. Drive type (Pozidriv PZ3 here) is a common convention, not a verified spec — confirm against your specific confirmat screw brand."
+      ],
+      "tools": [
+        "4.5mm drill bit (pilot hole)",
+        "7mm drill bit or a stepped confirmat bit (clearance hole)",
+        "Pozidriv PZ3 screwdriver bit (or drill/driver)"
+      ],
+      "unitPanelIds": [
+        "panel-8",
+        "panel-10",
+        "panel-11",
+        "panel-9",
+        "panel-12"
+      ],
+      "warnings": []
+    },
+    {
+      "action": "install",
+      "clusterKind": "carcass",
+      "componentKind": "carcass",
+      "componentSubtitle": null,
+      "componentTitle": "CARCASS",
+      "description": "Start the sub-assembly with BO0001.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 53,
+        "support": 10,
+        "toolAccess": 0,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "ergonomics": {
+        "recommendedSurface": "table",
+        "twoPersonJob": false,
+        "weightKg": 2.3
+      },
+      "hardware": [],
+      "index": 6,
+      "instruction": "Start the sub-assembly with BO0001.",
+      "jointIds": [],
+      "kind": "join",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "BO0001"
+      ],
+      "panelIds": [
+        "panel-4"
+      ],
+      "panelNames": [
+        "Bottom"
+      ],
+      "phase": "internal",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "bottom",
+      "stage": "carcass",
+      "stepId": "S06",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "toolNotes": [],
+      "tools": [],
+      "unitPanelIds": null,
+      "warnings": []
+    },
+    {
+      "action": "install",
+      "clusterKind": "carcass",
+      "componentKind": "carcass",
+      "componentSubtitle": null,
+      "componentTitle": "CARCASS",
+      "description": "Attach LE0001 to BO0001 (corner_butt).",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 57,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "ergonomics": {
+        "orientationAxis": "y",
+        "recommendedSurface": "table",
+        "reorientationNeeded": false,
+        "singleJointCaution": true,
+        "twoPersonJob": false,
+        "weightKg": 5.6
+      },
+      "hardware": [
+        {
+          "displayId": "FS002",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-1:panel-4:y",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-1",
+          "panelACode": "LE0001",
+          "panelAName": "Left",
+          "panelB": "panel-4",
+          "panelBCode": "BO0001",
+          "panelBName": "Bottom",
+          "positions": [
+            {
+              "x": 9,
+              "y": 78,
+              "z": -150
+            },
+            {
+              "x": 9,
+              "y": 78,
+              "z": 0
+            },
+            {
+              "x": 9,
+              "y": 78,
+              "z": 150
+            }
+          ]
+        }
+      ],
+      "index": 7,
+      "instruction": "Attach LE0001 to BO0001.",
+      "jointIds": [
+        "panel-1:panel-4:y"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "y",
+          "contactPosition": 78,
+          "faceA": "bottom",
+          "faceB": "back",
+          "gap": 0,
+          "id": "panel-1:panel-4:y",
+          "overlap": {
+            "x": [
+              0,
+              18
+            ],
+            "z": [
+              -200,
+              200
+            ]
+          },
+          "panelA": "panel-1",
+          "panelB": "panel-4",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        }
+      ],
+      "kind": "join",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [
+        "panel-4"
+      ],
+      "panelCodes": [
+        "LE0001"
+      ],
+      "panelIds": [
+        "panel-1"
+      ],
+      "panelNames": [
+        "Left"
+      ],
+      "phase": "subassembly",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "unknown",
+      "stage": "carcass",
+      "stepId": "S07",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "toolNotes": [
+        "Requires a proper two-stage pilot + clearance hole (see the catalog entry's own pilotHoleDiameterMm/clearanceHoleDiameterMm) or the panel will split. Drive type (Pozidriv PZ3 here) is a common convention, not a verified spec — confirm against your specific confirmat screw brand."
+      ],
+      "tools": [
+        "4.5mm drill bit (pilot hole)",
+        "7mm drill bit or a stepped confirmat bit (clearance hole)",
+        "Pozidriv PZ3 screwdriver bit (or drill/driver)"
+      ],
+      "unitPanelIds": null,
+      "warnings": []
+    },
+    {
+      "action": "install",
+      "clusterKind": "carcass",
+      "componentKind": "carcass",
+      "componentSubtitle": null,
+      "componentTitle": "CARCASS",
+      "description": "Attach RI0001 to BO0001 (corner_butt).",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 57,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "ergonomics": {
+        "orientationAxis": "y",
+        "recommendedSurface": "table",
+        "reorientationNeeded": false,
+        "singleJointCaution": true,
+        "twoPersonJob": false,
+        "weightKg": 8.9
+      },
+      "hardware": [
+        {
+          "displayId": "FS005",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-2:panel-4:y",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-2",
+          "panelACode": "RI0001",
+          "panelAName": "Right",
+          "panelB": "panel-4",
+          "panelBCode": "BO0001",
+          "panelBName": "Bottom",
+          "positions": [
+            {
+              "x": 491,
+              "y": 78,
+              "z": -150
+            },
+            {
+              "x": 491,
+              "y": 78,
+              "z": 0
+            },
+            {
+              "x": 491,
+              "y": 78,
+              "z": 150
+            }
+          ]
+        }
+      ],
+      "index": 8,
+      "instruction": "Attach RI0001 to BO0001.",
+      "jointIds": [
+        "panel-2:panel-4:y"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "y",
+          "contactPosition": 78,
+          "faceA": "bottom",
+          "faceB": "back",
+          "gap": 0,
+          "id": "panel-2:panel-4:y",
+          "overlap": {
+            "x": [
+              482,
+              500
+            ],
+            "z": [
+              -200,
+              200
+            ]
+          },
+          "panelA": "panel-2",
+          "panelB": "panel-4",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        }
+      ],
+      "kind": "join",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [
+        "panel-4"
+      ],
+      "panelCodes": [
+        "RI0001"
+      ],
+      "panelIds": [
+        "panel-2"
+      ],
+      "panelNames": [
+        "Right"
+      ],
+      "phase": "subassembly",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "unknown",
+      "stage": "carcass",
+      "stepId": "S08",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "toolNotes": [
+        "Requires a proper two-stage pilot + clearance hole (see the catalog entry's own pilotHoleDiameterMm/clearanceHoleDiameterMm) or the panel will split. Drive type (Pozidriv PZ3 here) is a common convention, not a verified spec — confirm against your specific confirmat screw brand."
+      ],
+      "tools": [
+        "4.5mm drill bit (pilot hole)",
+        "7mm drill bit or a stepped confirmat bit (clearance hole)",
+        "Pozidriv PZ3 screwdriver bit (or drill/driver)"
+      ],
+      "unitPanelIds": null,
+      "warnings": []
+    },
+    {
+      "action": "close",
+      "clusterKind": "carcass",
+      "componentKind": "carcass",
+      "componentSubtitle": null,
+      "componentTitle": "CARCASS",
+      "description": "Install BA0001 as a back closure after all accessible internal components are in place.",
+      "ergonomic": {
+        "posture": 1.5,
+        "reach": 5,
+        "reposition": 2,
+        "score": 62.3,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "ergonomics": {
+        "orientationAxis": "z",
+        "recommendedSurface": "floor",
+        "reorientationNeeded": false,
+        "singleJointCaution": false,
+        "twoPersonJob": false,
+        "weightKg": 13.2
+      },
+      "hardware": [
+        {
+          "displayId": "FS003",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-1:panel-5:z",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-1",
+          "panelACode": "LE0001",
+          "panelAName": "Left",
+          "panelB": "panel-5",
+          "panelBCode": "BA0001",
+          "panelBName": "Back",
+          "positions": [
+            {
+              "x": 9,
+              "y": 128,
+              "z": -200
+            },
+            {
+              "x": 9,
+              "y": 278,
+              "z": -200
+            },
+            {
+              "x": 9,
+              "y": 428,
+              "z": -200
+            },
+            {
+              "x": 9,
+              "y": 578,
+              "z": -200
+            },
+            {
+              "x": 9,
+              "y": 728,
+              "z": -200
+            }
+          ]
+        },
+        {
+          "displayId": "FS006",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-2:panel-5:z",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-2",
+          "panelACode": "RI0001",
+          "panelAName": "Right",
+          "panelB": "panel-5",
+          "panelBCode": "BA0001",
+          "panelBName": "Back",
+          "positions": [
+            {
+              "x": 491,
+              "y": 128,
+              "z": -200
+            },
+            {
+              "x": 491,
+              "y": 278,
+              "z": -200
+            },
+            {
+              "x": 491,
+              "y": 428,
+              "z": -200
+            },
+            {
+              "x": 491,
+              "y": 578,
+              "z": -200
+            },
+            {
+              "x": 491,
+              "y": 728,
+              "z": -200
+            }
+          ]
+        },
+        {
+          "displayId": "FS008",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-4:panel-5:z",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-4",
+          "panelACode": "BO0001",
+          "panelAName": "Bottom",
+          "panelB": "panel-5",
+          "panelBCode": "BA0001",
+          "panelBName": "Back",
+          "positions": [
+            {
+              "x": 50,
+              "y": 69,
+              "z": -200
+            },
+            {
+              "x": 183.333,
+              "y": 69,
+              "z": -200
+            },
+            {
+              "x": 316.667,
+              "y": 69,
+              "z": -200
+            },
+            {
+              "x": 450,
+              "y": 69,
+              "z": -200
+            }
+          ]
+        }
+      ],
+      "index": 9,
+      "instruction": "Install BA0001 as the back panel after all accessible internal components are installed.",
+      "jointIds": [
+        "panel-1:panel-5:z",
+        "panel-2:panel-5:z",
+        "panel-4:panel-5:z"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "z",
+          "contactPosition": -200,
+          "faceA": "right",
+          "faceB": "front",
+          "gap": 0,
+          "id": "panel-1:panel-5:z",
+          "overlap": {
+            "x": [
+              0,
+              18
+            ],
+            "y": [
+              78,
+              778
+            ]
+          },
+          "panelA": "panel-1",
+          "panelB": "panel-5",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        },
+        {
+          "contactAxis": "z",
+          "contactPosition": -200,
+          "faceA": "right",
+          "faceB": "front",
+          "gap": 0,
+          "id": "panel-2:panel-5:z",
+          "overlap": {
+            "x": [
+              482,
+              500
+            ],
+            "y": [
+              78,
+              778
+            ]
+          },
+          "panelA": "panel-2",
+          "panelB": "panel-5",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        },
+        {
+          "contactAxis": "z",
+          "contactPosition": -200,
+          "faceA": "bottom",
+          "faceB": "front",
+          "gap": 0,
+          "id": "panel-4:panel-5:z",
+          "overlap": {
+            "x": [
+              0,
+              500
+            ],
+            "y": [
+              60,
+              78
+            ]
+          },
+          "panelA": "panel-4",
+          "panelB": "panel-5",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        }
+      ],
+      "kind": "join",
+      "orientation": "rear_access",
+      "orientationInstruction": "Keep the rear/open face accessible for this operation.",
+      "otherPanelIds": [
+        "panel-1",
+        "panel-2",
+        "panel-4"
+      ],
+      "panelCodes": [
+        "BA0001"
+      ],
+      "panelIds": [
+        "panel-5"
+      ],
+      "panelNames": [
+        "Back"
+      ],
+      "phase": "closure",
+      "prerequisiteStepIds": [
+        "S06"
+      ],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 1,
+      "requiresReposition": true,
+      "role": "back",
+      "stage": "carcass",
+      "stepId": "S09",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "toolNotes": [
+        "Requires a proper two-stage pilot + clearance hole (see the catalog entry's own pilotHoleDiameterMm/clearanceHoleDiameterMm) or the panel will split. Drive type (Pozidriv PZ3 here) is a common convention, not a verified spec — confirm against your specific confirmat screw brand."
+      ],
+      "tools": [
+        "4.5mm drill bit (pilot hole)",
+        "7mm drill bit or a stepped confirmat bit (clearance hole)",
+        "Pozidriv PZ3 screwdriver bit (or drill/driver)"
+      ],
+      "unitPanelIds": null,
+      "warnings": [
+        "Do not install the back until all required internal components are in place."
+      ]
+    },
+    {
+      "action": "close",
+      "clusterKind": "carcass",
+      "componentKind": "carcass",
+      "componentSubtitle": null,
+      "componentTitle": "CARCASS",
+      "description": "Install TO0001 as a top closure after all accessible internal components are in place.",
+      "ergonomic": {
+        "posture": 3.5,
+        "reach": 5,
+        "reposition": 2,
+        "score": 64.3,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "ergonomics": {
+        "orientationAxis": null,
+        "recommendedSurface": "floor",
+        "reorientationNeeded": false,
+        "singleJointCaution": false,
+        "twoPersonJob": false,
+        "weightKg": 15.6
+      },
+      "hardware": [
+        {
+          "displayId": "FS001",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-1:panel-3:y",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-1",
+          "panelACode": "LE0001",
+          "panelAName": "Left",
+          "panelB": "panel-3",
+          "panelBCode": "TO0001",
+          "panelBName": "Top",
+          "positions": [
+            {
+              "x": 9,
+              "y": 778,
+              "z": -150
+            },
+            {
+              "x": 9,
+              "y": 778,
+              "z": 0
+            },
+            {
+              "x": 9,
+              "y": 778,
+              "z": 150
+            }
+          ]
+        },
+        {
+          "displayId": "FS004",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-2:panel-3:y",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-2",
+          "panelACode": "RI0001",
+          "panelAName": "Right",
+          "panelB": "panel-3",
+          "panelBCode": "TO0001",
+          "panelBName": "Top",
+          "positions": [
+            {
+              "x": 491,
+              "y": 778,
+              "z": -150
+            },
+            {
+              "x": 491,
+              "y": 778,
+              "z": 0
+            },
+            {
+              "x": 491,
+              "y": 778,
+              "z": 150
+            }
+          ]
+        },
+        {
+          "displayId": "FS007",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-3:panel-5:z",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-3",
+          "panelACode": "TO0001",
+          "panelAName": "Top",
+          "panelB": "panel-5",
+          "panelBCode": "BA0001",
+          "panelBName": "Back",
+          "positions": [
+            {
+              "x": 50,
+              "y": 787,
+              "z": -200
+            },
+            {
+              "x": 183.333,
+              "y": 787,
+              "z": -200
+            },
+            {
+              "x": 316.667,
+              "y": 787,
+              "z": -200
+            },
+            {
+              "x": 450,
+              "y": 787,
+              "z": -200
+            }
+          ]
+        }
+      ],
+      "index": 10,
+      "instruction": "Install TO0001 as the top panel only after the internal assembly and back panel are complete.",
+      "jointIds": [
+        "panel-1:panel-3:y",
+        "panel-2:panel-3:y",
+        "panel-3:panel-5:z"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "y",
+          "contactPosition": 778,
+          "faceA": "top",
+          "faceB": "front",
+          "gap": 0,
+          "id": "panel-1:panel-3:y",
+          "overlap": {
+            "x": [
+              0,
+              18
+            ],
+            "z": [
+              -200,
+              200
+            ]
+          },
+          "panelA": "panel-1",
+          "panelB": "panel-3",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        },
+        {
+          "contactAxis": "y",
+          "contactPosition": 778,
+          "faceA": "top",
+          "faceB": "front",
+          "gap": 0,
+          "id": "panel-2:panel-3:y",
+          "overlap": {
+            "x": [
+              482,
+              500
+            ],
+            "z": [
+              -200,
+              200
+            ]
+          },
+          "panelA": "panel-2",
+          "panelB": "panel-3",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        },
+        {
+          "contactAxis": "z",
+          "contactPosition": -200,
+          "faceA": "bottom",
+          "faceB": "front",
+          "gap": 0,
+          "id": "panel-3:panel-5:z",
+          "overlap": {
+            "x": [
+              0,
+              500
+            ],
+            "y": [
+              778,
+              796
+            ]
+          },
+          "panelA": "panel-3",
+          "panelB": "panel-5",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        }
+      ],
+      "kind": "join",
+      "orientation": "upright",
+      "orientationInstruction": "Work with the furniture upright and stable.",
+      "otherPanelIds": [
+        "panel-1",
+        "panel-2",
+        "panel-5"
+      ],
+      "panelCodes": [
+        "TO0001"
+      ],
+      "panelIds": [
+        "panel-3"
+      ],
+      "panelNames": [
+        "Top"
+      ],
+      "phase": "closure",
+      "prerequisiteStepIds": [
+        "S09"
+      ],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 1,
+      "requiresReposition": true,
+      "role": "top",
+      "stage": "carcass",
+      "stepId": "S10",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "toolNotes": [
+        "Requires a proper two-stage pilot + clearance hole (see the catalog entry's own pilotHoleDiameterMm/clearanceHoleDiameterMm) or the panel will split. Drive type (Pozidriv PZ3 here) is a common convention, not a verified spec — confirm against your specific confirmat screw brand."
+      ],
+      "tools": [
+        "4.5mm drill bit (pilot hole)",
+        "7mm drill bit or a stepped confirmat bit (clearance hole)",
+        "Pozidriv PZ3 screwdriver bit (or drill/driver)"
+      ],
+      "unitPanelIds": null,
+      "warnings": [
+        "Do not install the top until the internal components and back panel are complete."
+      ]
+    },
+    {
+      "action": "integrate",
+      "clusterKind": "plinth",
+      "componentKind": "integration",
+      "componentSubtitle": null,
+      "componentTitle": "FINAL ASSEMBLY",
+      "description": "Fit the plinth (LE0002, BA0002, FR0002, RI0002, PA0001) under the finished carcass (BO0001).",
+      "ergonomic": {
+        "posture": 3.5,
+        "reach": 5,
+        "reposition": 0,
+        "score": 59.6,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "ergonomics": {
+        "recommendedSurface": "floor",
+        "twoPersonJob": false,
+        "weightKg": 17.1
+      },
+      "hardware": [
+        {
+          "displayId": "FS009",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-4:panel-8:y",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-4",
+          "panelACode": "BO0001",
+          "panelAName": "Bottom",
+          "panelB": "panel-8",
+          "panelBCode": "LE0002",
+          "panelBName": "Plinth Left",
+          "positions": [
+            {
+              "x": 9,
+              "y": 60,
+              "z": -132
+            },
+            {
+              "x": 9,
+              "y": 60,
+              "z": 0
+            },
+            {
+              "x": 9,
+              "y": 60,
+              "z": 132
+            }
+          ]
+        },
+        {
+          "displayId": "FS010",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-4:panel-9:y",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-4",
+          "panelACode": "BO0001",
+          "panelAName": "Bottom",
+          "panelB": "panel-9",
+          "panelBCode": "RI0002",
+          "panelBName": "Plinth Right",
+          "positions": [
+            {
+              "x": 491,
+              "y": 60,
+              "z": -132
+            },
+            {
+              "x": 491,
+              "y": 60,
+              "z": 0
+            },
+            {
+              "x": 491,
+              "y": 60,
+              "z": 132
+            }
+          ]
+        },
+        {
+          "displayId": "FS011",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-4:panel-10:y",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-4",
+          "panelACode": "BO0001",
+          "panelAName": "Bottom",
+          "panelB": "panel-10",
+          "panelBCode": "BA0002",
+          "panelBName": "Plinth Back",
+          "positions": [
+            {
+              "x": 50,
+              "y": 60,
+              "z": -191
+            },
+            {
+              "x": 183.333,
+              "y": 60,
+              "z": -191
+            },
+            {
+              "x": 316.667,
+              "y": 60,
+              "z": -191
+            },
+            {
+              "x": 450,
+              "y": 60,
+              "z": -191
+            }
+          ]
+        },
+        {
+          "displayId": "FS012",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-4:panel-11:y",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-4",
+          "panelACode": "BO0001",
+          "panelAName": "Bottom",
+          "panelB": "panel-11",
+          "panelBCode": "FR0002",
+          "panelBName": "Plinth Front",
+          "positions": [
+            {
+              "x": 50,
+              "y": 60,
+              "z": 191
+            },
+            {
+              "x": 183.333,
+              "y": 60,
+              "z": 191
+            },
+            {
+              "x": 316.667,
+              "y": 60,
+              "z": 191
+            },
+            {
+              "x": 450,
+              "y": 60,
+              "z": 191
+            }
+          ]
+        },
+        {
+          "displayId": "FS013",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-4:panel-12:y",
+          "jointType": "t_butt",
+          "kind": "fastener",
+          "panelA": "panel-4",
+          "panelACode": "BO0001",
+          "panelAName": "Bottom",
+          "panelB": "panel-12",
+          "panelBCode": "PA0001",
+          "panelBName": "Plinth Rib y-1-1",
+          "positions": [
+            {
+              "x": 250,
+              "y": 60,
+              "z": -132
+            },
+            {
+              "x": 250,
+              "y": 60,
+              "z": 0
+            },
+            {
+              "x": 250,
+              "y": 60,
+              "z": 132
+            }
+          ]
+        }
+      ],
+      "index": 11,
+      "instruction": "Fit the plinth (LE0002, BA0002, FR0002, RI0002, PA0001) under the finished carcass (BO0001).",
+      "integrationSubassemblyIds": [
+        "SUB02",
+        "SUB01"
+      ],
+      "jointIds": [
+        "panel-4:panel-8:y",
+        "panel-4:panel-9:y",
+        "panel-4:panel-10:y",
+        "panel-4:panel-11:y",
+        "panel-4:panel-12:y"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "y",
+          "contactPosition": 60,
+          "faceA": "front",
+          "faceB": "top",
+          "gap": 0,
+          "id": "panel-4:panel-8:y",
+          "overlap": {
+            "x": [
+              0,
+              18
+            ],
+            "z": [
+              -182,
+              182
+            ]
+          },
+          "panelA": "panel-4",
+          "panelB": "panel-8",
+          "sameGroup": false,
+          "status": "classified",
+          "type": "corner_butt"
+        },
+        {
+          "contactAxis": "y",
+          "contactPosition": 60,
+          "faceA": "front",
+          "faceB": "top",
+          "gap": 0,
+          "id": "panel-4:panel-9:y",
+          "overlap": {
+            "x": [
+              482,
+              500
+            ],
+            "z": [
+              -182,
+              182
+            ]
+          },
+          "panelA": "panel-4",
+          "panelB": "panel-9",
+          "sameGroup": false,
+          "status": "classified",
+          "type": "corner_butt"
+        },
+        {
+          "contactAxis": "y",
+          "contactPosition": 60,
+          "faceA": "front",
+          "faceB": "top",
+          "gap": 0,
+          "id": "panel-4:panel-10:y",
+          "overlap": {
+            "x": [
+              0,
+              500
+            ],
+            "z": [
+              -200,
+              -182
+            ]
+          },
+          "panelA": "panel-4",
+          "panelB": "panel-10",
+          "sameGroup": false,
+          "status": "classified",
+          "type": "corner_butt"
+        },
+        {
+          "contactAxis": "y",
+          "contactPosition": 60,
+          "faceA": "front",
+          "faceB": "top",
+          "gap": 0,
+          "id": "panel-4:panel-11:y",
+          "overlap": {
+            "x": [
+              0,
+              500
+            ],
+            "z": [
+              182,
+              200
+            ]
+          },
+          "panelA": "panel-4",
+          "panelB": "panel-11",
+          "sameGroup": false,
+          "status": "classified",
+          "type": "corner_butt"
+        },
+        {
+          "contactAxis": "y",
+          "contactPosition": 60,
+          "faceA": "front",
+          "faceB": "top",
+          "gap": 0,
+          "id": "panel-4:panel-12:y",
+          "overlap": {
+            "x": [
+              241,
+              259
+            ],
+            "z": [
+              -182,
+              182
+            ]
+          },
+          "panelA": "panel-4",
+          "panelB": "panel-12",
+          "sameGroup": false,
+          "status": "classified",
+          "type": "t_butt"
+        }
+      ],
+      "kind": "integrate",
+      "orientation": "upright",
+      "orientationInstruction": "Work with the furniture upright and stable.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "LE0002",
+        "BA0002",
+        "FR0002",
+        "RI0002",
+        "PA0001",
+        "BO0001"
+      ],
+      "panelIds": [
+        "panel-8",
+        "panel-10",
+        "panel-11",
+        "panel-9",
+        "panel-12",
+        "panel-4"
+      ],
+      "panelNames": [
+        "Plinth Left",
+        "Plinth Back",
+        "Plinth Front",
+        "Plinth Right",
+        "Plinth Rib y-1-1",
+        "Bottom"
+      ],
+      "phase": "integration",
+      "prerequisiteStepIds": [
+        "S05",
+        "S10"
+      ],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "plinth",
+      "stage": "integration",
+      "stepId": "S11",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB02",
+      "subassemblyName": "Plinth",
+      "toolNotes": [
+        "Requires a proper two-stage pilot + clearance hole (see the catalog entry's own pilotHoleDiameterMm/clearanceHoleDiameterMm) or the panel will split. Drive type (Pozidriv PZ3 here) is a common convention, not a verified spec — confirm against your specific confirmat screw brand."
+      ],
+      "tools": [
+        "4.5mm drill bit (pilot hole)",
+        "7mm drill bit or a stepped confirmat bit (clearance hole)",
+        "Pozidriv PZ3 screwdriver bit (or drill/driver)"
+      ],
+      "unitPanelIds": null,
+      "warnings": []
+    }
+  ],
+  "toolsSummary": [
+    "4.5mm drill bit (pilot hole)",
+    "7mm drill bit or a stepped confirmat bit (clearance hole)",
+    "Pozidriv PZ3 screwdriver bit (or drill/driver)"
+  ]
+}

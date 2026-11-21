@@ -1,0 +1,193 @@
+[
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 20,
+    "hidden": false,
+    "id": "panel-1",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Lo",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 1000
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 50.5,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 20,
+    "hidden": false,
+    "id": "panel-2",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Hi",
+    "position": {
+      "x": 0,
+      "y": 50.5,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 1000
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-3",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": true,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "S1",
+    "position": {
+      "x": 0,
+      "y": 13.125,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "equal spacing: the 3 shelves (54 mm) don't fit in 31 mm"
+    ],
+    "width": 400
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-4",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": true,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "S2",
+    "position": {
+      "x": 0,
+      "y": 25.25,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "equal spacing: the 3 shelves (54 mm) don't fit in 31 mm"
+    ],
+    "width": 400
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-5",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": true,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "S3",
+    "position": {
+      "x": 0,
+      "y": 37.375,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [
+      "equal spacing: the 3 shelves (54 mm) don't fit in 31 mm"
+    ],
+    "width": 400
+  }
+]

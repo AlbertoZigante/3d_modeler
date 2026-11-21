@@ -1,0 +1,72 @@
+[
+  {
+    "edgeBandingPricePerM": 1.2,
+    "grainInterchangeable": true,
+    "kerfMm": 3.0,
+    "name": "Melamine White 18mm",
+    "pricePerSheet": 45.0,
+    "sheetHeightMm": 1220.0,
+    "sheetWidthMm": 2440.0,
+    "thicknessMm": 18.0
+  },
+  {
+    "edgeBandingPricePerM": 1.8,
+    "grainInterchangeable": false,
+    "kerfMm": 3.0,
+    "name": "Melamine Oak 18mm",
+    "pricePerSheet": 52.0,
+    "sheetHeightMm": 1220.0,
+    "sheetWidthMm": 2440.0,
+    "thicknessMm": 18.0
+  },
+  {
+    "edgeBandingPricePerM": 0.9,
+    "grainInterchangeable": true,
+    "kerfMm": 3.2,
+    "name": "MDF Raw 18mm",
+    "pricePerSheet": 32.0,
+    "sheetHeightMm": 1220.0,
+    "sheetWidthMm": 2440.0,
+    "thicknessMm": 18.0
+  },
+  {
+    "edgeBandingPricePerM": 1.1,
+    "grainInterchangeable": true,
+    "kerfMm": 3.2,
+    "name": "MDF Raw 25mm",
+    "pricePerSheet": 42.0,
+    "sheetHeightMm": 1220.0,
+    "sheetWidthMm": 2440.0,
+    "thicknessMm": 25.0
+  },
+  {
+    "edgeBandingPricePerM": 2.2,
+    "grainInterchangeable": false,
+    "kerfMm": 2.5,
+    "name": "Plywood Birch 12mm",
+    "pricePerSheet": 58.0,
+    "sheetHeightMm": 1220.0,
+    "sheetWidthMm": 2440.0,
+    "thicknessMm": 12.0
+  },
+  {
+    "edgeBandingPricePerM": 2.2,
+    "grainInterchangeable": false,
+    "kerfMm": 2.5,
+    "name": "Plywood Birch 18mm",
+    "pricePerSheet": 68.0,
+    "sheetHeightMm": 1220.0,
+    "sheetWidthMm": 2440.0,
+    "thicknessMm": 18.0
+  },
+  {
+    "edgeBandingPricePerM": 0.0,
+    "grainInterchangeable": true,
+    "kerfMm": 2.0,
+    "name": "Hardboard Back Panel 6mm",
+    "pricePerSheet": 18.0,
+    "sheetHeightMm": 1220.0,
+    "sheetWidthMm": 2440.0,
+    "thicknessMm": 6.0
+  }
+]

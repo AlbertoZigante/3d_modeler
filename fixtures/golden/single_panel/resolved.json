@@ -1,0 +1,39 @@
+[
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 100,
+    "hidden": false,
+    "id": "panel-1",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Floating",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 100
+  }
+]

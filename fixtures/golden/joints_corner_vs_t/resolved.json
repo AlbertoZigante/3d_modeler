@@ -1,0 +1,335 @@
+[
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 600,
+    "hidden": false,
+    "id": "panel-1",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Wall",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 800
+  },
+  {
+    "basePosition": {
+      "x": -391,
+      "y": 0,
+      "z": 159
+    },
+    "groupId": null,
+    "height": 600,
+    "hidden": false,
+    "id": "panel-2",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Corner",
+    "position": {
+      "x": -391,
+      "y": 0,
+      "z": 159
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "warnings": [],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 159
+    },
+    "groupId": null,
+    "height": 600,
+    "hidden": false,
+    "id": "panel-3",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "MidT",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 159
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "warnings": [],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 200,
+      "y": -100,
+      "z": 159
+    },
+    "groupId": null,
+    "height": 200,
+    "hidden": false,
+    "id": "panel-4",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "MidT partial",
+    "position": {
+      "x": 200,
+      "y": -100,
+      "z": 159
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "warnings": [],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 391,
+      "y": 100,
+      "z": 159
+    },
+    "groupId": null,
+    "height": 200,
+    "hidden": false,
+    "id": "panel-5",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Edge partial",
+    "position": {
+      "x": 391,
+      "y": 100,
+      "z": 159
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "warnings": [],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": -390.45,
+      "y": 0,
+      "z": -159
+    },
+    "groupId": null,
+    "height": 200,
+    "hidden": false,
+    "id": "panel-6",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Left edge +0.55",
+    "position": {
+      "x": -390.45,
+      "y": 0,
+      "z": -159
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "warnings": [],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 390.55,
+      "y": 0,
+      "z": -159
+    },
+    "groupId": null,
+    "height": 200,
+    "hidden": false,
+    "id": "panel-7",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Right edge -0.45",
+    "position": {
+      "x": 390.55,
+      "y": 0,
+      "z": -159
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "warnings": [],
+    "width": 300
+  },
+  {
+    "basePosition": {
+      "x": 2000,
+      "y": 0,
+      "z": 0
+    },
+    "groupId": null,
+    "height": 100,
+    "hidden": false,
+    "id": "panel-8",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Narrow flat",
+    "position": {
+      "x": 2000,
+      "y": 0,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 18
+  },
+  {
+    "basePosition": {
+      "x": 2000,
+      "y": 0,
+      "z": 59
+    },
+    "groupId": null,
+    "height": 100,
+    "hidden": false,
+    "id": "panel-9",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": false,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Narrow butt",
+    "position": {
+      "x": 2000,
+      "y": 0,
+      "z": 59
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "warnings": [],
+    "width": 100
+  }
+]

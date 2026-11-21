@@ -1,0 +1,97 @@
+[
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 600,
+    "hidden": false,
+    "id": "panel-1",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "Wall",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 1000
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [
+      {
+        "field": "positionX",
+        "from": {
+          "face": "left",
+          "node": "panel-1",
+          "offset": 0
+        },
+        "id": "a-positionX",
+        "myFace": "left",
+        "overridden": false,
+        "type": "attachedTo"
+      },
+      {
+        "field": "width",
+        "from": {
+          "face": "left",
+          "node": "panel-1",
+          "offset": 0
+        },
+        "id": "late-span",
+        "overridden": false,
+        "to": {
+          "face": "right",
+          "node": "panel-1",
+          "offset": 0
+        },
+        "type": "spansBetween"
+      }
+    ],
+    "groupId": null,
+    "height": 100,
+    "hidden": false,
+    "id": "panel-2",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "Order",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0002",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 100
+  }
+]

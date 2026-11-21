@@ -1,0 +1,191 @@
+[
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [
+      {
+        "field": "width",
+        "from": {
+          "face": "left",
+          "node": "panel-1"
+        },
+        "id": "c-width-left",
+        "overridden": false,
+        "to": {
+          "face": "right",
+          "node": "panel-1"
+        },
+        "type": "spansBetween"
+      }
+    ],
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-4",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "W",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0004",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 300
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [
+      {
+        "field": "width",
+        "from": {
+          "face": "left",
+          "node": "panel-2"
+        },
+        "id": "c-width-left",
+        "overridden": false,
+        "to": {
+          "face": "right",
+          "node": "panel-2"
+        },
+        "type": "spansBetween"
+      }
+    ],
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-1",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "X",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 300
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [
+      {
+        "field": "width",
+        "from": {
+          "face": "left",
+          "node": "panel-1"
+        },
+        "id": "c-width-left",
+        "overridden": false,
+        "to": {
+          "face": "right",
+          "node": "panel-1"
+        },
+        "type": "spansBetween"
+      }
+    ],
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-2",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "Y",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0002",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 300
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [
+      {
+        "field": "positionX",
+        "from": {
+          "face": "right",
+          "node": "panel-3"
+        },
+        "id": "a-positionX",
+        "myFace": "left",
+        "overridden": false,
+        "type": "attachedTo"
+      }
+    ],
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-3",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "Z",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0003",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 300
+  }
+]

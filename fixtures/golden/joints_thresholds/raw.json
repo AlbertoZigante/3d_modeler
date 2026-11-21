@@ -1,0 +1,992 @@
+[
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-1",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap -0.049 base",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 17.951
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-2",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap -0.049 partner",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0002",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 1000,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-3",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap -0.051 base",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0003",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 1000,
+      "y": 0,
+      "z": 17.949
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-4",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap -0.051 partner",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0004",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 2000,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-5",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap 0 base",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0005",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 2000,
+      "y": 0,
+      "z": 18
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-6",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap 0 partner",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0006",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 3000,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-7",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap 0.049 base",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0007",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 3000,
+      "y": 0,
+      "z": 18.049
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-8",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap 0.049 partner",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0008",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 4000,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-9",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap 0.051 base",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0009",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 4000,
+      "y": 0,
+      "z": 18.051
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-10",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap 0.051 partner",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0010",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 1000,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-11",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap 2.9 base",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0011",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 1000,
+      "z": 20.9
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-12",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap 2.9 partner",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0012",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 1000,
+      "y": 1000,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-13",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap 3 base",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0013",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 1000,
+      "y": 1000,
+      "z": 21
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-14",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap 3 partner",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0014",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 2000,
+      "y": 1000,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-15",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap 3.1 base",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0015",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 2000,
+      "y": 1000,
+      "z": 21.1
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-16",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap 3.1 partner",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0016",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 3000,
+      "y": 1000,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-17",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap -0.99 base",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0017",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 3000,
+      "y": 1000,
+      "z": 17.01
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-18",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap -0.99 partner",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0018",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 4000,
+      "y": 1000,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-19",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap -1 base",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0019",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 4000,
+      "y": 1000,
+      "z": 17
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-20",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap -1 partner",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0020",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 2000,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-21",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap -1.01 base",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0021",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 2000,
+      "z": 16.99
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-22",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap -1.01 partner",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0022",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 1000,
+      "y": 2000,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-23",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap -5 base",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0023",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 1000,
+      "y": 2000,
+      "z": 13
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-24",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "gap -5 partner",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0024",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 2000,
+      "y": 2000,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-25",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "footprint 4.9 base",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0025",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 2395.1,
+      "y": 2000,
+      "z": 18
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-26",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "footprint 4.9 partner",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0026",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 3000,
+      "y": 2000,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-27",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "footprint 5 base",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0027",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 3395,
+      "y": 2000,
+      "z": 18
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-28",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "footprint 5 partner",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0028",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 4000,
+      "y": 2000,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-29",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "footprint 5.1 base",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0029",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 4394.9,
+      "y": 2000,
+      "z": 18
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 400,
+    "hidden": false,
+    "id": "panel-30",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "footprint 5.1 partner",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0030",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 400
+  }
+]

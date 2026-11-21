@@ -1,0 +1,20 @@
+{
+  "bom": {
+    "materialSummary": [],
+    "rows": []
+  },
+  "results": [],
+  "summary": {
+    "perMaterial": [],
+    "totals": {
+      "sheetsUsed": 0,
+      "totalAreaM2": 0,
+      "totalCost": 0,
+      "unplacedAreaM2": 0,
+      "unplacedCount": 0,
+      "usedAreaM2": 0,
+      "utilization": 0,
+      "wasteAreaM2": 0
+    }
+  }
+}

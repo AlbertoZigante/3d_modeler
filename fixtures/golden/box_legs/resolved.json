@@ -1,0 +1,372 @@
+[
+  {
+    "basePosition": {
+      "x": 250,
+      "y": 438,
+      "z": 0
+    },
+    "groupId": "panel-1",
+    "height": 700,
+    "hidden": false,
+    "id": "panel-1",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": true,
+      "positionZ": true,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Left",
+    "position": {
+      "x": 9,
+      "y": 438,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "warnings": [],
+    "width": 400
+  },
+  {
+    "basePosition": {
+      "x": 250,
+      "y": 438,
+      "z": 0
+    },
+    "groupId": "panel-1",
+    "height": 700,
+    "hidden": false,
+    "id": "panel-2",
+    "lockedFields": {
+      "height": false,
+      "positionX": false,
+      "positionY": true,
+      "positionZ": true,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Right",
+    "position": {
+      "x": 491,
+      "y": 438,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "x",
+    "warnings": [],
+    "width": 400
+  },
+  {
+    "basePosition": {
+      "x": 250,
+      "y": 438,
+      "z": 0
+    },
+    "groupId": "panel-1",
+    "height": 418,
+    "hidden": false,
+    "id": "panel-3",
+    "lockedFields": {
+      "height": false,
+      "positionX": true,
+      "positionY": false,
+      "positionZ": true,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Top",
+    "position": {
+      "x": 250,
+      "y": 797,
+      "z": 9
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 90,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "y",
+    "warnings": [],
+    "width": 500
+  },
+  {
+    "basePosition": {
+      "x": 250,
+      "y": 438,
+      "z": 0
+    },
+    "groupId": "panel-1",
+    "height": 400,
+    "hidden": false,
+    "id": "panel-4",
+    "lockedFields": {
+      "height": false,
+      "positionX": true,
+      "positionY": false,
+      "positionZ": true,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Bottom",
+    "position": {
+      "x": 250,
+      "y": 79,
+      "z": 0
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 90,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "y",
+    "warnings": [],
+    "width": 500
+  },
+  {
+    "basePosition": {
+      "x": 250,
+      "y": 438,
+      "z": 0
+    },
+    "groupId": "panel-1",
+    "height": 736,
+    "hidden": false,
+    "id": "panel-5",
+    "lockedFields": {
+      "height": false,
+      "positionX": true,
+      "positionY": true,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Back",
+    "position": {
+      "x": 250,
+      "y": 438,
+      "z": -209
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 500
+  },
+  {
+    "basePosition": {
+      "x": 250,
+      "y": 438,
+      "z": 0
+    },
+    "groupId": "panel-1",
+    "height": 718,
+    "hidden": true,
+    "id": "panel-6",
+    "lockedFields": {
+      "height": false,
+      "positionX": true,
+      "positionY": true,
+      "positionZ": false,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Melamine White 18mm",
+    "name": "Front",
+    "position": {
+      "x": 250,
+      "y": 429,
+      "z": 209
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "warnings": [],
+    "width": 500
+  },
+  {
+    "basePosition": {
+      "x": 250,
+      "y": 438,
+      "z": 0
+    },
+    "groupId": "panel-7",
+    "height": 70,
+    "hidden": false,
+    "id": "panel-8",
+    "lockedFields": {
+      "height": false,
+      "positionX": true,
+      "positionY": true,
+      "positionZ": true,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Black Leg 30x30",
+    "name": "Leg back-left",
+    "position": {
+      "x": 25,
+      "y": 35,
+      "z": -175
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 30,
+    "thicknessAxis": "x",
+    "warnings": [],
+    "width": 30
+  },
+  {
+    "basePosition": {
+      "x": 250,
+      "y": 438,
+      "z": 0
+    },
+    "groupId": "panel-7",
+    "height": 70,
+    "hidden": false,
+    "id": "panel-9",
+    "lockedFields": {
+      "height": false,
+      "positionX": true,
+      "positionY": true,
+      "positionZ": true,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Black Leg 30x30",
+    "name": "Leg back-right",
+    "position": {
+      "x": 475,
+      "y": 35,
+      "z": -175
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 30,
+    "thicknessAxis": "x",
+    "warnings": [],
+    "width": 30
+  },
+  {
+    "basePosition": {
+      "x": 250,
+      "y": 438,
+      "z": 0
+    },
+    "groupId": "panel-7",
+    "height": 70,
+    "hidden": false,
+    "id": "panel-10",
+    "lockedFields": {
+      "height": false,
+      "positionX": true,
+      "positionY": true,
+      "positionZ": true,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Black Leg 30x30",
+    "name": "Leg front-left",
+    "position": {
+      "x": 25,
+      "y": 35,
+      "z": 175
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 30,
+    "thicknessAxis": "x",
+    "warnings": [],
+    "width": 30
+  },
+  {
+    "basePosition": {
+      "x": 250,
+      "y": 438,
+      "z": 0
+    },
+    "groupId": "panel-7",
+    "height": 70,
+    "hidden": false,
+    "id": "panel-11",
+    "lockedFields": {
+      "height": false,
+      "positionX": true,
+      "positionY": true,
+      "positionZ": true,
+      "thickness": false,
+      "width": false
+    },
+    "material": "Black Leg 30x30",
+    "name": "Leg front-right",
+    "position": {
+      "x": 475,
+      "y": 35,
+      "z": 175
+    },
+    "quantity": 1,
+    "resizeProxy": null,
+    "rotation": {
+      "x": 0,
+      "y": 90,
+      "z": 0
+    },
+    "thickness": 30,
+    "thicknessAxis": "x",
+    "warnings": [],
+    "width": 30
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "collisions": [
+    {
+      "overlapMm": {
+        "x": 300,
+        "y": 300,
+        "z": 13
+      },
+      "panelA": "panel-1",
+      "panelB": "panel-2"
+    }
+  ],
+  "joints": []
+}

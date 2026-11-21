@@ -1,0 +1,83 @@
+[
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 600,
+    "hidden": false,
+    "id": "panel-1",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "Wall",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 1000
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [
+      {
+        "field": "width",
+        "from": {
+          "mm": 100
+        },
+        "id": "c-width-mm",
+        "overridden": false,
+        "to": {
+          "face": "right",
+          "node": "panel-1",
+          "offset": 0
+        },
+        "type": "spansBetween"
+      }
+    ],
+    "groupId": null,
+    "height": 200,
+    "hidden": false,
+    "id": "panel-2",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "Resized",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0002",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 100
+  }
+]

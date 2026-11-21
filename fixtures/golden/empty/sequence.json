@@ -1,0 +1,52 @@
+{
+  "clusters": [],
+  "phases": [
+    {
+      "id": "prepare",
+      "name": "Prepare components"
+    },
+    {
+      "id": "subassembly",
+      "name": "Build independent sub-assemblies"
+    },
+    {
+      "id": "internal",
+      "name": "Build internal carcass components"
+    },
+    {
+      "id": "closure",
+      "name": "Close the carcass"
+    },
+    {
+      "id": "integration",
+      "name": "Final integration"
+    }
+  ],
+  "stages": [
+    {
+      "id": "doors",
+      "name": "Doors & handles"
+    },
+    {
+      "id": "drawers",
+      "name": "Drawer boxes, fronts & handles"
+    },
+    {
+      "id": "guides",
+      "name": "Drawer guides on carcass panels"
+    },
+    {
+      "id": "plinth",
+      "name": "Plinth"
+    },
+    {
+      "id": "carcass",
+      "name": "Main carcass"
+    },
+    {
+      "id": "integration",
+      "name": "Final integration"
+    }
+  ],
+  "steps": []
+}

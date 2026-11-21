@@ -1,0 +1,3499 @@
+{
+  "clusters": [
+    {
+      "id": "SUB05",
+      "name": "Drawer assembly 1",
+      "panelIds": [
+        "panel-11",
+        "panel-13",
+        "panel-14",
+        "panel-12"
+      ],
+      "role": "drawer_box"
+    },
+    {
+      "id": "SUB06",
+      "name": "Drawer assembly 2",
+      "panelIds": [
+        "panel-15",
+        "panel-17",
+        "panel-18",
+        "panel-16"
+      ],
+      "role": "drawer_box"
+    },
+    {
+      "id": "SUB07",
+      "name": "Drawer assembly 3",
+      "panelIds": [
+        "panel-19",
+        "panel-21",
+        "panel-22",
+        "panel-20"
+      ],
+      "role": "drawer_box"
+    },
+    {
+      "id": "SUB02",
+      "name": "Drawer front assembly 1",
+      "panelIds": [
+        "panel-8"
+      ],
+      "role": "drawer_front"
+    },
+    {
+      "id": "SUB03",
+      "name": "Drawer front assembly 2",
+      "panelIds": [
+        "panel-9"
+      ],
+      "role": "drawer_front"
+    },
+    {
+      "id": "SUB04",
+      "name": "Drawer front assembly 3",
+      "panelIds": [
+        "panel-10"
+      ],
+      "role": "drawer_front"
+    },
+    {
+      "id": "SUB01",
+      "name": "Main carcass",
+      "panelIds": [
+        "panel-1",
+        "panel-3",
+        "panel-4",
+        "panel-5",
+        "panel-2"
+      ],
+      "role": "carcass"
+    }
+  ],
+  "phases": [
+    {
+      "id": "prepare",
+      "name": "Prepare components"
+    },
+    {
+      "id": "subassembly",
+      "name": "Build independent sub-assemblies"
+    },
+    {
+      "id": "internal",
+      "name": "Build internal carcass components"
+    },
+    {
+      "id": "closure",
+      "name": "Close the carcass"
+    },
+    {
+      "id": "integration",
+      "name": "Final integration"
+    }
+  ],
+  "stages": [
+    {
+      "id": "doors",
+      "name": "Doors & handles"
+    },
+    {
+      "id": "drawers",
+      "name": "Drawer boxes, fronts & handles"
+    },
+    {
+      "id": "guides",
+      "name": "Drawer guides on carcass panels"
+    },
+    {
+      "id": "plinth",
+      "name": "Plinth"
+    },
+    {
+      "id": "carcass",
+      "name": "Main carcass"
+    },
+    {
+      "id": "integration",
+      "name": "Final integration"
+    }
+  ],
+  "steps": [
+    {
+      "action": "prepare",
+      "clusterKind": "drawer_box",
+      "componentKind": "drawer",
+      "componentSubtitle": "Drawers 1, 2, 3 are identical — build this drawer 3 times",
+      "componentTitle": "DRAWER ×3",
+      "description": "Fit drawer guide RN001 on the left side LE0002.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 53,
+        "support": 10,
+        "toolAccess": 0,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "RN001",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-11",
+          "panelACode": "LE0002",
+          "panelAName": "Drawer Left",
+          "panelB": "panel-1",
+          "panelBCode": "LE0001",
+          "panelBName": "Left",
+          "side": "left"
+        }
+      ],
+      "index": 1,
+      "instruction": "Fit drawer guide RN001 on the left side LE0002 while it is still loose.",
+      "jointIds": [],
+      "key": "guide-left",
+      "kind": "pre_install",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "LE0002"
+      ],
+      "panelIds": [
+        "panel-11"
+      ],
+      "panelNames": [
+        "Drawer Left"
+      ],
+      "phase": "prepare",
+      "prerequisiteStepIds": [],
+      "repeatCount": 3,
+      "repeatHardware": [
+        {
+          "displayId": "RN003",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-15",
+          "panelACode": "LE0003",
+          "panelAName": "Drawer Left",
+          "panelB": "panel-1",
+          "panelBCode": "LE0001",
+          "panelBName": "Left",
+          "side": "left"
+        },
+        {
+          "displayId": "RN005",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-19",
+          "panelACode": "LE0004",
+          "panelAName": "Drawer Left",
+          "panelB": "panel-1",
+          "panelBCode": "LE0001",
+          "panelBName": "Left",
+          "side": "left"
+        }
+      ],
+      "repeatLabels": [
+        "Drawer 1",
+        "Drawer 2",
+        "Drawer 3"
+      ],
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "drawer_box",
+      "stage": "drawers",
+      "stepId": "S01",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB05",
+      "subassemblyName": "Drawers 1, 2, 3 (×3)",
+      "unitPanelIds": [
+        "panel-8",
+        "panel-11",
+        "panel-12",
+        "panel-14",
+        "panel-13"
+      ],
+      "warnings": [
+        "Complete the drawer box before inserting it into the carcass.",
+        "Keep the panel separate while fitting this hardware."
+      ]
+    },
+    {
+      "action": "prepare",
+      "clusterKind": "drawer_box",
+      "componentKind": "drawer",
+      "componentSubtitle": "Drawers 1, 2, 3 are identical — build this drawer 3 times",
+      "componentTitle": "DRAWER ×3",
+      "description": "Fit drawer guide RN002 on the right side RI0002.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 53,
+        "support": 10,
+        "toolAccess": 0,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "RN002",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-12",
+          "panelACode": "RI0002",
+          "panelAName": "Drawer Right",
+          "panelB": "panel-2",
+          "panelBCode": "RI0001",
+          "panelBName": "Right",
+          "side": "right"
+        }
+      ],
+      "index": 2,
+      "instruction": "Fit drawer guide RN002 on the right side RI0002 while it is still loose.",
+      "jointIds": [],
+      "key": "guide-right",
+      "kind": "pre_install",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "RI0002"
+      ],
+      "panelIds": [
+        "panel-12"
+      ],
+      "panelNames": [
+        "Drawer Right"
+      ],
+      "phase": "prepare",
+      "prerequisiteStepIds": [],
+      "repeatCount": 3,
+      "repeatHardware": [
+        {
+          "displayId": "RN004",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-16",
+          "panelACode": "RI0003",
+          "panelAName": "Drawer Right",
+          "panelB": "panel-2",
+          "panelBCode": "RI0001",
+          "panelBName": "Right",
+          "side": "right"
+        },
+        {
+          "displayId": "RN006",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-20",
+          "panelACode": "RI0004",
+          "panelAName": "Drawer Right",
+          "panelB": "panel-2",
+          "panelBCode": "RI0001",
+          "panelBName": "Right",
+          "side": "right"
+        }
+      ],
+      "repeatLabels": [
+        "Drawer 1",
+        "Drawer 2",
+        "Drawer 3"
+      ],
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "drawer_box",
+      "stage": "drawers",
+      "stepId": "S02",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB05",
+      "subassemblyName": "Drawers 1, 2, 3 (×3)",
+      "unitPanelIds": [
+        "panel-8",
+        "panel-11",
+        "panel-12",
+        "panel-14",
+        "panel-13"
+      ],
+      "warnings": [
+        "Complete the drawer box before inserting it into the carcass.",
+        "Keep the panel separate while fitting this hardware."
+      ]
+    },
+    {
+      "action": "assemble",
+      "clusterKind": "drawer_box",
+      "componentKind": "drawer",
+      "componentSubtitle": "Drawers 1, 2, 3 are identical — build this drawer 3 times",
+      "componentTitle": "DRAWER ×3",
+      "description": "Attach LE0002 to FR0002.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 57,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "FS010",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-8:panel-11:z",
+          "jointType": "t_butt",
+          "kind": "fastener",
+          "panelA": "panel-8",
+          "panelACode": "FR0002",
+          "panelAName": "Drawer Front 1",
+          "panelB": "panel-11",
+          "panelBCode": "LE0002",
+          "panelBName": "Drawer Left",
+          "positions": [
+            {
+              "x": 48,
+              "y": 88,
+              "z": 200
+            },
+            {
+              "x": 48,
+              "y": 181.333,
+              "z": 200
+            }
+          ]
+        }
+      ],
+      "index": 3,
+      "instruction": "Lay the drawer front FR0002 face down, then attach the left side LE0002 to it.",
+      "jointIds": [
+        "panel-8:panel-11:z"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "z",
+          "contactPosition": 200,
+          "faceA": "back",
+          "faceB": "left",
+          "gap": 0,
+          "id": "panel-8:panel-11:z",
+          "overlap": {
+            "x": [
+              39,
+              57
+            ],
+            "y": [
+              38,
+              231.333
+            ]
+          },
+          "panelA": "panel-8",
+          "panelB": "panel-11",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "t_butt"
+        }
+      ],
+      "key": "attach-left",
+      "kind": "join",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [
+        "panel-8"
+      ],
+      "panelCodes": [
+        "LE0002"
+      ],
+      "panelIds": [
+        "panel-11"
+      ],
+      "panelNames": [
+        "Drawer Left"
+      ],
+      "phase": "subassembly",
+      "prerequisiteStepIds": [],
+      "repeatCount": 3,
+      "repeatHardware": [
+        {
+          "displayId": "FS013",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-9:panel-15:z",
+          "jointType": "t_butt",
+          "kind": "fastener",
+          "panelA": "panel-9",
+          "panelACode": "FR0003",
+          "panelAName": "Drawer Front 2",
+          "panelB": "panel-15",
+          "panelBCode": "LE0003",
+          "panelBName": "Drawer Left",
+          "positions": [
+            {
+              "x": 48,
+              "y": 321.333,
+              "z": 200
+            },
+            {
+              "x": 48,
+              "y": 414.667,
+              "z": 200
+            }
+          ]
+        },
+        {
+          "displayId": "FS016",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-10:panel-19:z",
+          "jointType": "t_butt",
+          "kind": "fastener",
+          "panelA": "panel-10",
+          "panelACode": "FR0004",
+          "panelAName": "Drawer Front 3",
+          "panelB": "panel-19",
+          "panelBCode": "LE0004",
+          "panelBName": "Drawer Left",
+          "positions": [
+            {
+              "x": 48,
+              "y": 554.667,
+              "z": 200
+            },
+            {
+              "x": 48,
+              "y": 648,
+              "z": 200
+            }
+          ]
+        }
+      ],
+      "repeatLabels": [
+        "Drawer 1",
+        "Drawer 2",
+        "Drawer 3"
+      ],
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "drawer_box",
+      "stage": "drawers",
+      "stepId": "S03",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB05",
+      "subassemblyName": "Drawers 1, 2, 3 (×3)",
+      "unitPanelIds": [
+        "panel-8",
+        "panel-11",
+        "panel-12",
+        "panel-14",
+        "panel-13"
+      ],
+      "warnings": [
+        "Complete the drawer box before inserting it into the carcass."
+      ]
+    },
+    {
+      "action": "assemble",
+      "clusterKind": "drawer_box",
+      "componentKind": "drawer",
+      "componentSubtitle": "Drawers 1, 2, 3 are identical — build this drawer 3 times",
+      "componentTitle": "DRAWER ×3",
+      "description": "Attach RI0002 to FR0002.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 57,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "FS011",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-8:panel-12:z",
+          "jointType": "t_butt",
+          "kind": "fastener",
+          "panelA": "panel-8",
+          "panelACode": "FR0002",
+          "panelAName": "Drawer Front 1",
+          "panelB": "panel-12",
+          "panelBCode": "RI0002",
+          "panelBName": "Drawer Right",
+          "positions": [
+            {
+              "x": 452,
+              "y": 88,
+              "z": 200
+            },
+            {
+              "x": 452,
+              "y": 181.333,
+              "z": 200
+            }
+          ]
+        }
+      ],
+      "index": 4,
+      "instruction": "Attach the right side RI0002 to the drawer front FR0002.",
+      "jointIds": [
+        "panel-8:panel-12:z"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "z",
+          "contactPosition": 200,
+          "faceA": "back",
+          "faceB": "left",
+          "gap": 0,
+          "id": "panel-8:panel-12:z",
+          "overlap": {
+            "x": [
+              443,
+              461
+            ],
+            "y": [
+              38,
+              231.333
+            ]
+          },
+          "panelA": "panel-8",
+          "panelB": "panel-12",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "t_butt"
+        }
+      ],
+      "key": "attach-right",
+      "kind": "join",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [
+        "panel-8"
+      ],
+      "panelCodes": [
+        "RI0002"
+      ],
+      "panelIds": [
+        "panel-12"
+      ],
+      "panelNames": [
+        "Drawer Right"
+      ],
+      "phase": "subassembly",
+      "prerequisiteStepIds": [],
+      "repeatCount": 3,
+      "repeatHardware": [
+        {
+          "displayId": "FS014",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-9:panel-16:z",
+          "jointType": "t_butt",
+          "kind": "fastener",
+          "panelA": "panel-9",
+          "panelACode": "FR0003",
+          "panelAName": "Drawer Front 2",
+          "panelB": "panel-16",
+          "panelBCode": "RI0003",
+          "panelBName": "Drawer Right",
+          "positions": [
+            {
+              "x": 452,
+              "y": 321.333,
+              "z": 200
+            },
+            {
+              "x": 452,
+              "y": 414.667,
+              "z": 200
+            }
+          ]
+        },
+        {
+          "displayId": "FS017",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-10:panel-20:z",
+          "jointType": "t_butt",
+          "kind": "fastener",
+          "panelA": "panel-10",
+          "panelACode": "FR0004",
+          "panelAName": "Drawer Front 3",
+          "panelB": "panel-20",
+          "panelBCode": "RI0004",
+          "panelBName": "Drawer Right",
+          "positions": [
+            {
+              "x": 452,
+              "y": 554.667,
+              "z": 200
+            },
+            {
+              "x": 452,
+              "y": 648,
+              "z": 200
+            }
+          ]
+        }
+      ],
+      "repeatLabels": [
+        "Drawer 1",
+        "Drawer 2",
+        "Drawer 3"
+      ],
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "drawer_box",
+      "stage": "drawers",
+      "stepId": "S04",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB05",
+      "subassemblyName": "Drawers 1, 2, 3 (×3)",
+      "unitPanelIds": [
+        "panel-8",
+        "panel-11",
+        "panel-12",
+        "panel-14",
+        "panel-13"
+      ],
+      "warnings": [
+        "Complete the drawer box before inserting it into the carcass."
+      ]
+    },
+    {
+      "action": "assemble",
+      "clusterKind": "drawer_box",
+      "componentKind": "drawer",
+      "componentSubtitle": "Drawers 1, 2, 3 are identical — build this drawer 3 times",
+      "componentTitle": "DRAWER ×3",
+      "description": "Attach BA0002 to LE0002, RI0002.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 57,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "FS020",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-11:panel-14:x",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-11",
+          "panelACode": "LE0002",
+          "panelAName": "Drawer Left",
+          "panelB": "panel-14",
+          "panelBCode": "BA0002",
+          "panelBName": "Drawer Back",
+          "positions": [
+            {
+              "x": 57,
+              "y": 106,
+              "z": -171
+            },
+            {
+              "x": 57,
+              "y": 181.333,
+              "z": -171
+            }
+          ]
+        },
+        {
+          "displayId": "FS022",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-12:panel-14:x",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-12",
+          "panelACode": "RI0002",
+          "panelAName": "Drawer Right",
+          "panelB": "panel-14",
+          "panelBCode": "BA0002",
+          "panelBName": "Drawer Back",
+          "positions": [
+            {
+              "x": 443,
+              "y": 106,
+              "z": -171
+            },
+            {
+              "x": 443,
+              "y": 181.333,
+              "z": -171
+            }
+          ]
+        }
+      ],
+      "index": 5,
+      "instruction": "Attach the back panel BA0002 between the two sides.",
+      "jointIds": [
+        "panel-11:panel-14:x",
+        "panel-12:panel-14:x"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "x",
+          "contactPosition": 57,
+          "faceA": "front",
+          "faceB": "left",
+          "gap": 0,
+          "id": "panel-11:panel-14:x",
+          "overlap": {
+            "y": [
+              56,
+              231.333
+            ],
+            "z": [
+              -180,
+              -162
+            ]
+          },
+          "panelA": "panel-11",
+          "panelB": "panel-14",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        },
+        {
+          "contactAxis": "x",
+          "contactPosition": 443,
+          "faceA": "back",
+          "faceB": "right",
+          "gap": 0,
+          "id": "panel-12:panel-14:x",
+          "overlap": {
+            "y": [
+              56,
+              231.333
+            ],
+            "z": [
+              -180,
+              -162
+            ]
+          },
+          "panelA": "panel-12",
+          "panelB": "panel-14",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        }
+      ],
+      "key": "attach-back",
+      "kind": "join",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [
+        "panel-11",
+        "panel-12"
+      ],
+      "panelCodes": [
+        "BA0002"
+      ],
+      "panelIds": [
+        "panel-14"
+      ],
+      "panelNames": [
+        "Drawer Back"
+      ],
+      "phase": "subassembly",
+      "prerequisiteStepIds": [],
+      "repeatCount": 3,
+      "repeatHardware": [
+        {
+          "displayId": "FS024",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-15:panel-18:x",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-15",
+          "panelACode": "LE0003",
+          "panelAName": "Drawer Left",
+          "panelB": "panel-18",
+          "panelBCode": "BA0003",
+          "panelBName": "Drawer Back",
+          "positions": [
+            {
+              "x": 57,
+              "y": 339.333,
+              "z": -171
+            },
+            {
+              "x": 57,
+              "y": 414.667,
+              "z": -171
+            }
+          ]
+        },
+        {
+          "displayId": "FS026",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-16:panel-18:x",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-16",
+          "panelACode": "RI0003",
+          "panelAName": "Drawer Right",
+          "panelB": "panel-18",
+          "panelBCode": "BA0003",
+          "panelBName": "Drawer Back",
+          "positions": [
+            {
+              "x": 443,
+              "y": 339.333,
+              "z": -171
+            },
+            {
+              "x": 443,
+              "y": 414.667,
+              "z": -171
+            }
+          ]
+        },
+        {
+          "displayId": "FS028",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-19:panel-22:x",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-19",
+          "panelACode": "LE0004",
+          "panelAName": "Drawer Left",
+          "panelB": "panel-22",
+          "panelBCode": "BA0004",
+          "panelBName": "Drawer Back",
+          "positions": [
+            {
+              "x": 57,
+              "y": 572.667,
+              "z": -171
+            },
+            {
+              "x": 57,
+              "y": 648,
+              "z": -171
+            }
+          ]
+        },
+        {
+          "displayId": "FS030",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-20:panel-22:x",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-20",
+          "panelACode": "RI0004",
+          "panelAName": "Drawer Right",
+          "panelB": "panel-22",
+          "panelBCode": "BA0004",
+          "panelBName": "Drawer Back",
+          "positions": [
+            {
+              "x": 443,
+              "y": 572.667,
+              "z": -171
+            },
+            {
+              "x": 443,
+              "y": 648,
+              "z": -171
+            }
+          ]
+        }
+      ],
+      "repeatLabels": [
+        "Drawer 1",
+        "Drawer 2",
+        "Drawer 3"
+      ],
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "drawer_box",
+      "stage": "drawers",
+      "stepId": "S05",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB05",
+      "subassemblyName": "Drawers 1, 2, 3 (×3)",
+      "unitPanelIds": [
+        "panel-8",
+        "panel-11",
+        "panel-12",
+        "panel-14",
+        "panel-13"
+      ],
+      "warnings": [
+        "Complete the drawer box before inserting it into the carcass."
+      ]
+    },
+    {
+      "action": "assemble",
+      "clusterKind": "drawer_box",
+      "componentKind": "drawer",
+      "componentSubtitle": "Drawers 1, 2, 3 are identical — build this drawer 3 times",
+      "componentTitle": "DRAWER ×3",
+      "description": "Attach BO0002 to LE0002, RI0002, BA0002.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 57,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "FS019",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-11:panel-13:x",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-11",
+          "panelACode": "LE0002",
+          "panelAName": "Drawer Left",
+          "panelB": "panel-13",
+          "panelBCode": "BO0002",
+          "panelBName": "Drawer Bottom",
+          "positions": [
+            {
+              "x": 57,
+              "y": 47,
+              "z": -112
+            },
+            {
+              "x": 57,
+              "y": 47,
+              "z": 19
+            },
+            {
+              "x": 57,
+              "y": 47,
+              "z": 150
+            }
+          ]
+        },
+        {
+          "displayId": "FS021",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-12:panel-13:x",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-12",
+          "panelACode": "RI0002",
+          "panelAName": "Drawer Right",
+          "panelB": "panel-13",
+          "panelBCode": "BO0002",
+          "panelBName": "Drawer Bottom",
+          "positions": [
+            {
+              "x": 443,
+              "y": 47,
+              "z": -112
+            },
+            {
+              "x": 443,
+              "y": 47,
+              "z": 19
+            },
+            {
+              "x": 443,
+              "y": 47,
+              "z": 150
+            }
+          ]
+        }
+      ],
+      "index": 6,
+      "instruction": "Fit the drawer bottom BO0002 into the box.",
+      "jointIds": [
+        "panel-11:panel-13:x",
+        "panel-12:panel-13:x"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "x",
+          "contactPosition": 57,
+          "faceA": "front",
+          "faceB": "left",
+          "gap": 0,
+          "id": "panel-11:panel-13:x",
+          "overlap": {
+            "y": [
+              38,
+              56
+            ],
+            "z": [
+              -162,
+              200
+            ]
+          },
+          "panelA": "panel-11",
+          "panelB": "panel-13",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        },
+        {
+          "contactAxis": "x",
+          "contactPosition": 443,
+          "faceA": "back",
+          "faceB": "right",
+          "gap": 0,
+          "id": "panel-12:panel-13:x",
+          "overlap": {
+            "y": [
+              38,
+              56
+            ],
+            "z": [
+              -162,
+              200
+            ]
+          },
+          "panelA": "panel-12",
+          "panelB": "panel-13",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        }
+      ],
+      "key": "attach-bottom",
+      "kind": "join",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [
+        "panel-11",
+        "panel-12",
+        "panel-14"
+      ],
+      "panelCodes": [
+        "BO0002"
+      ],
+      "panelIds": [
+        "panel-13"
+      ],
+      "panelNames": [
+        "Drawer Bottom"
+      ],
+      "phase": "subassembly",
+      "prerequisiteStepIds": [],
+      "repeatCount": 3,
+      "repeatHardware": [
+        {
+          "displayId": "FS023",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-15:panel-17:x",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-15",
+          "panelACode": "LE0003",
+          "panelAName": "Drawer Left",
+          "panelB": "panel-17",
+          "panelBCode": "BO0003",
+          "panelBName": "Drawer Bottom",
+          "positions": [
+            {
+              "x": 57,
+              "y": 280.333,
+              "z": -112
+            },
+            {
+              "x": 57,
+              "y": 280.333,
+              "z": 19
+            },
+            {
+              "x": 57,
+              "y": 280.333,
+              "z": 150
+            }
+          ]
+        },
+        {
+          "displayId": "FS025",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-16:panel-17:x",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-16",
+          "panelACode": "RI0003",
+          "panelAName": "Drawer Right",
+          "panelB": "panel-17",
+          "panelBCode": "BO0003",
+          "panelBName": "Drawer Bottom",
+          "positions": [
+            {
+              "x": 443,
+              "y": 280.333,
+              "z": -112
+            },
+            {
+              "x": 443,
+              "y": 280.333,
+              "z": 19
+            },
+            {
+              "x": 443,
+              "y": 280.333,
+              "z": 150
+            }
+          ]
+        },
+        {
+          "displayId": "FS027",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-19:panel-21:x",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-19",
+          "panelACode": "LE0004",
+          "panelAName": "Drawer Left",
+          "panelB": "panel-21",
+          "panelBCode": "BO0004",
+          "panelBName": "Drawer Bottom",
+          "positions": [
+            {
+              "x": 57,
+              "y": 513.667,
+              "z": -112
+            },
+            {
+              "x": 57,
+              "y": 513.667,
+              "z": 19
+            },
+            {
+              "x": 57,
+              "y": 513.667,
+              "z": 150
+            }
+          ]
+        },
+        {
+          "displayId": "FS029",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-20:panel-21:x",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-20",
+          "panelACode": "RI0004",
+          "panelAName": "Drawer Right",
+          "panelB": "panel-21",
+          "panelBCode": "BO0004",
+          "panelBName": "Drawer Bottom",
+          "positions": [
+            {
+              "x": 443,
+              "y": 513.667,
+              "z": -112
+            },
+            {
+              "x": 443,
+              "y": 513.667,
+              "z": 19
+            },
+            {
+              "x": 443,
+              "y": 513.667,
+              "z": 150
+            }
+          ]
+        }
+      ],
+      "repeatLabels": [
+        "Drawer 1",
+        "Drawer 2",
+        "Drawer 3"
+      ],
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "drawer_box",
+      "stage": "drawers",
+      "stepId": "S06",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB05",
+      "subassemblyName": "Drawers 1, 2, 3 (×3)",
+      "unitPanelIds": [
+        "panel-8",
+        "panel-11",
+        "panel-12",
+        "panel-14",
+        "panel-13"
+      ],
+      "warnings": [
+        "Complete the drawer box before inserting it into the carcass."
+      ]
+    },
+    {
+      "action": "install",
+      "clusterKind": "drawer_front",
+      "completionInstruction": "Sub-assembly complete: Drawers 1, 2, 3 (×3). Set it aside until final integration.",
+      "componentKind": "drawer",
+      "componentSubtitle": "Drawers 1, 2, 3 are identical — build this drawer 3 times",
+      "componentTitle": "DRAWER ×3",
+      "description": "Fit handle HN01 on drawer front FR0002.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 53,
+        "support": 10,
+        "toolAccess": 0,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "axis": "x",
+          "displayId": "HN01",
+          "hardware": {
+            "brand": "Generic",
+            "kind": "handle",
+            "lengthMm": 128,
+            "series": "Bar handle 128 mm"
+          },
+          "hinge": null,
+          "kind": "handle",
+          "panelA": "panel-8",
+          "panelB": null
+        }
+      ],
+      "index": 7,
+      "instruction": "Fit handle HN01 (Bar handle 128 mm) on FR0002: horizontal, centred on the front.",
+      "jointIds": [],
+      "kind": "fit_handle",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "FR0002"
+      ],
+      "panelIds": [
+        "panel-8"
+      ],
+      "panelNames": [
+        "Drawer Front 1"
+      ],
+      "phase": "prepare",
+      "prerequisiteStepIds": [],
+      "repeatCount": 3,
+      "repeatHardware": [
+        {
+          "axis": "x",
+          "displayId": "HN02",
+          "hardware": {
+            "brand": "Generic",
+            "kind": "handle",
+            "lengthMm": 128,
+            "series": "Bar handle 128 mm"
+          },
+          "hinge": null,
+          "kind": "handle",
+          "panelA": "panel-9",
+          "panelB": null
+        },
+        {
+          "axis": "x",
+          "displayId": "HN03",
+          "hardware": {
+            "brand": "Generic",
+            "kind": "handle",
+            "lengthMm": 128,
+            "series": "Bar handle 128 mm"
+          },
+          "hinge": null,
+          "kind": "handle",
+          "panelA": "panel-10",
+          "panelB": null
+        }
+      ],
+      "repeatLabels": [
+        "Drawer 1",
+        "Drawer 2",
+        "Drawer 3"
+      ],
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "drawer_front",
+      "stage": "drawers",
+      "stepId": "S07",
+      "subassemblyComplete": true,
+      "subassemblyId": "SUB05",
+      "subassemblyName": "Drawers 1, 2, 3 (×3)",
+      "unitPanelIds": [
+        "panel-8",
+        "panel-11",
+        "panel-12",
+        "panel-14",
+        "panel-13"
+      ],
+      "warnings": [
+        "Fit the handle while the panel is flat on a protected surface."
+      ]
+    },
+    {
+      "action": "prepare",
+      "clusterKind": "carcass",
+      "componentKind": "guides",
+      "componentSubtitle": null,
+      "componentTitle": "DRAWER GUIDES",
+      "description": "Mount drawer guide RN001 on LE0001 before the panel joins the carcass.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 53,
+        "support": 10,
+        "toolAccess": 0,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "RN001",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-11",
+          "panelACode": "LE0002",
+          "panelAName": "Drawer Left",
+          "panelB": "panel-1",
+          "panelBCode": "LE0001",
+          "panelBName": "Left",
+          "side": "left"
+        }
+      ],
+      "index": 8,
+      "instruction": "Mount drawer guide RN001 on panel LE0001 while it is loose and fully accessible.",
+      "jointIds": [],
+      "kind": "pre_install",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "LE0001"
+      ],
+      "panelIds": [
+        "panel-1"
+      ],
+      "panelNames": [
+        "Left"
+      ],
+      "phase": "prepare",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "unknown",
+      "stage": "guides",
+      "stepId": "S08",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "unitPanelIds": [
+        "panel-1"
+      ],
+      "warnings": [
+        "Keep the panel separate while fitting this hardware."
+      ]
+    },
+    {
+      "action": "prepare",
+      "clusterKind": "carcass",
+      "componentKind": "guides",
+      "componentSubtitle": null,
+      "componentTitle": "DRAWER GUIDES",
+      "description": "Mount drawer guide RN002 on RI0001 before the panel joins the carcass.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 53,
+        "support": 10,
+        "toolAccess": 0,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "RN002",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-12",
+          "panelACode": "RI0002",
+          "panelAName": "Drawer Right",
+          "panelB": "panel-2",
+          "panelBCode": "RI0001",
+          "panelBName": "Right",
+          "side": "right"
+        }
+      ],
+      "index": 9,
+      "instruction": "Mount drawer guide RN002 on panel RI0001 while it is loose and fully accessible.",
+      "jointIds": [],
+      "kind": "pre_install",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "RI0001"
+      ],
+      "panelIds": [
+        "panel-2"
+      ],
+      "panelNames": [
+        "Right"
+      ],
+      "phase": "prepare",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "unknown",
+      "stage": "guides",
+      "stepId": "S09",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "unitPanelIds": [
+        "panel-2"
+      ],
+      "warnings": [
+        "Keep the panel separate while fitting this hardware."
+      ]
+    },
+    {
+      "action": "prepare",
+      "clusterKind": "carcass",
+      "componentKind": "guides",
+      "componentSubtitle": null,
+      "componentTitle": "DRAWER GUIDES",
+      "description": "Mount drawer guide RN003 on LE0001 before the panel joins the carcass.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 53,
+        "support": 10,
+        "toolAccess": 0,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "RN003",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-15",
+          "panelACode": "LE0003",
+          "panelAName": "Drawer Left",
+          "panelB": "panel-1",
+          "panelBCode": "LE0001",
+          "panelBName": "Left",
+          "side": "left"
+        }
+      ],
+      "index": 10,
+      "instruction": "Mount drawer guide RN003 on panel LE0001 while it is loose and fully accessible.",
+      "jointIds": [],
+      "kind": "pre_install",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "LE0001"
+      ],
+      "panelIds": [
+        "panel-1"
+      ],
+      "panelNames": [
+        "Left"
+      ],
+      "phase": "prepare",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "unknown",
+      "stage": "guides",
+      "stepId": "S10",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "unitPanelIds": [
+        "panel-1"
+      ],
+      "warnings": [
+        "Keep the panel separate while fitting this hardware."
+      ]
+    },
+    {
+      "action": "prepare",
+      "clusterKind": "carcass",
+      "componentKind": "guides",
+      "componentSubtitle": null,
+      "componentTitle": "DRAWER GUIDES",
+      "description": "Mount drawer guide RN004 on RI0001 before the panel joins the carcass.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 53,
+        "support": 10,
+        "toolAccess": 0,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "RN004",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-16",
+          "panelACode": "RI0003",
+          "panelAName": "Drawer Right",
+          "panelB": "panel-2",
+          "panelBCode": "RI0001",
+          "panelBName": "Right",
+          "side": "right"
+        }
+      ],
+      "index": 11,
+      "instruction": "Mount drawer guide RN004 on panel RI0001 while it is loose and fully accessible.",
+      "jointIds": [],
+      "kind": "pre_install",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "RI0001"
+      ],
+      "panelIds": [
+        "panel-2"
+      ],
+      "panelNames": [
+        "Right"
+      ],
+      "phase": "prepare",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "unknown",
+      "stage": "guides",
+      "stepId": "S11",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "unitPanelIds": [
+        "panel-2"
+      ],
+      "warnings": [
+        "Keep the panel separate while fitting this hardware."
+      ]
+    },
+    {
+      "action": "prepare",
+      "clusterKind": "carcass",
+      "componentKind": "guides",
+      "componentSubtitle": null,
+      "componentTitle": "DRAWER GUIDES",
+      "description": "Mount drawer guide RN005 on LE0001 before the panel joins the carcass.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 53,
+        "support": 10,
+        "toolAccess": 0,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "RN005",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-19",
+          "panelACode": "LE0004",
+          "panelAName": "Drawer Left",
+          "panelB": "panel-1",
+          "panelBCode": "LE0001",
+          "panelBName": "Left",
+          "side": "left"
+        }
+      ],
+      "index": 12,
+      "instruction": "Mount drawer guide RN005 on panel LE0001 while it is loose and fully accessible.",
+      "jointIds": [],
+      "kind": "pre_install",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "LE0001"
+      ],
+      "panelIds": [
+        "panel-1"
+      ],
+      "panelNames": [
+        "Left"
+      ],
+      "phase": "prepare",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "unknown",
+      "stage": "guides",
+      "stepId": "S12",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "unitPanelIds": [
+        "panel-1"
+      ],
+      "warnings": [
+        "Keep the panel separate while fitting this hardware."
+      ]
+    },
+    {
+      "action": "prepare",
+      "clusterKind": "carcass",
+      "componentKind": "guides",
+      "componentSubtitle": null,
+      "componentTitle": "DRAWER GUIDES",
+      "description": "Mount drawer guide RN006 on RI0001 before the panel joins the carcass.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 53,
+        "support": 10,
+        "toolAccess": 0,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "RN006",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-20",
+          "panelACode": "RI0004",
+          "panelAName": "Drawer Right",
+          "panelB": "panel-2",
+          "panelBCode": "RI0001",
+          "panelBName": "Right",
+          "side": "right"
+        }
+      ],
+      "index": 13,
+      "instruction": "Mount drawer guide RN006 on panel RI0001 while it is loose and fully accessible.",
+      "jointIds": [],
+      "kind": "pre_install",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "RI0001"
+      ],
+      "panelIds": [
+        "panel-2"
+      ],
+      "panelNames": [
+        "Right"
+      ],
+      "phase": "prepare",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "unknown",
+      "stage": "guides",
+      "stepId": "S13",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "unitPanelIds": [
+        "panel-2"
+      ],
+      "warnings": [
+        "Keep the panel separate while fitting this hardware."
+      ]
+    },
+    {
+      "action": "install",
+      "clusterKind": "carcass",
+      "componentKind": "carcass",
+      "componentSubtitle": null,
+      "componentTitle": "CARCASS",
+      "description": "Start the sub-assembly with BO0001.",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 53,
+        "support": 10,
+        "toolAccess": 0,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [],
+      "index": 14,
+      "instruction": "Start the sub-assembly with BO0001.",
+      "jointIds": [],
+      "kind": "join",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "BO0001"
+      ],
+      "panelIds": [
+        "panel-4"
+      ],
+      "panelNames": [
+        "Bottom"
+      ],
+      "phase": "internal",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "bottom",
+      "stage": "carcass",
+      "stepId": "S14",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "unitPanelIds": null,
+      "warnings": []
+    },
+    {
+      "action": "install",
+      "clusterKind": "carcass",
+      "componentKind": "carcass",
+      "componentSubtitle": null,
+      "componentTitle": "CARCASS",
+      "description": "Attach LE0001 to BO0001 (corner_butt).",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 57,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "FS002",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-1:panel-4:y",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-1",
+          "panelACode": "LE0001",
+          "panelAName": "Left",
+          "panelB": "panel-4",
+          "panelBCode": "BO0001",
+          "panelBName": "Bottom",
+          "positions": [
+            {
+              "x": 9,
+              "y": 18,
+              "z": -150
+            },
+            {
+              "x": 9,
+              "y": 18,
+              "z": 0
+            },
+            {
+              "x": 9,
+              "y": 18,
+              "z": 150
+            }
+          ]
+        }
+      ],
+      "index": 15,
+      "instruction": "Attach LE0001 to BO0001.",
+      "jointIds": [
+        "panel-1:panel-4:y"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "y",
+          "contactPosition": 18,
+          "faceA": "bottom",
+          "faceB": "back",
+          "gap": 0,
+          "id": "panel-1:panel-4:y",
+          "overlap": {
+            "x": [
+              0,
+              18
+            ],
+            "z": [
+              -200,
+              200
+            ]
+          },
+          "panelA": "panel-1",
+          "panelB": "panel-4",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        }
+      ],
+      "kind": "join",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [
+        "panel-4"
+      ],
+      "panelCodes": [
+        "LE0001"
+      ],
+      "panelIds": [
+        "panel-1"
+      ],
+      "panelNames": [
+        "Left"
+      ],
+      "phase": "subassembly",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "unknown",
+      "stage": "carcass",
+      "stepId": "S15",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "unitPanelIds": null,
+      "warnings": []
+    },
+    {
+      "action": "install",
+      "clusterKind": "carcass",
+      "componentKind": "carcass",
+      "componentSubtitle": null,
+      "componentTitle": "CARCASS",
+      "description": "Attach RI0001 to BO0001 (corner_butt).",
+      "ergonomic": {
+        "posture": 1,
+        "reach": 5,
+        "reposition": 0,
+        "score": 57,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "FS005",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-2:panel-4:y",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-2",
+          "panelACode": "RI0001",
+          "panelAName": "Right",
+          "panelB": "panel-4",
+          "panelBCode": "BO0001",
+          "panelBName": "Bottom",
+          "positions": [
+            {
+              "x": 491,
+              "y": 18,
+              "z": -150
+            },
+            {
+              "x": 491,
+              "y": 18,
+              "z": 0
+            },
+            {
+              "x": 491,
+              "y": 18,
+              "z": 150
+            }
+          ]
+        }
+      ],
+      "index": 16,
+      "instruction": "Attach RI0001 to BO0001.",
+      "jointIds": [
+        "panel-2:panel-4:y"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "y",
+          "contactPosition": 18,
+          "faceA": "bottom",
+          "faceB": "back",
+          "gap": 0,
+          "id": "panel-2:panel-4:y",
+          "overlap": {
+            "x": [
+              482,
+              500
+            ],
+            "z": [
+              -200,
+              200
+            ]
+          },
+          "panelA": "panel-2",
+          "panelB": "panel-4",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        }
+      ],
+      "kind": "join",
+      "orientation": "flat",
+      "orientationInstruction": "Work with the component flat on a supported surface.",
+      "otherPanelIds": [
+        "panel-4"
+      ],
+      "panelCodes": [
+        "RI0001"
+      ],
+      "panelIds": [
+        "panel-2"
+      ],
+      "panelNames": [
+        "Right"
+      ],
+      "phase": "subassembly",
+      "prerequisiteStepIds": [],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "unknown",
+      "stage": "carcass",
+      "stepId": "S16",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "unitPanelIds": null,
+      "warnings": []
+    },
+    {
+      "action": "close",
+      "clusterKind": "carcass",
+      "componentKind": "carcass",
+      "componentSubtitle": null,
+      "componentTitle": "CARCASS",
+      "description": "Install BA0001 as a back closure after all accessible internal components are in place.",
+      "ergonomic": {
+        "posture": 1.5,
+        "reach": 5,
+        "reposition": 2,
+        "score": 62.3,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "FS003",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-1:panel-5:z",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-1",
+          "panelACode": "LE0001",
+          "panelAName": "Left",
+          "panelB": "panel-5",
+          "panelBCode": "BA0001",
+          "panelBName": "Back",
+          "positions": [
+            {
+              "x": 9,
+              "y": 68,
+              "z": -200
+            },
+            {
+              "x": 9,
+              "y": 218,
+              "z": -200
+            },
+            {
+              "x": 9,
+              "y": 368,
+              "z": -200
+            },
+            {
+              "x": 9,
+              "y": 518,
+              "z": -200
+            },
+            {
+              "x": 9,
+              "y": 668,
+              "z": -200
+            }
+          ]
+        },
+        {
+          "displayId": "FS006",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-2:panel-5:z",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-2",
+          "panelACode": "RI0001",
+          "panelAName": "Right",
+          "panelB": "panel-5",
+          "panelBCode": "BA0001",
+          "panelBName": "Back",
+          "positions": [
+            {
+              "x": 491,
+              "y": 68,
+              "z": -200
+            },
+            {
+              "x": 491,
+              "y": 218,
+              "z": -200
+            },
+            {
+              "x": 491,
+              "y": 368,
+              "z": -200
+            },
+            {
+              "x": 491,
+              "y": 518,
+              "z": -200
+            },
+            {
+              "x": 491,
+              "y": 668,
+              "z": -200
+            }
+          ]
+        },
+        {
+          "displayId": "FS009",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-4:panel-5:z",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-4",
+          "panelACode": "BO0001",
+          "panelAName": "Bottom",
+          "panelB": "panel-5",
+          "panelBCode": "BA0001",
+          "panelBName": "Back",
+          "positions": [
+            {
+              "x": 50,
+              "y": 9,
+              "z": -200
+            },
+            {
+              "x": 183.333,
+              "y": 9,
+              "z": -200
+            },
+            {
+              "x": 316.667,
+              "y": 9,
+              "z": -200
+            },
+            {
+              "x": 450,
+              "y": 9,
+              "z": -200
+            }
+          ]
+        }
+      ],
+      "index": 17,
+      "instruction": "Install BA0001 as the back panel after all accessible internal components are installed.",
+      "jointIds": [
+        "panel-1:panel-5:z",
+        "panel-2:panel-5:z",
+        "panel-4:panel-5:z"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "z",
+          "contactPosition": -200,
+          "faceA": "right",
+          "faceB": "front",
+          "gap": 0,
+          "id": "panel-1:panel-5:z",
+          "overlap": {
+            "x": [
+              0,
+              18
+            ],
+            "y": [
+              18,
+              718
+            ]
+          },
+          "panelA": "panel-1",
+          "panelB": "panel-5",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        },
+        {
+          "contactAxis": "z",
+          "contactPosition": -200,
+          "faceA": "right",
+          "faceB": "front",
+          "gap": 0,
+          "id": "panel-2:panel-5:z",
+          "overlap": {
+            "x": [
+              482,
+              500
+            ],
+            "y": [
+              18,
+              718
+            ]
+          },
+          "panelA": "panel-2",
+          "panelB": "panel-5",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        },
+        {
+          "contactAxis": "z",
+          "contactPosition": -200,
+          "faceA": "bottom",
+          "faceB": "front",
+          "gap": 0,
+          "id": "panel-4:panel-5:z",
+          "overlap": {
+            "x": [
+              0,
+              500
+            ],
+            "y": [
+              0,
+              18
+            ]
+          },
+          "panelA": "panel-4",
+          "panelB": "panel-5",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        }
+      ],
+      "kind": "join",
+      "orientation": "rear_access",
+      "orientationInstruction": "Keep the rear/open face accessible for this operation.",
+      "otherPanelIds": [
+        "panel-1",
+        "panel-2",
+        "panel-4"
+      ],
+      "panelCodes": [
+        "BA0001"
+      ],
+      "panelIds": [
+        "panel-5"
+      ],
+      "panelNames": [
+        "Back"
+      ],
+      "phase": "closure",
+      "prerequisiteStepIds": [
+        "S14"
+      ],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 1,
+      "requiresReposition": true,
+      "role": "back",
+      "stage": "carcass",
+      "stepId": "S17",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "unitPanelIds": null,
+      "warnings": [
+        "Do not install the back until all required internal components are in place."
+      ]
+    },
+    {
+      "action": "close",
+      "clusterKind": "carcass",
+      "componentKind": "carcass",
+      "componentSubtitle": null,
+      "componentTitle": "CARCASS",
+      "description": "Install TO0001 as a top closure after all accessible internal components are in place.",
+      "ergonomic": {
+        "posture": 3.5,
+        "reach": 5,
+        "reposition": 2,
+        "score": 64.3,
+        "support": 10,
+        "toolAccess": 2,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "FS001",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-1:panel-3:y",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-1",
+          "panelACode": "LE0001",
+          "panelAName": "Left",
+          "panelB": "panel-3",
+          "panelBCode": "TO0001",
+          "panelBName": "Top",
+          "positions": [
+            {
+              "x": 9,
+              "y": 718,
+              "z": -150
+            },
+            {
+              "x": 9,
+              "y": 718,
+              "z": 0
+            },
+            {
+              "x": 9,
+              "y": 718,
+              "z": 150
+            }
+          ]
+        },
+        {
+          "displayId": "FS004",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-2:panel-3:y",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-2",
+          "panelACode": "RI0001",
+          "panelAName": "Right",
+          "panelB": "panel-3",
+          "panelBCode": "TO0001",
+          "panelBName": "Top",
+          "positions": [
+            {
+              "x": 491,
+              "y": 718,
+              "z": -150
+            },
+            {
+              "x": 491,
+              "y": 718,
+              "z": 0
+            },
+            {
+              "x": 491,
+              "y": 718,
+              "z": 150
+            }
+          ]
+        },
+        {
+          "displayId": "FS007",
+          "hardware": {
+            "brand": null,
+            "clearanceHoleDiameterMm": 7,
+            "diameterMm": 7,
+            "edgeOffsetMm": 50,
+            "id": "generic-confirmat-7x50",
+            "kind": "confirmat_screw",
+            "lengthMm": 50,
+            "maxSpacingMm": 150,
+            "minPanelThicknessMm": 16,
+            "pilotHoleDiameterMm": 4.5
+          },
+          "jointId": "panel-3:panel-5:z",
+          "jointType": "corner_butt",
+          "kind": "fastener",
+          "panelA": "panel-3",
+          "panelACode": "TO0001",
+          "panelAName": "Top",
+          "panelB": "panel-5",
+          "panelBCode": "BA0001",
+          "panelBName": "Back",
+          "positions": [
+            {
+              "x": 50,
+              "y": 727,
+              "z": -200
+            },
+            {
+              "x": 183.333,
+              "y": 727,
+              "z": -200
+            },
+            {
+              "x": 316.667,
+              "y": 727,
+              "z": -200
+            },
+            {
+              "x": 450,
+              "y": 727,
+              "z": -200
+            }
+          ]
+        }
+      ],
+      "index": 18,
+      "instruction": "Install TO0001 as the top panel only after the internal assembly and back panel are complete.",
+      "jointIds": [
+        "panel-1:panel-3:y",
+        "panel-2:panel-3:y",
+        "panel-3:panel-5:z"
+      ],
+      "jointObjects": [
+        {
+          "contactAxis": "y",
+          "contactPosition": 718,
+          "faceA": "top",
+          "faceB": "front",
+          "gap": 0,
+          "id": "panel-1:panel-3:y",
+          "overlap": {
+            "x": [
+              0,
+              18
+            ],
+            "z": [
+              -200,
+              200
+            ]
+          },
+          "panelA": "panel-1",
+          "panelB": "panel-3",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        },
+        {
+          "contactAxis": "y",
+          "contactPosition": 718,
+          "faceA": "top",
+          "faceB": "front",
+          "gap": 0,
+          "id": "panel-2:panel-3:y",
+          "overlap": {
+            "x": [
+              482,
+              500
+            ],
+            "z": [
+              -200,
+              200
+            ]
+          },
+          "panelA": "panel-2",
+          "panelB": "panel-3",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        },
+        {
+          "contactAxis": "z",
+          "contactPosition": -200,
+          "faceA": "bottom",
+          "faceB": "front",
+          "gap": 0,
+          "id": "panel-3:panel-5:z",
+          "overlap": {
+            "x": [
+              0,
+              500
+            ],
+            "y": [
+              718,
+              736
+            ]
+          },
+          "panelA": "panel-3",
+          "panelB": "panel-5",
+          "sameGroup": true,
+          "status": "classified",
+          "type": "corner_butt"
+        }
+      ],
+      "kind": "join",
+      "orientation": "upright",
+      "orientationInstruction": "Work with the furniture upright and stable.",
+      "otherPanelIds": [
+        "panel-1",
+        "panel-2",
+        "panel-5"
+      ],
+      "panelCodes": [
+        "TO0001"
+      ],
+      "panelIds": [
+        "panel-3"
+      ],
+      "panelNames": [
+        "Top"
+      ],
+      "phase": "closure",
+      "prerequisiteStepIds": [
+        "S17"
+      ],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 1,
+      "requiresReposition": true,
+      "role": "top",
+      "stage": "carcass",
+      "stepId": "S18",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB01",
+      "subassemblyName": "Main carcass",
+      "unitPanelIds": null,
+      "warnings": [
+        "Do not install the top until the internal components and back panel are complete."
+      ]
+    },
+    {
+      "action": "integrate",
+      "clusterKind": "drawer_box",
+      "componentKind": "integration",
+      "componentSubtitle": null,
+      "componentTitle": "FINAL ASSEMBLY",
+      "description": "Slide the drawer box (LE0002, RI0002) into the carcass on its runners (LE0001, RI0001).",
+      "ergonomic": {
+        "posture": 3.5,
+        "reach": 5,
+        "reposition": 0,
+        "score": 60.6,
+        "support": 10,
+        "toolAccess": 2.5,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "RN001",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-11",
+          "panelACode": "LE0002",
+          "panelAName": "Drawer Left",
+          "panelB": "panel-1",
+          "panelBCode": "LE0001",
+          "panelBName": "Left",
+          "side": "left"
+        },
+        {
+          "displayId": "RN002",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-12",
+          "panelACode": "RI0002",
+          "panelAName": "Drawer Right",
+          "panelB": "panel-2",
+          "panelBCode": "RI0001",
+          "panelBName": "Right",
+          "side": "right"
+        }
+      ],
+      "index": 19,
+      "instruction": "Slide the drawer box (LE0002, RI0002) into the carcass on its runners (LE0001, RI0001).",
+      "integrationSubassemblyIds": [
+        "SUB05",
+        "SUB01"
+      ],
+      "jointIds": [
+        "panel-11:panel-1:slide",
+        "panel-12:panel-2:slide"
+      ],
+      "jointObjects": [
+        {
+          "axis": "z",
+          "clearanceMm": 21,
+          "id": "panel-11:panel-1:slide",
+          "kind": "drawer_slide",
+          "lengthMm": 380,
+          "p1": {
+            "x": 48,
+            "y": 134.667,
+            "z": -180
+          },
+          "p2": {
+            "x": 48,
+            "y": 134.667,
+            "z": 200
+          },
+          "panelA": "panel-11",
+          "panelB": "panel-1",
+          "side": "left"
+        },
+        {
+          "axis": "z",
+          "clearanceMm": 21,
+          "id": "panel-12:panel-2:slide",
+          "kind": "drawer_slide",
+          "lengthMm": 380,
+          "p1": {
+            "x": 452,
+            "y": 134.667,
+            "z": -180
+          },
+          "p2": {
+            "x": 452,
+            "y": 134.667,
+            "z": 200
+          },
+          "panelA": "panel-12",
+          "panelB": "panel-2",
+          "side": "right"
+        }
+      ],
+      "kind": "integrate",
+      "orientation": "upright",
+      "orientationInstruction": "Work with the furniture upright and stable.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "LE0002",
+        "RI0002",
+        "LE0001",
+        "RI0001"
+      ],
+      "panelIds": [
+        "panel-11",
+        "panel-12",
+        "panel-1",
+        "panel-2"
+      ],
+      "panelNames": [
+        "Drawer Left",
+        "Drawer Right",
+        "Left",
+        "Right"
+      ],
+      "phase": "integration",
+      "prerequisiteStepIds": [
+        "S07",
+        "S18"
+      ],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "drawer_box",
+      "stage": "integration",
+      "stepId": "S19",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB05",
+      "subassemblyName": "Drawer assembly 1",
+      "unitPanelIds": null,
+      "warnings": [
+        "Complete the drawer box before inserting it into the carcass."
+      ]
+    },
+    {
+      "action": "integrate",
+      "clusterKind": "drawer_box",
+      "componentKind": "integration",
+      "componentSubtitle": null,
+      "componentTitle": "FINAL ASSEMBLY",
+      "description": "Slide the drawer box (LE0003, RI0003) into the carcass on its runners (LE0001, RI0001).",
+      "ergonomic": {
+        "posture": 3.5,
+        "reach": 5,
+        "reposition": 0,
+        "score": 60.6,
+        "support": 10,
+        "toolAccess": 2.5,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "RN003",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-15",
+          "panelACode": "LE0003",
+          "panelAName": "Drawer Left",
+          "panelB": "panel-1",
+          "panelBCode": "LE0001",
+          "panelBName": "Left",
+          "side": "left"
+        },
+        {
+          "displayId": "RN004",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-16",
+          "panelACode": "RI0003",
+          "panelAName": "Drawer Right",
+          "panelB": "panel-2",
+          "panelBCode": "RI0001",
+          "panelBName": "Right",
+          "side": "right"
+        }
+      ],
+      "index": 20,
+      "instruction": "Slide the drawer box (LE0003, RI0003) into the carcass on its runners (LE0001, RI0001).",
+      "integrationSubassemblyIds": [
+        "SUB06",
+        "SUB01"
+      ],
+      "jointIds": [
+        "panel-15:panel-1:slide",
+        "panel-16:panel-2:slide"
+      ],
+      "jointObjects": [
+        {
+          "axis": "z",
+          "clearanceMm": 21,
+          "id": "panel-15:panel-1:slide",
+          "kind": "drawer_slide",
+          "lengthMm": 380,
+          "p1": {
+            "x": 48,
+            "y": 368,
+            "z": -180
+          },
+          "p2": {
+            "x": 48,
+            "y": 368,
+            "z": 200
+          },
+          "panelA": "panel-15",
+          "panelB": "panel-1",
+          "side": "left"
+        },
+        {
+          "axis": "z",
+          "clearanceMm": 21,
+          "id": "panel-16:panel-2:slide",
+          "kind": "drawer_slide",
+          "lengthMm": 380,
+          "p1": {
+            "x": 452,
+            "y": 368,
+            "z": -180
+          },
+          "p2": {
+            "x": 452,
+            "y": 368,
+            "z": 200
+          },
+          "panelA": "panel-16",
+          "panelB": "panel-2",
+          "side": "right"
+        }
+      ],
+      "kind": "integrate",
+      "orientation": "upright",
+      "orientationInstruction": "Work with the furniture upright and stable.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "LE0003",
+        "RI0003",
+        "LE0001",
+        "RI0001"
+      ],
+      "panelIds": [
+        "panel-15",
+        "panel-16",
+        "panel-1",
+        "panel-2"
+      ],
+      "panelNames": [
+        "Drawer Left",
+        "Drawer Right",
+        "Left",
+        "Right"
+      ],
+      "phase": "integration",
+      "prerequisiteStepIds": [
+        "S18"
+      ],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "drawer_box",
+      "stage": "integration",
+      "stepId": "S20",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB06",
+      "subassemblyName": "Drawer assembly 2",
+      "unitPanelIds": null,
+      "warnings": [
+        "Complete the drawer box before inserting it into the carcass."
+      ]
+    },
+    {
+      "action": "integrate",
+      "clusterKind": "drawer_box",
+      "componentKind": "integration",
+      "componentSubtitle": null,
+      "componentTitle": "FINAL ASSEMBLY",
+      "description": "Slide the drawer box (LE0004, RI0004) into the carcass on its runners (LE0001, RI0001).",
+      "ergonomic": {
+        "posture": 3.5,
+        "reach": 5,
+        "reposition": 0,
+        "score": 60.6,
+        "support": 10,
+        "toolAccess": 2.5,
+        "twoPerson": 8,
+        "weight": 10
+      },
+      "hardware": [
+        {
+          "displayId": "RN005",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-19",
+          "panelACode": "LE0004",
+          "panelAName": "Drawer Left",
+          "panelB": "panel-1",
+          "panelBCode": "LE0001",
+          "panelBName": "Left",
+          "side": "left"
+        },
+        {
+          "displayId": "RN006",
+          "hardware": {
+            "brand": "Blum",
+            "fixingScrew": "612TH wood screw",
+            "id": "blum-legrabox-c",
+            "minScrewsPerBracket": 3,
+            "nominalLengthsMm": [
+              270,
+              350,
+              400,
+              450,
+              500,
+              550,
+              600
+            ],
+            "series": "LEGRABOX",
+            "sideClearanceMm": 21,
+            "type": "steel-profile-side-mount"
+          },
+          "kind": "runner",
+          "nominalLengthMm": 350,
+          "panelA": "panel-20",
+          "panelACode": "RI0004",
+          "panelAName": "Drawer Right",
+          "panelB": "panel-2",
+          "panelBCode": "RI0001",
+          "panelBName": "Right",
+          "side": "right"
+        }
+      ],
+      "index": 21,
+      "instruction": "Slide the drawer box (LE0004, RI0004) into the carcass on its runners (LE0001, RI0001).",
+      "integrationSubassemblyIds": [
+        "SUB07",
+        "SUB01"
+      ],
+      "jointIds": [
+        "panel-19:panel-1:slide",
+        "panel-20:panel-2:slide"
+      ],
+      "jointObjects": [
+        {
+          "axis": "z",
+          "clearanceMm": 21,
+          "id": "panel-19:panel-1:slide",
+          "kind": "drawer_slide",
+          "lengthMm": 380,
+          "p1": {
+            "x": 48,
+            "y": 601.333,
+            "z": -180
+          },
+          "p2": {
+            "x": 48,
+            "y": 601.333,
+            "z": 200
+          },
+          "panelA": "panel-19",
+          "panelB": "panel-1",
+          "side": "left"
+        },
+        {
+          "axis": "z",
+          "clearanceMm": 21,
+          "id": "panel-20:panel-2:slide",
+          "kind": "drawer_slide",
+          "lengthMm": 380,
+          "p1": {
+            "x": 452,
+            "y": 601.333,
+            "z": -180
+          },
+          "p2": {
+            "x": 452,
+            "y": 601.333,
+            "z": 200
+          },
+          "panelA": "panel-20",
+          "panelB": "panel-2",
+          "side": "right"
+        }
+      ],
+      "kind": "integrate",
+      "orientation": "upright",
+      "orientationInstruction": "Work with the furniture upright and stable.",
+      "otherPanelIds": [],
+      "panelCodes": [
+        "LE0004",
+        "RI0004",
+        "LE0001",
+        "RI0001"
+      ],
+      "panelIds": [
+        "panel-19",
+        "panel-20",
+        "panel-1",
+        "panel-2"
+      ],
+      "panelNames": [
+        "Drawer Left",
+        "Drawer Right",
+        "Left",
+        "Right"
+      ],
+      "phase": "integration",
+      "prerequisiteStepIds": [
+        "S18"
+      ],
+      "repeatCount": 1,
+      "repeatLabels": null,
+      "repositionCost": 0,
+      "requiresReposition": false,
+      "role": "drawer_box",
+      "stage": "integration",
+      "stepId": "S21",
+      "subassemblyComplete": false,
+      "subassemblyId": "SUB07",
+      "subassemblyName": "Drawer assembly 3",
+      "unitPanelIds": null,
+      "warnings": [
+        "Complete the drawer box before inserting it into the carcass."
+      ]
+    }
+  ]
+}

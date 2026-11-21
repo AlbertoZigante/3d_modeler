@@ -1732,38 +1732,6 @@ const GROUPS = [
   { name:'onDimensionEdit / onDimensionRemove / onDimensionMove', io:'(spec, ...) &rarr; <b>boolean|void</b>', role:'Handlers for the in-viewport dimensions. spec.kind "imposed": retype (changeQuoteValue), remove (empty Enter) and move (changeQuoteOffset). spec.kind "candidate" (grey): typing a DIFFERENT number plans the pair (planDimension) and imposes it through commitDimension, then closes the Dimension tool; confirming the value it already shows changes nothing &mdash; a grey dimension only starts acting on the geometry when it is modified.', calls:['commitDimension() / changeQuoteValue() &mdash; same file'] },
         ]
       },
-      {
-        path: 'main.js',
-        status: 'warn',
-        exportsList: [],
-        role: 'Vite starter-template entry (hero image + counter demo). modeller.html loads modeller-main.js directly, so this file is not part of the modeller; leftover scaffolding.',
-        fns: [
-        ]
-      },
-      {
-        path: 'counter.js',
-        status: 'warn',
-        exportsList: [],
-        role: 'Vite starter-template counter demo used only by main.js. Unused by the modeller.',
-        fns: [
-        ]
-      },
-      {
-        path: 'App.jsx',
-        status: 'warn',
-        exportsList: [],
-        role: 'React shell that only mounts PanelModelerStage0. Not loaded by any HTML page; historical prototype scaffolding.',
-        fns: [
-        ]
-      },
-      {
-        path: 'components/PanelModelerStage0.jsx',
-        status: 'warn',
-        exportsList: [],
-        role: '"STAGE 0" prototype from the very beginning of the project (React state graph -> Three.js mesh, one panel type). Superseded by modeller-main.js and the modeller/ layer; kept as history, not loaded by any page.',
-        fns: [
-        ]
-      },
     ]
   },
   {
@@ -2119,18 +2087,6 @@ const GROUPS = [
 ]
       },
       {
-        path: 'modeller/node.js',
-        status: 'stub',
-        role: 'Intended split target for node primitives out of modules.js — currently plain text, not real code (no export/function keywords). modules.js still covers this content today, so nothing is broken, but nothing should import from this file yet.',
-        fns: []
-      },
-      {
-        path: 'modeller/materials.js',
-        status: 'stub',
-        role: 'Intended split target for the material catalog out of modules.js — same issue as node.js: placeholder text, not implemented.',
-        fns: []
-      },
-      {
         path: 'modeller/snap.js',
         status: 'ok',
         imports: [{from:'./modules.js',names:['LOCAL_FACES','FACE_TO_DIM_FIELD','FIELD_TO_AXIS','MIN_PANEL_DIM_MM','getAlignedAxis','DIM_FIELD_PROBE_FACE','computeWorldHalfExtents']}],
@@ -2352,18 +2308,6 @@ const GROUPS = [
 ]
       },
       {
-        path: 'engine/pdfExport-assembly.js',
-        status: 'ok',
-        imports: [{from:'jspdf (external)',names:['jsPDF']},{from:'../modeller/modules.js',names:['computeWorldHalfExtents']},{from:'./pdfExport-shared.js',names:['PAGE_MARGIN_MM','TEXT_LINE_HEIGHT_MM','outputPdf']}],
-        exportsList: ['exportAssemblyPlanPdf'],
-        role: 'Assembly instructions PDF &mdash; schematic wireframe diagrams under a simple oblique (&quot;cabinet&quot;) projection, one step per page, in the style of a real flat-pack booklet: already-placed panels faint, this step&#39;s new panel(s) bold, an insertion arrow for join/integrate steps. Deliberately not photorealistic &mdash; jsPDF&#39;s own line-drawing primitives, no separate rendering pipeline. The assembly branch&#39;s own export file, split out of the old monolithic pdfExport.js.',
-        fns: [
-  { name:'projectOblique / computeBoxCorners / boxEdges / computeSharedProjectionBounds / toDiagramXY', io:'various', role:'The oblique-projection math &mdash; a panel&#39;s 8 AABB corners projected to 2D, with the SAME scale/bounds reused across every step&#39;s diagram so proportions never shift between pages.', calls:['computeWorldHalfExtents() &mdash; modeller/modules.js'], tag:'internal' },
-  { name:'drawPanelWireframe / drawInsertionArrow / drawStepDiagram', io:'various', role:'Draws one panel&#39;s 12 edges, a plain insertion arrow, and a full step&#39;s diagram box (every already-placed panel faint, this step&#39;s new panel(s) bold).', calls:[], tag:'internal' },
-  { name:'exportAssemblyPlanPdf', io:'(plan, resolvedPanels, {projectName, fileName, mode}) &rarr; <span class=&quot;ret&quot;>void</span>', role:'Cover page (tools needed + parts list) then one page per step from engine/ergonomics.js#buildAssemblyPlan &mdash; diagram, ergonomics flags, hardware, tools.', calls:['drawStepDiagram() &mdash; same file', 'outputPdf() &mdash; engine/pdfExport-shared.js', 'jsPDF &mdash; jspdf (external)'] },
-]
-      },
-      {
         path: 'engine/joints.js',
         status: 'verified',
         imports: [{from:'../modeller/modules.js',names:['computeWorldHalfExtents','getAlignedAxis','LOCAL_FACES']},{from:'../shared/geometry.js',names:['facingFace']},{from:'../modeller/snap.js',names:['resolveConstraints']},{from:'../shared/frontFit.js',names:['dimFieldForAxis']}],
@@ -2424,40 +2368,6 @@ const GROUPS = [
 ]
       },
       {
-        path: 'engine/assembly.js',
-        status: 'verified',
-        imports: [{from:'../modeller/snap.js',names:['resolveConstraints']},{from:'./joints.js',names:['detectJoints','detectFeatureJoints']},{from:'./hardware.js',names:['buildHardwarePlan']}],
-        exportsList: ['buildAssemblySequence','formatAssemblySequenceLines'],
-        role: '<b>This is where &quot;assembly&quot; lives.</b> Assembly SEQUENCING: in what order a design actually gets put together. Sits above engine/hardware.js the way hardware.js sits above engine/joints.js &mdash; geometry says where things meet, hardware says what holds them together, this says in what order a person does it. Core insight: a structural Joint (corner_butt/t_butt/face_to_face) means two panels are rigidly joined into the same sub-assembly, built panel by panel; a FeatureJoint (drawer_slide/door_hinge) means two ALREADY-COMPLETE sub-assemblies get connected to each other, scheduled only once both sides are finished, hinges always last.',
-        note: 'Known gap, flagged in the file itself: a drawer front&#39;s attachment to its drawer box isn&#39;t modeled as a joint yet (matched via drawerBoxFrontId, not a Joint/FeatureJoint) &mdash; a front with no other structural joints shows up as its own flagged `kind:&#39;unattached&#39;` step rather than being silently dropped, same philosophy as joints.js#findOrphanPanels.',
-        fns: [
-  { name:'computeClusters', io:'(panelIds, structuralJoints) &rarr; <b>{panelIds}[]</b>', role:'Connected components over the STRUCTURAL graph only (near_contact/edge_to_edge don&#39;t count as real connections yet).', calls:[], tag:'internal' },
-  { name:'buildAssemblySequence', io:'(panels) &rarr; <b>{ steps: AssemblyStep[], clusters }</b>', role:'Clusters panels into rigid sub-assemblies, orders each cluster&#39;s own panels internally, pre-installs single-panel hardware (a runner bracket, a hinge cup/plate) before that panel&#39;s first structural joint, then schedules integration steps (drawer insertion, door hanging) once both sides are complete &mdash; hinges always last. Pure function, nothing persisted, same convention as buildJointsReport/buildHardwarePlan.', calls:['computeClusters() &mdash; same file', 'detectJoints() / detectFeatureJoints() &mdash; engine/joints.js', 'buildHardwarePlan() &mdash; engine/hardware.js'] },
-  { name:'formatAssemblySequenceLines', io:'(sequence) &rarr; <b>string[]</b>', role:'Plain-text rendering of a sequence &mdash; print-and-eyeball the order before building anything visual, same convention as joints.js/hardware.js&#39;s own text formatters.', calls:[] },
-]
-      },
-      {
-        path: 'engine/ergonomics.js',
-        status: 'verified',
-        imports: [{from:'../modeller/snap.js',names:['resolveConstraints']},{from:'./assembly.js',names:['buildAssemblySequence']}],
-        exportsList: ['TOOL_CATALOG','annotateStepsWithTools','scoreErgonomics','buildAssemblyPlan','formatAssemblyPlanLines'],
-        role: 'Tool identification + ergonomics scoring &mdash; an ANNOTATION pass over engine/assembly.js#buildAssemblySequence&#39;s output, not a second sequencer: neither phase invents a new order, both just attach information to the order assembly.js already computed. Three concrete per-step checks: cumulative weightKg / twoPersonJob (union-find over panels as they get joined), plus whatever else the original ergonomics plan scoped (flip-count, cantilever/support).',
-        note: 'The confirmat screw drive type in TOOL_CATALOG is flagged as a convention to confirm per actual screw brand, not cited as a verified spec the way the Blum numbers in engine/hardware.js are.',
-        fns: [
-  { name:'TOOL_CATALOG', io:'object constant', role:'Maps a hardware kind (from buildHardwarePlan) to the tool(s) it needs.', calls:[], tag:'internal' },
-  { name:'annotateStepsWithTools', io:'(sequence) &rarr; <b>{ steps, toolsSummary: string[] }</b>', role:'A step&#39;s tools are the union of tools its hardware needs.', calls:['TOOL_CATALOG &mdash; same file (constant)'] },
-  { name:'scoreErgonomics', io:'(panels, sequence) &rarr; <b>{ steps }</b>', role:'Attaches weightKg/twoPersonJob and the other ergonomics flags to each step.', calls:[] },
-  { name:'buildAssemblyPlan', io:'(panels) &rarr; <b>{ steps, clusters, toolsSummary }</b>', role:'Ties sequencing + tools + ergonomics into one call &mdash; same &quot;one entry point, same shape&quot; pattern as buildJointsReport/buildHardwarePlan.', calls:['buildAssemblySequence() &mdash; engine/assembly.js', 'annotateStepsWithTools() / scoreErgonomics() &mdash; same file'] },
-  { name:'formatAssemblyPlanLines', io:'(plan) &rarr; <b>string[]</b>', role:'Plain-text rendering of a full assembly plan.', calls:[] },
-]
-      },
-      {
-        path: 'engine/resolveConstraints.js',
-        status: 'stub',
-        role: 'Empty scaffolding — created during the restructure but never populated. The app still correctly uses modeller/snap.js#resolveConstraints; nothing imports from this file today.',
-        fns: []
-      },
-      {
         path: 'engine/validator.js',
         status: 'ok',
         imports: [{from:'./quoteConflicts.js',names:['findQuoteConflicts']},{from:'./joints.js',names:['detectJoints']},{from:'./clearance.js',names:['findClearanceViolations']},{from:'../shared/geometry.js',names:['findPanelSizeViolation','findDesignLimitViolation','checkMinGap','collectAxisSlabs']},{from:'../modeller/modules.js',names:['MIN_PANEL_DIM_MM']}],
@@ -2472,12 +2382,6 @@ const GROUPS = [
   { name:'minGapViolations', io:'(panels) &rarr; <b>Violation[]</b>', role:'Whole-design backstop for MIN_WALL_GAP_MM (&quot;too close shelves&quot;), swept across EVERY group and both axes rather than just the one group/axis a direct drag happens to be touching. Operates on the RAW graph, not resolved &mdash; collectAxisSlabs reads each panel&#39;s own pre-resolve .offset field.', calls:['collectAxisSlabs() / checkMinGap() &mdash; shared/geometry.js'], tag:'internal' },
   { name:'validateDesign', io:'(panels, resolvedPanels, {joints?, collisions?}) &rarr; <b>{ violations: Violation[] }</b>', role:'The single entry point &mdash; runs the four sweeps above plus engine/clearance.js#findClearanceViolations. Reuses a precomputed `collisions` array if the caller supplies one (see modeller-main.js#checkJointWarnings, which already calls detectJoints() for its own orphan/cross-group checks) rather than running a second full O(panel count²) pass for the same answer.', calls:['collisionViolations() / panelSizeViolations() / designLimitViolations() / minGapViolations() &mdash; same file', 'findClearanceViolations() &mdash; engine/clearance.js', 'detectJoints() &mdash; engine/joints.js (only if collisions not supplied)'] },
 ]
-      },
-      {
-        path: 'engine/extractor.js',
-        status: 'stub',
-        role: 'Empty, unused.',
-        fns: []
       },
       {
         path: 'engine/quotes.js',
@@ -2510,16 +2414,6 @@ const GROUPS = [
         fns: [
   { name:'activeQuotes', io:'(panels) &rarr; <b>{panel, c}[]</b>', role:'Every non-overridden `distance` constraint in the raw graph.', calls:[], tag:'internal' },
   { name:'findQuoteConflicts', io:'(panels, resolvedPanels, {collisions?}) &rarr; <b>Violation[]</b>', role:'Returns the quote violations described above. Each carries drivenIds (the quoted panels involved &mdash; the dimension overlay turns them red) and, for overflows, `explains`: the keys of the generic collision/exceedsDesignLimit violations it already accounts for, so validateDesign can drop the duplicates. Reuses detectJoints&#39; own collisions instead of a second pairwise pass.', calls:['getPanelOwnership() / getAlignedAxis() / computeWorldHalfExtents() &mdash; modeller/modules.js', 'findDesignLimitViolation() &mdash; shared/geometry.js'] },
-        ]
-      },
-      {
-        path: 'engine/pdfExport.js',
-        status: 'warn',
-        imports: [{from:'jspdf',names:['jsPDF']},{from:'./joints.js',names:['formatSummaryLines','formatAttentionLines','formatJointTableRow','formatFeatureJointTableRow']},{from:'./hardware.js',names:['formatHardwareTableRow']}],
-        exportsList: ['exportCutListPdf','exportHistoryPdf','exportJointsPdf','exportNestingPdf','exportAssemblyPlanPdf'],
-        role: 'LEGACY monolithic PDF exporter (cut list, history, joints, nesting, assembly in one 900-line file). Superseded by the one-per-domain split &mdash; pdfExport-bom.js, pdfExport-history.js, pdfExport-joints.js, pdfExport-assembly.js and pdfExport-shared.js &mdash; and no longer imported by any module (only comments in history.js and the split files still mention it). Kept for reference; safe to delete once nobody needs the old copy.',
-        fns: [
-  { name:'exportCutListPdf / exportHistoryPdf / exportJointsPdf / exportNestingPdf / exportAssemblyPlanPdf', io:'(data, opts) &rarr; <span class="ret">void</span>', role:'Same names and signatures as the split files; do not import from here.', calls:[] },
         ]
       },
     ]
@@ -3512,48 +3406,13 @@ function renderKnownGaps() {
     <p class="known-gaps-intro">Everything below is empty, unfinished, or flagged as incomplete right in the file it's found in — gathered here in one place since this is usually the first thing worth checking before planning new work.</p>
     <ul class="known-gaps-list">
       <li>
-        <span class="gap-files">${fileLink('engine/extractor.js')}</span>
-        <span class="gap-desc">Empty (0 bytes) — no documented intent yet.</span>
-        <a class="gap-module-link" href="#module-engine">Engine module →</a>
-      </li>
-      <li>
-        <span class="gap-files">engine/pdfExport.js</span>
-        <span class="gap-desc">Orphaned leftover from the pdfExport split — the 5 replacement files (pdfExport-shared/bom/joints/history/assembly.js) were added, but this original file was never deleted. Nothing imports it anymore; safe to remove.</span>
-        <a class="gap-module-link" href="#module-engine">Engine module →</a>
-      </li>
-      <li>
-        <span class="gap-files">${fileLink('engine/resolveConstraints.js')}</span>
-        <span class="gap-desc">Dead scaffolding from an earlier restructure — ${fileLink('modeller/snap.js')} is the resolver actually in use; nothing imports this one.</span>
-        <a class="gap-module-link" href="#module-engine">Engine module →</a>
-      </li>
-      <li>
         <span class="gap-files">${fileLink('engine/helpers.mjs')}</span>
         <span class="gap-desc">Likely misplaced — its own header claims a tests/ location its import path doesn't support from where it actually sits.</span>
         <a class="gap-module-link" href="#module-engine">Engine module →</a>
       </li>
       <li>
-        <span class="gap-files">${fileLink('engine/assembly.js')}</span>
-        <span class="gap-desc">Self-flagged: a drawer front's attachment to its own box isn't modeled as a real joint yet — it surfaces as its own flagged step instead.</span>
-        <a class="gap-module-link" href="#module-engine">Engine module →</a>
-      </li>
-      <li>
-        <span class="gap-files">${fileLink('modeller/node.js')} &amp; ${fileLink('modeller/materials.js')}</span>
-        <span class="gap-desc">Stub split targets out of modules.js — never populated; modules.js still covers this ground.</span>
-        <a class="gap-module-link" href="#module-graph">Modeller Engine module →</a>
-      </li>
-      <li>
         <span class="gap-files">${fileLink('modeller-main.js')}#updateSelectedField</span>
         <span class="gap-desc">The inspector&#39;s generic size/position edit path does not yet refuse system-owned panels (plinth, legs, box walls). Quotes are guarded in the engine, but a typed size/position on a system panel is still only blocked by its locked fields. Doors and drawers may legitimately use this path, so check before adding a blanket guard.</span>
-        <a class="gap-module-link" href="#module-core">Core module →</a>
-      </li>
-      <li>
-        <span class="gap-files">${fileLink('engine/pdfExport.js')}</span>
-        <span class="gap-desc">Legacy monolithic PDF exporter, superseded by the pdfExport-*.js split and imported by nothing.</span>
-        <a class="gap-module-link" href="#module-engine">Engine module →</a>
-      </li>
-      <li>
-        <span class="gap-files">${fileLink('main.js')}, ${fileLink('counter.js')}, ${fileLink('App.jsx')} &amp; ${fileLink('components/PanelModelerStage0.jsx')}</span>
-        <span class="gap-desc">Vite starter scaffolding and the original Stage 0 prototype; modeller.html loads modeller-main.js directly, so none of these are part of the running modeller.</span>
         <a class="gap-module-link" href="#module-core">Core module →</a>
       </li>
     </ul>
@@ -3681,7 +3540,7 @@ const MODULE_NARRATIVES = {
     <div class="module-section">
       <h3>Known rough edges (from the reference, not guesswork)</h3>
       <ul class="didactic-list">
-        <li>${fileLink('modeller/node.js')} and ${fileLink('modeller/materials.js')} are stubs — intended split targets out of modules.js that were never populated. Nothing should import from them yet; modules.js still covers that ground.</li>
+        <li>None open at the time of the phase 12 clean-up (the stub and orphan files this list used to name were deleted).</li>
       </ul>
     </div>
 
@@ -3704,14 +3563,13 @@ const MODULE_NARRATIVES = {
 
     <div class="module-section">
       <h3>Where "assembly" actually lives</h3>
-      <p>Four files form one pipeline, each building on the one before it — same "one entry point, same shape" convention throughout (<code>buildX(panels) → {…}</code>, plus a <code>formatXLines()</code> text renderer):</p>
+      <p><b>Since phase 12 the editor does not plan assemblies.</b> What it keeps is the live geometry it needs while you drag panels; everything that decides <i>what hardware, in what order, with which tools</i> is the API (api repo: <code>app/rules/hardware.py</code>, <code>app/rules/assembly/</code>, <code>docs/ASSEMBLY.md</code>):</p>
       <ul class="didactic-list">
-        <li>${fileLink('engine/joints.js')} — <b>where do panels actually touch, and what kind of contact is it.</b> Pure geometry: ${functionLink('detectJoints')} batch-scans a whole design; ${functionLink('classifyJoint')} does the identical single-pair check for ${fileLink('tools/attachTool.js')}'s manual confirmation flow (see the Tools &amp; Features module) — deliberately the same contact test, so the two can never disagree.</li>
-        <li>${fileLink('engine/hardware.js')} — <b>what hardware goes there, and exactly where its own fixings go.</b> ${functionLink('buildHardwarePlan')} selects real Blum hinges/runners against joints.js's output, plus generic panel connectors, and flags anything unmatched rather than dropping it.</li>
-        <li>${fileLink('engine/assembly.js')} — <b>what order a person actually builds it in.</b> ${functionLink('buildAssemblySequence')} clusters panels into rigid sub-assemblies via the structural joints, then schedules door/drawer integration once both sides of a hinge or slide are complete.</li>
-        <li>${fileLink('engine/ergonomics.js')} — an annotation pass over assembly.js's own sequence: which tools each step needs, and weight/two-person flags. Doesn't re-order anything.</li>
+        <li>${fileLink('engine/joints.js')} — <b>where do panels actually touch, and what kind of contact is it.</b> Kept in the client for live snapping and the validator (the API has its own copy for plans): ${functionLink('detectJoints')} batch-scans a whole design; ${functionLink('classifyJoint')} does the identical single-pair check.</li>
+        <li>${fileLink('engine/hardware.js')} — only the <i>live-validation subset</i> of the hardware rules (hinge and connector selection, used by clearance checks) and the table-row formatting. The hardware <i>plan</i> comes from <code>POST /v1/hardware-plan</code>.</li>
+        <li><code>POST /v1/assembly</code> — sub-assemblies, build order (doors + handles, drawers, guides, plinth, carcass, integration), tools and ergonomics, returned as <b>structured steps</b> (verb + params, warning codes) that ${fileLink('i18n/steps.js')} renders in English, French or Italian.</li>
+        <li>${fileLink('engine/assembly/manual/export.js')} — builds the printable manual (HTML for print / PDF) from those steps; ${fileLink('engine/pdfExport-joints.js')} prints the joint report with the server's hardware plan.</li>
       </ul>
-      <p>PDF export for all four (plus BOM/nesting/history) used to be one shared file; it's now split one-per-domain — ${fileLink('engine/pdfExport-bom.js')}, ${fileLink('engine/pdfExport-joints.js')}, ${fileLink('engine/pdfExport-assembly.js')}, ${fileLink('engine/pdfExport-history.js')} — plus ${fileLink('engine/pdfExport-shared.js')} for the handful of genuinely shared drawing helpers, specifically so the bom/joinery/assembly branches never collide editing the same export file.</p>
     </div>
 
     <div class="module-section">
@@ -3739,9 +3597,6 @@ const MODULE_NARRATIVES = {
     <div class="module-section">
       <h3>What's still actually missing</h3>
       <ul class="didactic-list">
-        <li>${fileLink('engine/extractor.js')} — still empty; no documented intent yet.</li>
-        <li>${fileLink('engine/resolveConstraints.js')} — empty scaffolding from an earlier restructure; the app still correctly uses ${fileLink('modeller/snap.js')}'s resolver, nothing imports this one.</li>
-        <li>${fileLink('engine/assembly.js')} itself flags one gap: a drawer front's attachment to its own box isn't modeled as a real joint yet, so it currently surfaces as its own flagged step rather than a proper structural connection.</li>
         <li>${fileLink('engine/clearance.js')} flags its own approximations rather than hiding them: door swing is a closed/open union, not a true swept arc; a fastener's driver-access direction straddles both sides of the joint rather than picking one; drawer travel assumes full extension. See that file's own note for the reasoning behind each.</li>
       </ul>
     </div>

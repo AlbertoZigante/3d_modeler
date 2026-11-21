@@ -1,0 +1,73 @@
+[
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "constraints": [],
+    "groupId": "g-1",
+    "height": 600,
+    "hidden": true,
+    "id": "panel-1",
+    "isBoxWall": false,
+    "material": "Melamine White 18mm",
+    "name": "Wall",
+    "offset": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownership": "user",
+    "pieceCode": "PA0001",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 1000
+  },
+  {
+    "bandedEdges": [],
+    "basePosition": {
+      "x": 5,
+      "y": 6,
+      "z": 7
+    },
+    "constraints": [],
+    "groupId": null,
+    "height": 300,
+    "hidden": false,
+    "id": "panel-2",
+    "isBoxWall": false,
+    "lockedMoveAxes": [
+      "x",
+      "z",
+      "nonsense"
+    ],
+    "material": "Melamine White 18mm",
+    "name": "Locked",
+    "offset": {
+      "x": 1,
+      "y": 2,
+      "z": 3
+    },
+    "ownership": "user",
+    "pieceCode": "PA0002",
+    "quantity": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "thickness": 18,
+    "thicknessAxis": "z",
+    "type": "panel",
+    "width": 300
+  }
+]

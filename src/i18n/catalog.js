@@ -344,6 +344,16 @@ export const CATALOG = [
   ['API {} {} failed (HTTP {})', "Échec de l'API {1} {2} (HTTP {3})", 'API {1} {2} non riuscita (HTTP {3})'],
   ['API {} timed out', "Délai dépassé pour l'API {1}", 'Timeout dell\'API {1}'],
   ['API {} unreachable', 'API {1} injoignable', 'API {1} non raggiungibile'],
+  // Backend error messages (src/api/errors.js) and cut-list / nesting states
+  ['The design could not be processed (invalid data).', "Le projet n'a pas pu être traité (données invalides).", 'Impossibile elaborare il progetto (dati non validi).'],
+  ['The design is too large to process.', 'Le projet est trop volumineux pour être traité.', 'Il progetto è troppo grande per essere elaborato.'],
+  ['The server is busy — try again in a few seconds.', 'Le serveur est occupé — réessayez dans quelques secondes.', 'Il server è occupato — riprova tra qualche secondo.'],
+  ['Nesting took too long — try a smaller design.', "L'optimisation a pris trop de temps — essayez un projet plus petit.", 'Il nesting ha richiesto troppo tempo — prova un progetto più piccolo.'],
+  ['This feature is not available on the server yet.', "Cette fonction n'est pas encore disponible sur le serveur.", 'Questa funzione non è ancora disponibile sul server.'],
+  ['The server took too long to answer.', 'Le serveur a mis trop de temps à répondre.', 'Il server ha impiegato troppo tempo a rispondere.'],
+  ['Request cancelled.', 'Requête annulée.', 'Richiesta annullata.'],
+  ['Backend error — please try again.', 'Erreur du serveur — veuillez réessayer.', 'Errore del server — riprova.'],
+  ['The cut list is out of date. It refreshes automatically on your next edit, or when you open the cut list.', "La liste de découpe n'est plus à jour. Elle se met à jour automatiquement à votre prochaine modification, ou à l'ouverture de la liste de découpe.", "L'elenco di taglio non è aggiornato. Si aggiorna automaticamente alla prossima modifica, oppure quando apri l'elenco di taglio."],
 
   // ---- Validation / conflict messages (engine) ----------------------------
   ['{} and {} are overlapping in space, not just touching.', '{1} et {2} se chevauchent dans l\'espace, ils ne font pas que se toucher.', '{1} e {2} si sovrappongono nello spazio, non si limitano a toccarsi.'],
@@ -416,6 +426,11 @@ export const CATALOG = [
   ['Group {}', 'Groupe {1}', 'Gruppo {1}'],
   ['Group', 'Groupe', 'Gruppo'],
   ['Invalid or missing API key', 'Clé API invalide ou manquante', 'Chiave API non valida o mancante'],
+  ['Please sign in to use this feature.', 'Connectez-vous pour utiliser cette fonction.', 'Accedi per usare questa funzione.'],
+  ['Your session is not valid — please sign in again.', "Votre session n'est pas valide — reconnectez-vous.", 'La tua sessione non è valida — accedi di nuovo.'],
+  ['Your session has expired — please sign in again.', 'Votre session a expiré — reconnectez-vous.', 'La tua sessione è scaduta — accedi di nuovo.'],
+  ['Too many requests — wait a moment and try again.', 'Trop de requêtes — patientez un instant puis réessayez.', 'Troppe richieste — attendi un momento e riprova.'],
+  ['The server had a problem — please try again.', 'Le serveur a rencontré un problème — réessayez.', 'Il server ha avuto un problema — riprova.'],
 
   // ---- More UI / tool messages -------------------------------------------
   ['Open door', 'Ouvrir la porte', "Apri l'anta"],

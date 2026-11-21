@@ -1,0 +1,28 @@
+{
+  "collisions": [],
+  "joints": [
+    {
+      "contactAxis": "z",
+      "contactPosition": 9.5,
+      "faceA": "front",
+      "faceB": "back",
+      "gap": 1,
+      "id": "panel-1:panel-2:z",
+      "overlap": {
+        "x": [
+          -150,
+          150
+        ],
+        "y": [
+          -150,
+          150
+        ]
+      },
+      "panelA": "panel-1",
+      "panelB": "panel-2",
+      "sameGroup": false,
+      "status": "classified",
+      "type": "near_contact"
+    }
+  ]
+}

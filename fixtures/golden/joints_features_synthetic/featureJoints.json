@@ -1,0 +1,119 @@
+[
+  {
+    "axis": "z",
+    "id": "panel-3:hinge",
+    "kind": "door_hinge",
+    "lengthMm": 690,
+    "p1": {
+      "x": -290,
+      "y": 5,
+      "z": 309
+    },
+    "p2": {
+      "x": -290,
+      "y": 695,
+      "z": 309
+    },
+    "panelA": "panel-3",
+    "panelB": "panel-1",
+    "side": "left"
+  },
+  {
+    "axis": "z",
+    "id": "panel-4:hinge",
+    "kind": "door_hinge",
+    "lengthMm": 690,
+    "p1": {
+      "x": 290,
+      "y": 5,
+      "z": 309
+    },
+    "p2": {
+      "x": 290,
+      "y": 695,
+      "z": 309
+    },
+    "panelA": "panel-4",
+    "panelB": "panel-2",
+    "side": "right"
+  },
+  {
+    "axis": "x",
+    "id": "panel-5:hinge",
+    "kind": "door_hinge",
+    "lengthMm": 690,
+    "p1": {
+      "x": 309,
+      "y": 5,
+      "z": 290
+    },
+    "p2": {
+      "x": 309,
+      "y": 695,
+      "z": 290
+    },
+    "panelA": "panel-5",
+    "panelB": "panel-2",
+    "side": "right"
+  },
+  {
+    "axis": "z",
+    "clearanceMm": 12,
+    "id": "panel-12:panel-1:slide",
+    "kind": "drawer_slide",
+    "lengthMm": 500,
+    "p1": {
+      "x": -270,
+      "y": 100,
+      "z": -200
+    },
+    "p2": {
+      "x": -270,
+      "y": 100,
+      "z": 300
+    },
+    "panelA": "panel-12",
+    "panelB": "panel-1",
+    "side": "left"
+  },
+  {
+    "axis": "z",
+    "clearanceMm": 9.5,
+    "id": "panel-13:panel-2:slide",
+    "kind": "drawer_slide",
+    "lengthMm": 500,
+    "p1": {
+      "x": 272.5,
+      "y": 100,
+      "z": -200
+    },
+    "p2": {
+      "x": 272.5,
+      "y": 100,
+      "z": 300
+    },
+    "panelA": "panel-13",
+    "panelB": "panel-2",
+    "side": "right"
+  },
+  {
+    "axis": "z",
+    "clearanceMm": 12,
+    "id": "panel-15:panel-1:slide",
+    "kind": "drawer_slide",
+    "lengthMm": 500,
+    "p1": {
+      "x": -270,
+      "y": 100,
+      "z": -200
+    },
+    "p2": {
+      "x": -270,
+      "y": 100,
+      "z": 300
+    },
+    "panelA": "panel-15",
+    "panelB": "panel-1",
+    "side": "left"
+  }
+]

@@ -1,0 +1,99 @@
+{
+  "bom": {
+    "materialSummary": [
+      {
+        "areaM2": 0.01,
+        "material": "Melamine White 18mm",
+        "quantity": 1,
+        "thickness": 18
+      }
+    ],
+    "rows": [
+      {
+        "areaM2": 0.01,
+        "assembly": "—",
+        "bandedEdges": [],
+        "bandedEdgesLabel": "—",
+        "bandingCost": 0,
+        "bandingLengthM": 0,
+        "grainInterchangeable": true,
+        "heightMm": 100,
+        "isHardware": false,
+        "label": "Floating",
+        "material": "Melamine White 18mm",
+        "pieceCodes": [
+          null
+        ],
+        "pieceNames": [
+          "Floating"
+        ],
+        "quantity": 1,
+        "thicknessMm": 18,
+        "unitAreaM2": 0.01,
+        "unitBandingLengthM": 0,
+        "widthMm": 100
+      }
+    ]
+  },
+  "results": [
+    {
+      "material": "Melamine White 18mm",
+      "sheets": [
+        {
+          "heightMm": 1220,
+          "placements": [
+            {
+              "finishedHeightMm": 100,
+              "finishedWidthMm": 100,
+              "heightMm": 100,
+              "pieceId": "Floating#1",
+              "rotated": false,
+              "widthMm": 100,
+              "xMm": 0,
+              "yMm": 0
+            }
+          ],
+          "sheetIndex": 0,
+          "totalAreaM2": 2.9768,
+          "usedAreaM2": 0.01,
+          "utilization": 0.003359312,
+          "widthMm": 2440
+        }
+      ],
+      "stockSheet": {
+        "heightMm": 1220,
+        "widthMm": 2440
+      },
+      "thicknessMm": 18,
+      "unplaced": []
+    }
+  ],
+  "summary": {
+    "perMaterial": [
+      {
+        "material": "Melamine White 18mm",
+        "pricePerSheet": 45,
+        "sheetsUsed": 1,
+        "thicknessMm": 18,
+        "totalAreaM2": 2.9768,
+        "totalCost": 45,
+        "unplacedAreaM2": 0,
+        "unplacedCount": 0,
+        "unplacedLabels": [],
+        "usedAreaM2": 0.01,
+        "utilization": 0.003359312,
+        "wasteAreaM2": 2.9668
+      }
+    ],
+    "totals": {
+      "sheetsUsed": 1,
+      "totalAreaM2": 2.9768,
+      "totalCost": 45,
+      "unplacedAreaM2": 0,
+      "unplacedCount": 0,
+      "usedAreaM2": 0.01,
+      "utilization": 0.003359312,
+      "wasteAreaM2": 2.9668
+    }
+  }
+}

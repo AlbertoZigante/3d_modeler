@@ -1,0 +1,90 @@
+{
+ "clusters": [
+  {
+   "id": "SUB01",
+   "name": "Main carcass",
+   "ordinal": 1,
+   "panelIds": [
+    "panel-1"
+   ],
+   "role": "carcass"
+  }
+ ],
+ "steps": [
+  {
+   "action": "inspect",
+   "clusterKind": "carcass",
+   "component": {
+    "kind": "carcass"
+   },
+   "componentKind": "carcass",
+   "componentSubtitle": null,
+   "componentTitle": "CARCASS",
+   "description": "Place PA0001 \u2014 no structural joint or hardware association found for it yet (see the known-gap note).",
+   "ergonomic": {
+    "posture": 1.0,
+    "reach": 5.0,
+    "reposition": 0.0,
+    "score": 53.0,
+    "support": 10.0,
+    "toolAccess": 0.0,
+    "twoPerson": 8.0,
+    "weight": 10.0
+   },
+   "ergonomics": {
+    "recommendedSurface": "table",
+    "twoPersonJob": false,
+    "weightKg": 0.1
+   },
+   "hardware": [],
+   "hardwareIds": [],
+   "index": 1,
+   "instruction": "Identify PA0001 and set it aside; no assembly connection is currently modeled for this part.",
+   "instructionVerb": "identify_unattached",
+   "jointIds": [],
+   "kind": "unattached",
+   "order": 1,
+   "orientation": "flat",
+   "orientationInstruction": "Work with the component flat on a supported surface.",
+   "otherPanelIds": [],
+   "panelCodes": [
+    "PA0001"
+   ],
+   "panelIds": [
+    "panel-1"
+   ],
+   "panelNames": [
+    "Floating"
+   ],
+   "params": {
+    "panel": "PA0001"
+   },
+   "phase": "unattached",
+   "prerequisiteStepIds": [],
+   "repeatCount": 1,
+   "repeatLabels": null,
+   "repositionCost": 0.0,
+   "requiresReposition": false,
+   "role": "unknown",
+   "stage": "carcass",
+   "stepId": "S01",
+   "subassemblyComplete": false,
+   "subassemblyId": "SUB01",
+   "subassemblyName": "Main carcass",
+   "subassemblyRef": {
+    "ordinal": 1,
+    "role": "carcass"
+   },
+   "toolCodes": [],
+   "toolNoteCodes": [],
+   "toolNotes": [],
+   "tools": [],
+   "unitPanelIds": null,
+   "verb": "place_loose",
+   "warningCodes": [],
+   "warnings": []
+  }
+ ],
+ "toolsSummary": [],
+ "toolsSummaryCodes": []
+}

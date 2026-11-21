@@ -1,0 +1,309 @@
+{
+  "bom": {
+    "materialSummary": [
+      {
+        "areaM2": 0.0084,
+        "material": "Black Leg 30x30",
+        "quantity": 4,
+        "thickness": 30
+      },
+      {
+        "areaM2": 1.337,
+        "material": "Melamine White 18mm",
+        "quantity": 5,
+        "thickness": 18
+      }
+    ],
+    "rows": [
+      {
+        "areaM2": 0.368,
+        "assembly": "Group 1",
+        "bandedEdges": [],
+        "bandedEdgesLabel": "—",
+        "bandingCost": 0,
+        "bandingLengthM": 0,
+        "grainInterchangeable": true,
+        "heightMm": 736,
+        "isHardware": false,
+        "label": "Group 1 — Back",
+        "material": "Melamine White 18mm",
+        "pieceCodes": [
+          null
+        ],
+        "pieceNames": [
+          "Back"
+        ],
+        "quantity": 1,
+        "thicknessMm": 18,
+        "unitAreaM2": 0.368,
+        "unitBandingLengthM": 0,
+        "widthMm": 500
+      },
+      {
+        "areaM2": 0.2,
+        "assembly": "Group 1",
+        "bandedEdges": [],
+        "bandedEdgesLabel": "—",
+        "bandingCost": 0,
+        "bandingLengthM": 0,
+        "grainInterchangeable": true,
+        "heightMm": 400,
+        "isHardware": false,
+        "label": "Group 1 — Bottom",
+        "material": "Melamine White 18mm",
+        "pieceCodes": [
+          null
+        ],
+        "pieceNames": [
+          "Bottom"
+        ],
+        "quantity": 1,
+        "thicknessMm": 18,
+        "unitAreaM2": 0.2,
+        "unitBandingLengthM": 0,
+        "widthMm": 500
+      },
+      {
+        "areaM2": 0.56,
+        "assembly": "Group 1",
+        "bandedEdges": [],
+        "bandedEdgesLabel": "—",
+        "bandingCost": 0,
+        "bandingLengthM": 0,
+        "grainInterchangeable": true,
+        "heightMm": 700,
+        "isHardware": false,
+        "label": "Group 1 — Left/Right",
+        "material": "Melamine White 18mm",
+        "pieceCodes": [
+          null,
+          null
+        ],
+        "pieceNames": [
+          "Left",
+          "Right"
+        ],
+        "quantity": 2,
+        "thicknessMm": 18,
+        "unitAreaM2": 0.28,
+        "unitBandingLengthM": 0,
+        "widthMm": 400
+      },
+      {
+        "areaM2": 0.209,
+        "assembly": "Group 1",
+        "bandedEdges": [],
+        "bandedEdgesLabel": "—",
+        "bandingCost": 0,
+        "bandingLengthM": 0,
+        "grainInterchangeable": true,
+        "heightMm": 418,
+        "isHardware": false,
+        "label": "Group 1 — Top",
+        "material": "Melamine White 18mm",
+        "pieceCodes": [
+          null
+        ],
+        "pieceNames": [
+          "Top"
+        ],
+        "quantity": 1,
+        "thicknessMm": 18,
+        "unitAreaM2": 0.209,
+        "unitBandingLengthM": 0,
+        "widthMm": 500
+      },
+      {
+        "areaM2": 0.0084,
+        "assembly": "Group 2",
+        "bandedEdges": [],
+        "bandedEdgesLabel": "—",
+        "bandingCost": 0,
+        "bandingLengthM": 0,
+        "grainInterchangeable": false,
+        "heightMm": 70,
+        "isHardware": false,
+        "label": "Group 2 — Leg back-left/Leg back-right/Leg front-left/Leg front-right",
+        "material": "Black Leg 30x30",
+        "pieceCodes": [
+          null,
+          null,
+          null,
+          null
+        ],
+        "pieceNames": [
+          "Leg back-left",
+          "Leg back-right",
+          "Leg front-left",
+          "Leg front-right"
+        ],
+        "quantity": 4,
+        "thicknessMm": 30,
+        "unitAreaM2": 0.0021,
+        "unitBandingLengthM": 0,
+        "widthMm": 30
+      }
+    ]
+  },
+  "results": [
+    {
+      "material": "Melamine White 18mm",
+      "sheets": [
+        {
+          "heightMm": 1220,
+          "placements": [
+            {
+              "finishedHeightMm": 736,
+              "finishedWidthMm": 500,
+              "heightMm": 736,
+              "pieceId": "Group 1 — Back#1",
+              "rotated": false,
+              "widthMm": 500,
+              "xMm": 0,
+              "yMm": 0
+            },
+            {
+              "finishedHeightMm": 700,
+              "finishedWidthMm": 400,
+              "heightMm": 700,
+              "pieceId": "Group 1 — Left/Right#1",
+              "rotated": false,
+              "widthMm": 400,
+              "xMm": 503,
+              "yMm": 0
+            },
+            {
+              "finishedHeightMm": 700,
+              "finishedWidthMm": 400,
+              "heightMm": 700,
+              "pieceId": "Group 1 — Left/Right#2",
+              "rotated": false,
+              "widthMm": 400,
+              "xMm": 906,
+              "yMm": 0
+            },
+            {
+              "finishedHeightMm": 418,
+              "finishedWidthMm": 500,
+              "heightMm": 418,
+              "pieceId": "Group 1 — Top#1",
+              "rotated": false,
+              "widthMm": 500,
+              "xMm": 0,
+              "yMm": 739
+            },
+            {
+              "finishedHeightMm": 500,
+              "finishedWidthMm": 400,
+              "heightMm": 500,
+              "pieceId": "Group 1 — Bottom#1",
+              "rotated": true,
+              "widthMm": 400,
+              "xMm": 503,
+              "yMm": 703
+            }
+          ],
+          "sheetIndex": 0,
+          "totalAreaM2": 2.9768,
+          "usedAreaM2": 1.337,
+          "utilization": 0.449140016,
+          "widthMm": 2440
+        }
+      ],
+      "stockSheet": {
+        "heightMm": 1220,
+        "widthMm": 2440
+      },
+      "thicknessMm": 18,
+      "unplaced": []
+    },
+    {
+      "material": "Black Leg 30x30",
+      "sheets": [],
+      "stockSheet": null,
+      "thicknessMm": 30,
+      "unplaced": [
+        {
+          "finishedHeightMm": 70,
+          "finishedWidthMm": 30,
+          "heightMm": 70,
+          "id": "Group 2 — Leg back-left/Leg back-right/Leg front-left/Leg front-right#1",
+          "label": "Group 2 — Leg back-left/Leg back-right/Leg front-left/Leg front-right",
+          "rotatable": false,
+          "widthMm": 30
+        },
+        {
+          "finishedHeightMm": 70,
+          "finishedWidthMm": 30,
+          "heightMm": 70,
+          "id": "Group 2 — Leg back-left/Leg back-right/Leg front-left/Leg front-right#2",
+          "label": "Group 2 — Leg back-left/Leg back-right/Leg front-left/Leg front-right",
+          "rotatable": false,
+          "widthMm": 30
+        },
+        {
+          "finishedHeightMm": 70,
+          "finishedWidthMm": 30,
+          "heightMm": 70,
+          "id": "Group 2 — Leg back-left/Leg back-right/Leg front-left/Leg front-right#3",
+          "label": "Group 2 — Leg back-left/Leg back-right/Leg front-left/Leg front-right",
+          "rotatable": false,
+          "widthMm": 30
+        },
+        {
+          "finishedHeightMm": 70,
+          "finishedWidthMm": 30,
+          "heightMm": 70,
+          "id": "Group 2 — Leg back-left/Leg back-right/Leg front-left/Leg front-right#4",
+          "label": "Group 2 — Leg back-left/Leg back-right/Leg front-left/Leg front-right",
+          "rotatable": false,
+          "widthMm": 30
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "perMaterial": [
+      {
+        "material": "Melamine White 18mm",
+        "pricePerSheet": 45,
+        "sheetsUsed": 1,
+        "thicknessMm": 18,
+        "totalAreaM2": 2.9768,
+        "totalCost": 45,
+        "unplacedAreaM2": 0,
+        "unplacedCount": 0,
+        "unplacedLabels": [],
+        "usedAreaM2": 1.337,
+        "utilization": 0.449140016,
+        "wasteAreaM2": 1.6398
+      },
+      {
+        "material": "Black Leg 30x30",
+        "pricePerSheet": 0,
+        "sheetsUsed": 0,
+        "thicknessMm": 30,
+        "totalAreaM2": 0,
+        "totalCost": 0,
+        "unplacedAreaM2": 0.0084,
+        "unplacedCount": 4,
+        "unplacedLabels": [
+          "Group 2 — Leg back-left/Leg back-right/Leg front-left/Leg front-right"
+        ],
+        "usedAreaM2": 0,
+        "utilization": 0,
+        "wasteAreaM2": 0
+      }
+    ],
+    "totals": {
+      "sheetsUsed": 1,
+      "totalAreaM2": 2.9768,
+      "totalCost": 45,
+      "unplacedAreaM2": 0.0084,
+      "unplacedCount": 4,
+      "usedAreaM2": 1.337,
+      "utilization": 0.449140016,
+      "wasteAreaM2": 1.6398
+    }
+  }
+}

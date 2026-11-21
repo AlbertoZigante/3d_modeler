@@ -1,4 +1,3 @@
-import { orientationInstruction } from '../humanModel.js';
 import { phase4Array, phase4EscapeHtml } from './format.js';
 
 export function phase4RenderProgress(progress) {

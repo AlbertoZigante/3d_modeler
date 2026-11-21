@@ -1,0 +1,35 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run api:types:check      # openapi.json + schema.d.ts match the API contract
+      - run: npm run test:unit            # http / errors / contract / payload / plans / i18n steps / manual
+      - run: npm run test:engine          # live geometry: joints, clearance, hardware subset, spacing, validator ...
+      - run: npm run test:bundle          # builds, then fails if business logic leaked into the bundle
+
+  browser:
+    # Real Chromium against the real API (tests/e2e/smoke.mjs starts uvicorn + Vite itself).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: 3d_modeler }
+      - uses: actions/checkout@v4
+        with: { repository: AlbertoZigante/api, ref: python-migration, path: api }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: pip install -e "./api[dev]"
+      - run: npm ci
+        working-directory: 3d_modeler
+      - run: npx playwright install --with-deps chromium
+        working-directory: 3d_modeler
+      - run: npm run test:e2e:browser
+        working-directory: 3d_modeler
+        env: { API_DIR: "${{ github.workspace }}/api" }

@@ -1,0 +1,259 @@
+{
+  "bom": {
+    "materialSummary": [
+      {
+        "areaM2": 1.6618,
+        "material": "Melamine White 18mm",
+        "quantity": 7,
+        "thickness": 18
+      }
+    ],
+    "rows": [
+      {
+        "areaM2": 0.368,
+        "assembly": "Group 1",
+        "bandedEdges": [],
+        "bandedEdgesLabel": "—",
+        "bandingCost": 0,
+        "bandingLengthM": 0,
+        "grainInterchangeable": true,
+        "heightMm": 736,
+        "isHardware": false,
+        "label": "Group 1 — Back",
+        "material": "Melamine White 18mm",
+        "pieceCodes": [
+          null
+        ],
+        "pieceNames": [
+          "Back"
+        ],
+        "quantity": 1,
+        "thicknessMm": 18,
+        "unitAreaM2": 0.368,
+        "unitBandingLengthM": 0,
+        "widthMm": 500
+      },
+      {
+        "areaM2": 0.2,
+        "assembly": "Group 1",
+        "bandedEdges": [],
+        "bandedEdgesLabel": "—",
+        "bandingCost": 0,
+        "bandingLengthM": 0,
+        "grainInterchangeable": true,
+        "heightMm": 400,
+        "isHardware": false,
+        "label": "Group 1 — Bottom",
+        "material": "Melamine White 18mm",
+        "pieceCodes": [
+          null
+        ],
+        "pieceNames": [
+          "Bottom"
+        ],
+        "quantity": 1,
+        "thicknessMm": 18,
+        "unitAreaM2": 0.2,
+        "unitBandingLengthM": 0,
+        "widthMm": 500
+      },
+      {
+        "areaM2": 0.56,
+        "assembly": "Group 1",
+        "bandedEdges": [],
+        "bandedEdgesLabel": "—",
+        "bandingCost": 0,
+        "bandingLengthM": 0,
+        "grainInterchangeable": true,
+        "heightMm": 700,
+        "isHardware": false,
+        "label": "Group 1 — Left/Right",
+        "material": "Melamine White 18mm",
+        "pieceCodes": [
+          null,
+          null
+        ],
+        "pieceNames": [
+          "Left",
+          "Right"
+        ],
+        "quantity": 2,
+        "thicknessMm": 18,
+        "unitAreaM2": 0.28,
+        "unitBandingLengthM": 0,
+        "widthMm": 400
+      },
+      {
+        "areaM2": 0.209,
+        "assembly": "Group 1",
+        "bandedEdges": [],
+        "bandedEdgesLabel": "—",
+        "bandingCost": 0,
+        "bandingLengthM": 0,
+        "grainInterchangeable": true,
+        "heightMm": 418,
+        "isHardware": false,
+        "label": "Group 1 — Top",
+        "material": "Melamine White 18mm",
+        "pieceCodes": [
+          null
+        ],
+        "pieceNames": [
+          "Top"
+        ],
+        "quantity": 1,
+        "thicknessMm": 18,
+        "unitAreaM2": 0.209,
+        "unitBandingLengthM": 0,
+        "widthMm": 500
+      },
+      {
+        "areaM2": 0.3248,
+        "assembly": "Group 2",
+        "bandedEdges": [],
+        "bandedEdgesLabel": "—",
+        "bandingCost": 0,
+        "bandingLengthM": 0,
+        "grainInterchangeable": true,
+        "heightMm": 350,
+        "isHardware": false,
+        "label": "Group 2 — Drawer Front 1/Drawer Front 2",
+        "material": "Melamine White 18mm",
+        "pieceCodes": [
+          null,
+          null
+        ],
+        "pieceNames": [
+          "Drawer Front 1",
+          "Drawer Front 2"
+        ],
+        "quantity": 2,
+        "thicknessMm": 18,
+        "unitAreaM2": 0.1624,
+        "unitBandingLengthM": 0,
+        "widthMm": 464
+      }
+    ]
+  },
+  "results": [
+    {
+      "material": "Melamine White 18mm",
+      "sheets": [
+        {
+          "heightMm": 1220,
+          "placements": [
+            {
+              "finishedHeightMm": 736,
+              "finishedWidthMm": 500,
+              "heightMm": 736,
+              "pieceId": "Group 1 — Back#1",
+              "rotated": false,
+              "widthMm": 500,
+              "xMm": 0,
+              "yMm": 0
+            },
+            {
+              "finishedHeightMm": 700,
+              "finishedWidthMm": 400,
+              "heightMm": 700,
+              "pieceId": "Group 1 — Left/Right#1",
+              "rotated": false,
+              "widthMm": 400,
+              "xMm": 503,
+              "yMm": 0
+            },
+            {
+              "finishedHeightMm": 700,
+              "finishedWidthMm": 400,
+              "heightMm": 700,
+              "pieceId": "Group 1 — Left/Right#2",
+              "rotated": false,
+              "widthMm": 400,
+              "xMm": 906,
+              "yMm": 0
+            },
+            {
+              "finishedHeightMm": 418,
+              "finishedWidthMm": 500,
+              "heightMm": 418,
+              "pieceId": "Group 1 — Top#1",
+              "rotated": false,
+              "widthMm": 500,
+              "xMm": 0,
+              "yMm": 739
+            },
+            {
+              "finishedHeightMm": 500,
+              "finishedWidthMm": 400,
+              "heightMm": 500,
+              "pieceId": "Group 1 — Bottom#1",
+              "rotated": true,
+              "widthMm": 400,
+              "xMm": 503,
+              "yMm": 703
+            },
+            {
+              "finishedHeightMm": 464,
+              "finishedWidthMm": 350,
+              "heightMm": 464,
+              "pieceId": "Group 2 — Drawer Front 1/Drawer Front 2#1",
+              "rotated": true,
+              "widthMm": 350,
+              "xMm": 906,
+              "yMm": 703
+            },
+            {
+              "finishedHeightMm": 350,
+              "finishedWidthMm": 464,
+              "heightMm": 350,
+              "pieceId": "Group 2 — Drawer Front 1/Drawer Front 2#2",
+              "rotated": false,
+              "widthMm": 464,
+              "xMm": 1309,
+              "yMm": 0
+            }
+          ],
+          "sheetIndex": 0,
+          "totalAreaM2": 2.9768,
+          "usedAreaM2": 1.6618,
+          "utilization": 0.55825047,
+          "widthMm": 2440
+        }
+      ],
+      "stockSheet": {
+        "heightMm": 1220,
+        "widthMm": 2440
+      },
+      "thicknessMm": 18,
+      "unplaced": []
+    }
+  ],
+  "summary": {
+    "perMaterial": [
+      {
+        "material": "Melamine White 18mm",
+        "pricePerSheet": 45,
+        "sheetsUsed": 1,
+        "thicknessMm": 18,
+        "totalAreaM2": 2.9768,
+        "totalCost": 45,
+        "unplacedAreaM2": 0,
+        "unplacedCount": 0,
+        "unplacedLabels": [],
+        "usedAreaM2": 1.6618,
+        "utilization": 0.55825047,
+        "wasteAreaM2": 1.315
+      }
+    ],
+    "totals": {
+      "sheetsUsed": 1,
+      "totalAreaM2": 2.9768,
+      "totalCost": 45,
+      "unplacedAreaM2": 0,
+      "unplacedCount": 0,
+      "usedAreaM2": 1.6618,
+      "utilization": 0.55825047,
+      "wasteAreaM2": 1.315
+    }
+  }
+}

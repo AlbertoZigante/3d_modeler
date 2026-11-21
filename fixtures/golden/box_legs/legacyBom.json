@@ -1,0 +1,146 @@
+{
+  "materialSummary": [
+    {
+      "areaM2": 0.0084,
+      "material": "Black Leg 30x30",
+      "quantity": 4,
+      "thickness": 30
+    },
+    {
+      "areaM2": 1.337,
+      "material": "Melamine White 18mm",
+      "quantity": 5,
+      "thickness": 18
+    }
+  ],
+  "rows": [
+    {
+      "areaM2": 0.368,
+      "assembly": "Group 1",
+      "bandedEdges": [],
+      "bandedEdgesLabel": "—",
+      "bandingCost": 0,
+      "bandingLengthM": 0,
+      "grainInterchangeable": true,
+      "heightMm": 736,
+      "isHardware": false,
+      "label": "Group 1 — Back",
+      "material": "Melamine White 18mm",
+      "pieceCodes": [
+        null
+      ],
+      "pieceNames": [
+        "Back"
+      ],
+      "quantity": 1,
+      "thicknessMm": 18,
+      "unitAreaM2": 0.368,
+      "unitBandingLengthM": 0,
+      "widthMm": 500
+    },
+    {
+      "areaM2": 0.2,
+      "assembly": "Group 1",
+      "bandedEdges": [],
+      "bandedEdgesLabel": "—",
+      "bandingCost": 0,
+      "bandingLengthM": 0,
+      "grainInterchangeable": true,
+      "heightMm": 400,
+      "isHardware": false,
+      "label": "Group 1 — Bottom",
+      "material": "Melamine White 18mm",
+      "pieceCodes": [
+        null
+      ],
+      "pieceNames": [
+        "Bottom"
+      ],
+      "quantity": 1,
+      "thicknessMm": 18,
+      "unitAreaM2": 0.2,
+      "unitBandingLengthM": 0,
+      "widthMm": 500
+    },
+    {
+      "areaM2": 0.56,
+      "assembly": "Group 1",
+      "bandedEdges": [],
+      "bandedEdgesLabel": "—",
+      "bandingCost": 0,
+      "bandingLengthM": 0,
+      "grainInterchangeable": true,
+      "heightMm": 700,
+      "isHardware": false,
+      "label": "Group 1 — Left/Right",
+      "material": "Melamine White 18mm",
+      "pieceCodes": [
+        null,
+        null
+      ],
+      "pieceNames": [
+        "Left",
+        "Right"
+      ],
+      "quantity": 2,
+      "thicknessMm": 18,
+      "unitAreaM2": 0.28,
+      "unitBandingLengthM": 0,
+      "widthMm": 400
+    },
+    {
+      "areaM2": 0.209,
+      "assembly": "Group 1",
+      "bandedEdges": [],
+      "bandedEdgesLabel": "—",
+      "bandingCost": 0,
+      "bandingLengthM": 0,
+      "grainInterchangeable": true,
+      "heightMm": 418,
+      "isHardware": false,
+      "label": "Group 1 — Top",
+      "material": "Melamine White 18mm",
+      "pieceCodes": [
+        null
+      ],
+      "pieceNames": [
+        "Top"
+      ],
+      "quantity": 1,
+      "thicknessMm": 18,
+      "unitAreaM2": 0.209,
+      "unitBandingLengthM": 0,
+      "widthMm": 500
+    },
+    {
+      "areaM2": 0.0084,
+      "assembly": "Group 2",
+      "bandedEdges": [],
+      "bandedEdgesLabel": "—",
+      "bandingCost": 0,
+      "bandingLengthM": 0,
+      "grainInterchangeable": false,
+      "heightMm": 70,
+      "isHardware": false,
+      "label": "Group 2 — Leg back-left/Leg back-right/Leg front-left/Leg front-right",
+      "material": "Black Leg 30x30",
+      "pieceCodes": [
+        null,
+        null,
+        null,
+        null
+      ],
+      "pieceNames": [
+        "Leg back-left",
+        "Leg back-right",
+        "Leg front-left",
+        "Leg front-right"
+      ],
+      "quantity": 4,
+      "thicknessMm": 30,
+      "unitAreaM2": 0.0021,
+      "unitBandingLengthM": 0,
+      "widthMm": 30
+    }
+  ]
+}
